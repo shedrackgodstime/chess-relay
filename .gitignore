@@ -1,0 +1,16 @@
+# Rust build output
+/target
+/temp
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+.aider*

@@ -3,4 +3,52 @@ name = "chess-relay"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+android = ["bevy/android-native-activity"]
+
 [dependencies]
+anyhow = "1.0.100"
+bevy = { version = "0.18.1", default-features = false, features = [
+    "bevy_asset",
+    "bevy_pbr",
+    "bevy_winit",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_log",
+    "bevy_mesh",
+    "bevy_window",
+    "bevy_gltf",
+    "bevy_camera",
+    "bevy_light",
+    "bevy_state",
+    "bevy_ui",
+    "bevy_text",
+    "bevy_scene",
+    "bevy_sprite",
+    "bevy_ui_render",
+    "bevy_picking",
+    "mesh_picking",
+    "tonemapping_luts",
+    "zstd_rust",
+    "default_font",
+    "x11",
+    "jpeg",
+] }
+resvg = "0.45.1"
+
+[target.'cfg(target_os = "android")'.dependencies]
+bevy_android = "0.18"
+jni = "0.22"
+
+[package.metadata.android]
+assets = "assets/"
+
+[package.metadata.android.signing.release]
+path = "release.keystore"
+keystore_password = "android"
+key_password = "android"
+alias = "chess-relay"
