@@ -1,0 +1,36 @@
+name: Build Android debug APK
+
+# Every push to main produces an installable debug APK, so the game can be
+# play-tested on a phone without any local Android SDK. Release signing is a
+# separate step and deliberately not part of this workflow: it needs a private
+# keystore, which must never live in the repo.
+#
+# Uses the barichello/godot-ci image pinned to our engine version, which ships
+# Godot, the export templates and the Android SDK together. Debug builds are
+# signed with the standard debug key, so no secrets are required.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.7.2
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Export debug APK
+        run: |
+          mkdir -p builds
+          godot --headless --export-debug "Android" builds/chess-relay-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chess-relay-debug-apk
+          path: builds/chess-relay-debug.apk
+          if-no-files-found: error
