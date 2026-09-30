@@ -62,7 +62,7 @@ const ICON_INSET := 12.0
 ## deliberately past it, because the label is a wide block of text while the
 ## menu is a small button, so a true 50/50 reads as closer to the label than
 ## it actually is. Tuning, not derivation, hence a named value.
-const VOICE_ANCHOR := 0.78
+const VOICE_ANCHOR := 0.82
 
 
 func _ready() -> void:
