@@ -12,6 +12,10 @@ extends Node3D
 @onready var world: Node3D = $World
 @onready var camera: OrbitCamera = $World/Camera
 @onready var highlight: SquareHighlight = $World/Highlight
+@onready var hud: Hud = $UILayer/Hud
+
+## Degrees of orbit per press of a rotate button.
+const HUD_ROTATE_STEP := 22.5
 
 ## Selected square as (file, rank), or (-1, -1) for nothing selected.
 var selected := Vector2i(-1, -1)
@@ -64,6 +68,33 @@ func _ready() -> void:
 	game.reset()
 	game.moved.connect(_on_game_moved)
 	_collect_pieces()
+	_connect_hud()
+	hud.bind()
+	hud.set_turn(game.state.side_to_move, game.history.size())
+
+
+## The HUD emits intents; this is the only place that decides what they mean.
+## Keeping the routing here means the camera and the game never learn that a
+## button exists.
+func _connect_hud() -> void:
+	hud.rotate_requested.connect(_on_rotate_requested)
+	hud.reset_view_requested.connect(frame_board)
+	hud.flip_requested.connect(_on_flip_requested)
+
+
+func _on_rotate_requested(direction: int) -> void:
+	camera.orbit_by(direction * HUD_ROTATE_STEP, 0.0)
+
+
+## Flipping the board is a half turn; pressing it again returns to the
+## original side, which is what players expect from a flip control. It reuses
+## the same framing as reset rather than calling frame_board, which would
+## zero the yaw again and undo the flip.
+func _on_flip_requested() -> void:
+	if camera == null:
+		return
+	var target := 180.0 if fmod(camera.yaw_degrees, 360.0) < 90.0 else 0.0
+	camera.reset_view(Vector3.ZERO, target, _framing_pitch(), _framing_distance())
 
 
 ## Registers every piece by the square it stands on. Positions come from the
@@ -90,10 +121,19 @@ func _register_subtree(node: Node) -> void:
 func frame_board() -> void:
 	if camera == null:
 		return
+	camera.reset_view(Vector3.ZERO, 0.0, _framing_pitch(), _framing_distance())
+
+
+## Pitch and distance that frame the board, derived from the exported ratios
+## so the default view survives a change to BoardMesh's dimensions. Shared by
+## reset and flip, which differ only in yaw.
+func _framing_pitch() -> float:
+	return rad_to_deg(atan2(framing_height, framing_distance))
+
+
+func _framing_distance() -> float:
 	var extent: float = BoardMesh.playing_half_extent() + BoardMesh.FRAME_MARGIN
-	var pitch := rad_to_deg(atan2(framing_height, framing_distance))
-	var orbit_distance := extent * Vector2(framing_distance, framing_height).length()
-	camera.reset_view(Vector3.ZERO, 0.0, pitch, orbit_distance)
+	return extent * Vector2(framing_distance, framing_height).length()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -217,6 +257,7 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 		victim.capture()
 	pieces[move.to_square] = piece
 	piece.home_square = move.to_square
+	hud.set_turn(game.state.side_to_move, game.history.size())
 	piece.glide_to(
 		BoardMesh.square_position(move.to_square.x, move.to_square.y),
 		piece.piece_type == PieceProfiles.Type.KNIGHT

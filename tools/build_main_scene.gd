@@ -36,6 +36,7 @@ func _init() -> void:
 	world.add_child(_fill_light())
 	world.add_child(_environment())
 	world.add_child(_camera())
+	root.add_child(_hud_layer())
 
 	# Children must be owned by the root for PackedScene.pack to store them.
 	_own(root, root)
@@ -126,6 +127,73 @@ func _piece(
 func square_name(file: int, rank: int) -> String:
 	var file_letter := char("A".unicode_at(0) + file)
 	return "%s%d" % [file_letter, rank + 1]
+
+
+## The HUD lives on its own CanvasLayer so its layout is resolution
+## independent, which matters on a cross-platform build.
+func _hud_layer() -> CanvasLayer:
+	var layer := CanvasLayer.new()
+	layer.name = "UILayer"
+	layer.add_child(_hud())
+	return layer
+
+
+func _hud() -> Control:
+	var hud := Control.new()
+	hud.name = "Hud"
+	hud.set_script(load("res://ui/hud.gd"))
+	hud.set_anchors_preset(Control.PRESET_FULL_RECT)
+	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+	hud.add_child(_turn_label())
+	hud.add_child(_button_bar())
+	return hud
+
+
+func _turn_label() -> Label:
+	var label := Label.new()
+	label.name = "TurnLabel"
+	label.unique_name_in_owner = true
+	label.text = "White to move    ·    0 moves"
+	# Anchored top-centre: the board owns the middle of the screen.
+	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	label.position = Vector2(-160.0, 12.0)
+	label.size = Vector2(320.0, 40.0)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.add_theme_font_size_override("font_size", 22)
+	label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82))
+	label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
+	label.add_theme_constant_override("outline_size", 6)
+	return label
+
+
+func _button_bar() -> HBoxContainer:
+	var bar := HBoxContainer.new()
+	bar.name = "ButtonBar"
+	bar.add_theme_constant_override("separation", 12)
+	bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	bar.position = Vector2(-180.0, -84.0)
+	bar.size = Vector2(360.0, 64.0)
+	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	for spec in [
+		["RotateLeftButton", "< Rotate"],
+		["RotateRightButton", "Rotate >"],
+		["FlipButton", "Flip"],
+		["ResetButton", "Reset"],
+	]:
+		bar.add_child(_button(String(spec[0]), String(spec[1])))
+	return bar
+
+
+func _button(node_name: String, text: String) -> Button:
+	var button := Button.new()
+	button.name = node_name
+	button.unique_name_in_owner = true
+	button.text = text
+	button.custom_minimum_size = Vector2(84.0, 56.0)
+	button.add_theme_font_size_override("font_size", 18)
+	return button
 
 
 ## The round table the board rests on. Round because the camera orbits: a
