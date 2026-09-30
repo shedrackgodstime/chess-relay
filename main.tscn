@@ -1,0 +1,241 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://main.gd" id="1_1bvp3"]
+[ext_resource type="Script" path="res://board/board_view.gd" id="2_lquwl"]
+[ext_resource type="Script" path="res://pieces/piece_view.gd" id="3_7mycd"]
+[ext_resource type="Script" path="res://camera/orbit_camera.gd" id="4_272bh"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5vw27"]
+albedo_color = Color(0.115, 0.13, 0.15, 1)
+roughness = 0.85
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_kek77"]
+size = Vector2(60, 60)
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_4c57u"]
+sky_top_color = Color(0.18, 0.29, 0.47, 1)
+sky_horizon_color = Color(0.64, 0.7, 0.76, 1)
+ground_bottom_color = Color(0.09, 0.1, 0.115, 1)
+ground_horizon_color = Color(0.48, 0.52, 0.56, 1)
+
+[sub_resource type="Sky" id="Sky_efxa6"]
+sky_material = SubResource("ProceduralSkyMaterial_4c57u")
+
+[sub_resource type="Environment" id="Environment_dg77c"]
+background_mode = 2
+sky = SubResource("Sky_efxa6")
+ambient_light_source = 3
+ambient_light_energy = 0.85
+tonemap_mode = 2
+
+[node name="Main" type="Node3D" unique_id=559527313]
+script = ExtResource("1_1bvp3")
+
+[node name="World" type="Node3D" parent="." unique_id=1277315467]
+
+[node name="Board" type="MeshInstance3D" parent="World" unique_id=1072758573]
+script = ExtResource("2_lquwl")
+
+[node name="Pieces" type="Node3D" parent="World" unique_id=548052311]
+
+[node name="WhiteBackRank" type="Node3D" parent="World/Pieces" unique_id=1963917743]
+
+[node name="WhiteRookA1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1916159737]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 3
+
+[node name="WhiteKnightB1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=188709582]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 1
+
+[node name="WhiteBishopC1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=316011274]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 2
+
+[node name="WhiteQueenD1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=429359010]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 4
+
+[node name="WhiteKingE1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=913450937]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 5
+
+[node name="WhiteBishopF1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1797391807]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 2
+
+[node name="WhiteKnightG1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1456117232]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 1
+
+[node name="WhiteRookH1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=380199968]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -3.5)
+script = ExtResource("3_7mycd")
+piece_type = 3
+
+[node name="WhitePawns" type="Node3D" parent="World/Pieces" unique_id=1216572037]
+
+[node name="WhitePawnA2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=992424097]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnB2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=7207789]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnC2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1214679240]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnD2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1706208714]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnE2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=942303809]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnF2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1277703472]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnG2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1851730344]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="WhitePawnH2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1500109374]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -2.5)
+script = ExtResource("3_7mycd")
+
+[node name="BlackBackRank" type="Node3D" parent="World/Pieces" unique_id=974765633]
+
+[node name="BlackRookA8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1475828122]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 3
+face_opponent = true
+
+[node name="BlackKnightB8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1807530799]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 1
+face_opponent = true
+
+[node name="BlackBishopC8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=137451447]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 2
+face_opponent = true
+
+[node name="BlackQueenD8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=770071108]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 4
+face_opponent = true
+
+[node name="BlackKingE8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1622631017]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 5
+face_opponent = true
+
+[node name="BlackBishopF8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=639941019]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 2
+face_opponent = true
+
+[node name="BlackKnightG8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=2107597820]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 1
+face_opponent = true
+
+[node name="BlackRookH8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1675703298]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3.5, 0, 3.5)
+script = ExtResource("3_7mycd")
+side = 1
+piece_type = 3
+face_opponent = true
+
+[node name="BlackPawns" type="Node3D" parent="World/Pieces" unique_id=324238946]
+
+[node name="BlackPawnA7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=2069182575]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnB7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1086955393]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnC7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=2111630931]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnD7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1464706671]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnE7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=786518029]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnF7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1236590292]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnG7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=367338212]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="BlackPawnH7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1148609176]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 2.5)
+script = ExtResource("3_7mycd")
+side = 1
+
+[node name="Ground" type="MeshInstance3D" parent="World" unique_id=15958763]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.27, 0)
+material_override = SubResource("StandardMaterial3D_5vw27")
+mesh = SubResource("PlaneMesh_kek77")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="World" unique_id=1744345974]
+transform = Transform3D(0.5368755, -0.70674187, 0.46073934, 0, 0.54611874, 0.8377079, -0.8436615, -0.44974482, 0.29319775, 0, 0, 0)
+light_color = Color(1, 0.965, 0.91, 1)
+light_energy = 1.25
+shadow_enabled = true
+directional_shadow_max_distance = 40.0
+
+[node name="FillLight" type="DirectionalLight3D" parent="World" unique_id=452265225]
+transform = Transform3D(-0.64594233, 0.4142058, -0.6412427, 0, 0.83999777, 0.54259, 0.7633863, 0.35048187, -0.54259, 0, 0, 0)
+light_color = Color(0.76, 0.83, 1, 1)
+light_energy = 0.35
+
+[node name="Environment" type="WorldEnvironment" parent="World" unique_id=822558990]
+environment = SubResource("Environment_dg77c")
+
+[node name="Camera" type="Camera3D" parent="World" unique_id=1163593193]
+transform = Transform3D(1, 0, 0, 0, 0.82903755, 0.5591929, 0, -0.5591929, 0.82903755, 0, 6.542557, 9.699739)
+current = true
+fov = 45.0
+script = ExtResource("4_272bh")
