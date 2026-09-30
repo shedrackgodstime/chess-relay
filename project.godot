@@ -28,3 +28,6 @@ window/stretch/aspect="expand"
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+; Required for the Android exporter, and the right default for a mobile
+; target anyway: ETC2 is universal on Android, ASTC covers newer devices.
+textures/vram_compression/import_etc2_astc=true
