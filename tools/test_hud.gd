@@ -18,6 +18,7 @@ func _init() -> void:
 	main.ai_opponent = false
 	var hud: Hud = main.hud
 
+	_asset_checks()
 	_layout_checks(hud)
 	_menu_check(main, hud)
 	_rotate_checks(main, hud)
@@ -71,6 +72,15 @@ func _layout_checks(hud: Hud) -> void:
 		"%s" % _child_names(column))
 	# Anchors, not absolute pixels: the layout must hold at any resolution,
 	# which is the point of anchoring in the first place.
+	# Padding: the glyph must be capped smaller than the button it sits in, or
+	# expand_icon overshoots and the icon hangs over the panel edge.
+	var capped := 0
+	for button in view_buttons:
+		var limit: int = button.get_theme_constant("icon_max_width")
+		if limit > 0 and Vector2(limit, limit) < button.custom_minimum_size:
+			capped += 1
+	_check("icons are padded inside their buttons", capped == 4, "ok=%d/4" % capped)
+
 	_check("column is anchored to the right edge", column.anchor_left >= 0.9,
 		"anchor_left=%.2f" % column.anchor_left)
 	_check("column is vertically centred",
@@ -174,6 +184,36 @@ func _turn_checks(main: Main, hud: Hud) -> void:
 		"text=%s" % hud.turn_label.text)
 	_check("a move passes the turn", hud.turn_label.text.begins_with("Black"),
 		"text=%s" % hud.turn_label.text)
+
+
+## The shipped glyphs are SVGs. They cannot be imported in this environment,
+## so this checks the source instead: present, non-empty, and carrying the
+## viewBox and raster size the importer needs.
+func _asset_checks() -> void:
+	print("Icon assets")
+	for name in ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings"]:
+		var path := "res://ui/icons/%s.svg" % name
+		var exists := FileAccess.file_exists(path)
+		_check("svg present: %s" % name, exists, path)
+		if not exists:
+			continue
+		var text := FileAccess.get_file_as_string(path)
+		_check("svg is sized for crisp expansion: %s" % name,
+			text.contains('width="64"') and text.contains('height="64"')
+				and text.contains('viewBox="0 0 24 24"'), "")
+		_check("svg is recoloured to the palette: %s" % name,
+			text.contains("#ffe19e") and not text.contains("currentColor"), "")
+		_check("svg has geometry: %s" % name,
+			text.contains("<path") or text.contains("<circle"), "")
+
+	# Every icon resolves to a real texture here, via SVG or the drawn fallback.
+	var resolved: Array[Texture2D] = [
+		Icons.rotate_left(), Icons.rotate_right(), Icons.flip(),
+		Icons.reset(), Icons.menu(), Icons.settings(),
+	]
+	var names := ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings"]
+	for i in resolved.size():
+		_check("icon resolves: %s" % names[i], resolved[i] != null, "")
 
 
 func _child_names(node: Node) -> Array:

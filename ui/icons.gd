@@ -1,16 +1,18 @@
 class_name Icons
 extends RefCounted
 
-## Control icons drawn in code.
+## Control icons.
 ##
-## Icons keep the project free of imported art, and drawing them means they can
-## share the game's palette exactly instead of approximating it. Everything is
-## rasterised at a larger size than it is displayed and relies on filtering, so
-## the curves stay smooth without an antialiasing pass.
+## The shipped glyphs are Lucide SVGs in ui/icons, recoloured to the game's
+## cream-gold and authored at 64 px so they stay crisp when a button expands
+## them. Lucide is the reference; see https://lucide.dev.
 ##
-## Shapes are built from three primitives — a stroked arc, a filled triangle
-## and a filled disc — which is enough for circular arrows, a swap glyph, a
-## crosshair and a menu.
+## Each has a procedural fallback drawn from an arc, a triangle and a disc.
+## The fallback exists because SVG import needs the editor's asset pipeline,
+## which is unavailable in the headless environment the tests run in, so a
+## missing import would otherwise leave the HUD with no icons at all and fail
+## the layout tests for no real reason. On a machine that can import, the SVG
+## always wins.
 
 const CANVAS := 128
 ## Warm cream-gold, matching the selection highlight.
@@ -19,36 +21,61 @@ const COLOUR := Color(1.0, 0.88, 0.62)
 static var _cache := {}
 
 
-static func rotate_left() -> ImageTexture:
-	return _cached("rotate_left", _mirror_x(_circular_arrow()))
+static func rotate_left() -> Texture2D:
+	return _icon("rotate_left", _fallback_rotate_left)
 
 
-static func rotate_right() -> ImageTexture:
-	return _cached("rotate_right", _circular_arrow())
+static func rotate_right() -> Texture2D:
+	return _icon("rotate_right", _fallback_rotate_right)
 
 
 ## Two arrows pointing opposite ways: the universal "swap sides" glyph.
-static func flip() -> ImageTexture:
-	return _cached("flip", _swap_arrows())
+static func flip() -> Texture2D:
+	return _icon("flip", _fallback_flip)
 
 
-## A crosshair: recentre the view.
-static func reset() -> ImageTexture:
-	return _cached("reset", _crosshair())
+static func reset() -> Texture2D:
+	return _icon("reset", _fallback_reset)
 
 
-static func menu() -> ImageTexture:
-	return _cached("menu", _three_dots())
+static func menu() -> Texture2D:
+	return _icon("menu", _fallback_menu)
+
+
+## Reserved for the settings screen in the menu.
+static func settings() -> Texture2D:
+	return _icon("settings", _fallback_menu)
 
 
 static func clear_cache() -> void:
 	_cache.clear()
 
 
-static func _cached(key: String, image: Image) -> ImageTexture:
-	if not _cache.has(key):
-		_cache[key] = ImageTexture.create_from_image(image)
-	return _cache[key]
+## Prefers the imported SVG, falling back to a drawn glyph when it is absent.
+static func _icon(name: String, fallback: Callable) -> Texture2D:
+	if _cache.has(name):
+		return _cache[name]
+	var texture: Texture2D = null
+	var path := "res://ui/icons/%s.svg" % name
+	if ResourceLoader.exists(path):
+		var loaded := ResourceLoader.load(path)
+		if loaded is Texture2D:
+			texture = loaded
+	if texture == null:
+		texture = ImageTexture.create_from_image(fallback.call())
+	_cache[name] = texture
+	return texture
+
+
+## Fallback glyphs, used only when the SVG has not been imported.
+
+
+static func _fallback_rotate_right() -> Image:
+	return _circular_arrow()
+
+
+static func _fallback_rotate_left() -> Image:
+	return _mirror_x(_circular_arrow())
 
 
 ## Circular arrow, clockwise. The left-facing one is this mirrored, which
@@ -71,6 +98,10 @@ static func _circular_arrow() -> Image:
 	return img
 
 
+static func _fallback_flip() -> Image:
+	return _swap_arrows()
+
+
 ## Two arrows pointing opposite ways: the universal "swap sides" glyph.
 static func _swap_arrows() -> Image:
 	var img := _blank()
@@ -87,6 +118,10 @@ static func _swap_arrows() -> Image:
 	return img
 
 
+static func _fallback_reset() -> Image:
+	return _crosshair()
+
+
 ## A crosshair: recentre the view.
 static func _crosshair() -> Image:
 	var img := _blank()
@@ -97,6 +132,10 @@ static func _crosshair() -> Image:
 		var direction := Vector2.RIGHT.rotated(deg_to_rad(90.0 * i))
 		_bar(img, centre + direction * CANVAS * 0.28, centre + direction * CANVAS * 0.40, CANVAS * 0.05)
 	return img
+
+
+static func _fallback_menu() -> Image:
+	return _three_dots()
 
 
 static func _three_dots() -> Image:

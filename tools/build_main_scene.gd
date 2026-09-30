@@ -208,7 +208,11 @@ func _icon_button(node_name: String, icon: Texture2D) -> Button:
 	button.unique_name_in_owner = true
 	button.icon = icon
 	button.custom_minimum_size = Hud.TOUCH_SIZE
+	# expand_icon scales the glyph to the button, which can overshoot and leave
+	# it hanging over the edge; icon_max_width caps it so there is even padding
+	# inside the rounded panel.
 	button.expand_icon = true
+	button.add_theme_constant_override("icon_max_width", Hud.ICON_SIZE)
 	button.focus_mode = Control.FOCUS_NONE
 	button.tooltip_text = node_name.trim_suffix("Button").to_lower()
 	button.add_theme_stylebox_override("normal", _button_box())

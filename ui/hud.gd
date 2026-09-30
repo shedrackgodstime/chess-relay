@@ -32,6 +32,9 @@ signal menu_requested
 
 ## Icon-only buttons still need a comfortable tap target.
 const TOUCH_SIZE := Vector2(64.0, 64.0)
+## Glyph size inside that target. Leaves a ring of padding so the icon reads
+## as centred rather than as filling the button edge to edge.
+const ICON_SIZE := 34
 
 
 func _ready() -> void:
