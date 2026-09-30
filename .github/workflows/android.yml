@@ -1,12 +1,13 @@
 name: Build Android debug APK
 
 # Every push to main produces an installable debug APK, so the game can be
-# play-tested on a phone without any local Android SDK. Release signing is a
-# separate step and deliberately not part of this workflow: it needs a private
-# keystore, which must never live in the repo.
+# play-tested on a phone without any local Android SDK. Release signing is
+# deliberately not part of this workflow: it needs a private keystore, which
+# must never live in the repo.
 #
-# Uses the barichello/godot-ci image pinned to our engine version, which ships
-# Godot, the export templates and the Android SDK together. Debug builds are
+# Godot's docs call for OpenJDK 17 plus the Android SDK (build-tools and
+# platform only; the prebuilt export templates mean no NDK/CMake needed since
+# gradle_build/use_gradle_build is false in the preset). Debug builds are
 # signed with the standard debug key, so no secrets are required.
 
 on:
@@ -17,16 +18,33 @@ on:
 jobs:
   android-debug:
     runs-on: ubuntu-latest
-    container:
-      image: barichello/godot-ci:4.7.2
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: true
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'build-tools;35.0.1 platform-tools platforms;android-35'
+          cmdline-tools-version: latest
+
       - name: Export debug APK
         run: |
           mkdir -p builds
-          godot --headless --export-debug "Android" builds/chess-relay-debug.apk
+          godot --headless --path . --export-debug "Android" builds/chess-relay-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
