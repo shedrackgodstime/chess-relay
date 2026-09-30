@@ -47,6 +47,16 @@ static func settings() -> Texture2D:
 	return _icon("settings", _fallback_menu)
 
 
+## Voice chat. The muted glyph is a separate icon rather than a tint, because
+## "you are not speaking" needs to be unmistakable at a glance mid-game.
+static func mic() -> Texture2D:
+	return _icon("mic", _fallback_mic)
+
+
+static func mic_off() -> Texture2D:
+	return _icon("mic_off", _fallback_mic)
+
+
 static func clear_cache() -> void:
 	_cache.clear()
 
@@ -136,6 +146,22 @@ static func _crosshair() -> Image:
 
 static func _fallback_menu() -> Image:
 	return _three_dots()
+
+
+## Capsule plus stand: close enough to a microphone that the button is never
+## ambiguous before the real icon has been imported.
+static func _fallback_mic() -> Image:
+	var img := _blank()
+	var width := CANVAS * 0.17
+	# Capsule: a bar with a disc capping each end, so no polygon fill needed.
+	_bar(img, Vector2(CANVAS * 0.5, CANVAS * 0.20), Vector2(CANVAS * 0.5, CANVAS * 0.48), width)
+	_disc(img, Vector2(CANVAS * 0.5, CANVAS * 0.20), width * 0.5)
+	_disc(img, Vector2(CANVAS * 0.5, CANVAS * 0.48), width * 0.5)
+	# Cradle, stem and base.
+	_arc(img, Vector2(CANVAS * 0.5, CANVAS * 0.42), CANVAS * 0.21, CANVAS * 0.05, 0.0, 180.0, 1.0)
+	_bar(img, Vector2(CANVAS * 0.5, CANVAS * 0.63), Vector2(CANVAS * 0.5, CANVAS * 0.80), CANVAS * 0.05)
+	_bar(img, Vector2(CANVAS * 0.37, CANVAS * 0.83), Vector2(CANVAS * 0.63, CANVAS * 0.83), CANVAS * 0.05)
+	return img
 
 
 static func _three_dots() -> Image:

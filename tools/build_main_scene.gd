@@ -147,6 +147,7 @@ func _hud() -> Control:
 
 	hud.add_child(_turn_label())
 	hud.add_child(_control_column())
+	hud.add_child(_mic_button())
 	hud.add_child(_menu_button())
 	return hud
 
@@ -192,13 +193,38 @@ func _control_column() -> VBoxContainer:
 	return column
 
 
-## The menu button sits alone in the top-right corner, away from the view
-## controls so it never gets hit by accident mid-game.
+## The menu button sits in the top-right corner, away from the view controls
+## so it never gets hit by accident mid-game.
 func _menu_button() -> Button:
 	var button := _icon_button("MenuButton", Icons.menu())
 	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	button.position = Vector2(-84.0, 16.0)
 	button.size = Hud.TOUCH_SIZE
+	return button
+
+
+## Voice chat, between the move count in the middle and the menu at the far
+## right. Deliberately bare: no panel, so it reads as a status affordance
+## rather than a control competing with the view buttons.
+func _mic_button() -> Button:
+	var button := _bare_icon_button("MicButton", Icons.mic_off())
+	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	button.position = Vector2(-152.0, 16.0)
+	button.size = Hud.TOUCH_SIZE
+	return button
+
+
+## An icon button with no panel behind it.
+func _bare_icon_button(node_name: String, icon: Texture2D) -> Button:
+	var button := Button.new()
+	button.name = node_name
+	button.unique_name_in_owner = true
+	button.icon = null
+	button.custom_minimum_size = Hud.TOUCH_SIZE
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = "voice"
+	button.flat = true
+	button.add_child(_glyph(icon))
 	return button
 
 

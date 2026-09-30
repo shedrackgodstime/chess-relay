@@ -19,7 +19,7 @@ func _init() -> void:
 	var hud: Hud = main.hud
 
 	_asset_checks()
-	_layout_checks(hud)
+	_layout_checks(main, hud)
 	_menu_check(main, hud)
 	_rotate_checks(main, hud)
 	_flip_checks(main)
@@ -34,7 +34,7 @@ func _init() -> void:
 	quit(1 if _failures > 0 else 0)
 
 
-func _layout_checks(hud: Hud) -> void:
+func _layout_checks(main: Main, hud: Hud) -> void:
 	print("HUD layout")
 	_check("turn label exists", hud.turn_label != null, "")
 	var view_buttons := [hud.rotate_left_button, hud.rotate_right_button,
@@ -74,6 +74,7 @@ func _layout_checks(hud: Hud) -> void:
 	# Anchors, not absolute pixels: the layout must hold at any resolution,
 	# which is the point of anchoring in the first place.
 	_centering_checks(view_buttons)
+	_mic_checks(main, hud)
 
 	_check("column is anchored to the right edge", column.anchor_left >= 0.9,
 		"anchor_left=%.2f" % column.anchor_left)
@@ -119,6 +120,36 @@ func _centering_checks(buttons: Array) -> void:
 			"inset=%.0f" % Hud.ICON_INSET)
 	_check("all four view buttons use the inset glyph",
 		checked == 4, "found=%d" % checked)
+
+
+## The mic control sits between the move count and the menu, with no panel,
+## and swaps its glyph rather than tinting so muted cannot look like styling.
+func _mic_checks(main: Main, hud: Hud) -> void:
+	print("Mic control")
+	_check("mic button exists", hud.mic_button != null, "")
+	_check("mic sits left of the menu",
+		hud.mic_button.position.x < hud.menu_button.position.x,
+		"mic=%.0f menu=%.0f" % [hud.mic_button.position.x, hud.menu_button.position.x])
+	_check("mic is in the top band", hud.mic_button.position.y < 100.0,
+		"y=%.0f" % hud.mic_button.position.y)
+	_check("mic has no panel behind it", hud.mic_button.flat, "")
+
+	var glyph := hud.mic_button.get_node_or_null("Glyph") as TextureRect
+	_check("mic carries a glyph", glyph != null and glyph.texture != null, "")
+	# The scene stores the generated texture, so the button starts with a
+	# deserialised copy rather than the instance Icons caches in this process.
+	# Identity is therefore only meaningful after a toggle.
+	var muted_texture: Texture2D = glyph.texture
+
+	var fired: Array[bool] = []
+	hud.mic_toggled.connect(func(on: bool) -> void: fired.append(on))
+	hud.mic_button.emit_signal("pressed")
+	_check("mic toggles on and announces it",
+		fired.size() == 1 and fired[0] and hud.mic_enabled, "fired=%d" % fired.size())
+	_check("live and muted use different glyphs", glyph.texture != muted_texture, "")
+	hud.mic_button.emit_signal("pressed")
+	_check("mic toggles back off", not hud.mic_enabled and fired.size() == 2, "")
+	_check("muted glyph is restored", glyph.texture == Icons.mic_off(), "")
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.
@@ -224,7 +255,7 @@ func _turn_checks(main: Main, hud: Hud) -> void:
 ## viewBox and raster size the importer needs.
 func _asset_checks() -> void:
 	print("Icon assets")
-	for name in ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings"]:
+	for name in ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings", "mic", "mic_off"]:
 		var path := "res://ui/icons/%s.svg" % name
 		var exists := FileAccess.file_exists(path)
 		_check("svg present: %s" % name, exists, path)
@@ -241,10 +272,10 @@ func _asset_checks() -> void:
 
 	# Every icon resolves to a real texture here, via SVG or the drawn fallback.
 	var resolved: Array[Texture2D] = [
-		Icons.rotate_left(), Icons.rotate_right(), Icons.flip(),
-		Icons.reset(), Icons.menu(), Icons.settings(),
+		Icons.rotate_left(), Icons.rotate_right(), Icons.flip(), Icons.reset(),
+		Icons.menu(), Icons.settings(), Icons.mic(), Icons.mic_off(),
 	]
-	var names := ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings"]
+	var names := ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings", "mic", "mic_off"]
 	for i in resolved.size():
 		_check("icon resolves: %s" % names[i], resolved[i] != null, "")
 

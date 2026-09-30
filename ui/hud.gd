@@ -21,6 +21,10 @@ signal reset_view_requested
 signal flip_requested
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
+## Emitted when the mic button is toggled, with the requested state. Voice
+## transport is not built yet, so nothing listens; the control exists so the
+## affordance is settled before the audio plumbing lands.
+signal mic_toggled(enabled: bool)
 
 @onready var turn_label: Label = %TurnLabel
 @onready var control_column: VBoxContainer = %ControlColumn
@@ -29,6 +33,10 @@ signal menu_requested
 @onready var flip_button: Button = %FlipButton
 @onready var reset_button: Button = %ResetButton
 @onready var menu_button: Button = %MenuButton
+@onready var mic_button: Button = %MicButton
+
+## Whether the mic control is currently presenting as live.
+var mic_enabled := false
 
 ## Icon-only buttons still need a comfortable tap target.
 const TOUCH_SIZE := Vector2(64.0, 64.0)
@@ -65,6 +73,7 @@ func bind() -> void:
 	_connect(flip_button, _on_flip)
 	_connect(reset_button, _on_reset)
 	_connect(menu_button, _on_menu)
+	_connect(mic_button, _on_mic)
 
 
 func _connect(button: Button, method: Callable) -> void:
@@ -90,3 +99,19 @@ func _on_reset() -> void:
 
 func _on_menu() -> void:
 	menu_requested.emit()
+
+
+## Swaps the glyph between live and muted rather than tinting one, so "you are
+## not speaking" cannot be misread as a styling state.
+func set_mic_enabled(enabled: bool) -> void:
+	mic_enabled = enabled
+	if mic_button == null:
+		return
+	var glyph := mic_button.get_node_or_null("Glyph") as TextureRect
+	if glyph != null:
+		glyph.texture = Icons.mic() if enabled else Icons.mic_off()
+
+
+func _on_mic() -> void:
+	set_mic_enabled(not mic_enabled)
+	mic_toggled.emit(mic_enabled)
