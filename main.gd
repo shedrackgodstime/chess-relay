@@ -80,10 +80,17 @@ func _connect_hud() -> void:
 	hud.rotate_requested.connect(_on_rotate_requested)
 	hud.reset_view_requested.connect(frame_board)
 	hud.flip_requested.connect(_on_flip_requested)
+	# The menu has no screen behind it yet; Phase 4 builds the settings
+	# shell that listens for this.
+	hud.menu_requested.connect(_on_menu_requested)
 
 
 func _on_rotate_requested(direction: int) -> void:
 	camera.orbit_by(direction * HUD_ROTATE_STEP, 0.0)
+
+
+func _on_menu_requested() -> void:
+	pass
 
 
 ## Flipping the board is a half turn; pressing it again returns to the

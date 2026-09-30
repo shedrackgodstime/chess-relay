@@ -19,6 +19,7 @@ func _init() -> void:
 	var hud: Hud = main.hud
 
 	_layout_checks(hud)
+	_menu_check(main, hud)
 	_rotate_checks(main, hud)
 	_flip_checks(main)
 	_reset_checks(main)
@@ -35,17 +36,60 @@ func _init() -> void:
 func _layout_checks(hud: Hud) -> void:
 	print("HUD layout")
 	_check("turn label exists", hud.turn_label != null, "")
-	_check("four control buttons exist",
-		hud.rotate_left_button != null and hud.rotate_right_button != null
-			and hud.flip_button != null and hud.reset_button != null, "")
+	var view_buttons := [hud.rotate_left_button, hud.rotate_right_button,
+		hud.flip_button, hud.reset_button]
+	_check("four view buttons plus a menu button exist",
+		all_buttons_present(view_buttons) and hud.menu_button != null, "")
 	var touch := 0
-	for button in [hud.rotate_left_button, hud.rotate_right_button,
-			hud.flip_button, hud.reset_button]:
+	for button in view_buttons:
 		if button.custom_minimum_size.x >= 48.0 and button.custom_minimum_size.y >= 44.0:
 			touch += 1
 	_check("buttons meet phone touch size", touch == 4, "ok=%d/4" % touch)
-	_check("buttons are labelled",
-		hud.rotate_left_button.text != "" and hud.reset_button.text != "", "")
+
+	# Icon-only: no text, but a tooltip and a real icon.
+	var labelled := 0
+	var with_icon := 0
+	for button in view_buttons + [hud.menu_button]:
+		if button.icon != null:
+			with_icon += 1
+		if button.text == "" and button.tooltip_text != "":
+			labelled += 1
+	_check("all buttons are icon-only with tooltips", labelled == 5,
+		"ok=%d/5" % labelled)
+	_check("all buttons have generated icons", with_icon == 5, "ok=%d/5" % with_icon)
+
+	# Vertical column, right-aligned, in a deliberate order.
+	var column := hud.control_column
+	_check("controls live in one vertical column", column is VBoxContainer, "")
+	_check("column holds the four view buttons", column.get_child_count() == 4,
+		"children=%d" % column.get_child_count())
+	_check("column order is rotate pair, flip, reset",
+		column.get_child(0).name == "RotateLeftButton"
+			and column.get_child(1).name == "RotateRightButton"
+			and column.get_child(2).name == "FlipButton"
+			and column.get_child(3).name == "ResetButton",
+		"%s" % _child_names(column))
+	# Anchors, not absolute pixels: the layout must hold at any resolution,
+	# which is the point of anchoring in the first place.
+	_check("column is anchored to the right edge", column.anchor_left >= 0.9,
+		"anchor_left=%.2f" % column.anchor_left)
+	_check("column is vertically centred",
+		absf(column.anchor_top - 0.5) < 0.01 and absf(column.anchor_bottom - 0.5) < 0.01,
+		"top=%.2f bottom=%.2f" % [column.anchor_top, column.anchor_bottom])
+
+
+## The menu button exists and announces itself; its screen is Phase 4.
+func _menu_check(main: Main, hud: Hud) -> void:
+	print("Menu button")
+	var fired := [false]
+	hud.menu_requested.connect(func() -> void: fired[0] = true)
+	hud.menu_button.emit_signal("pressed")
+	_check("menu button emits its intent", fired[0], "")
+	_check("menu button is separate from the view column",
+		hud.menu_button.get_parent() != hud.control_column, "")
+	_check("menu button is anchored top-right",
+		hud.menu_button.anchor_left >= 0.9 and hud.menu_button.anchor_top <= 0.1,
+		"left=%.2f top=%.2f" % [hud.menu_button.anchor_left, hud.menu_button.anchor_top])
 
 
 func _rotate_checks(main: Main, hud: Hud) -> void:
@@ -130,6 +174,20 @@ func _turn_checks(main: Main, hud: Hud) -> void:
 		"text=%s" % hud.turn_label.text)
 	_check("a move passes the turn", hud.turn_label.text.begins_with("Black"),
 		"text=%s" % hud.turn_label.text)
+
+
+func _child_names(node: Node) -> Array:
+	var names: Array = []
+	for child in node.get_children():
+		names.append(child.name)
+	return names
+
+
+func all_buttons_present(buttons: Array) -> bool:
+	for button in buttons:
+		if button == null:
+			return false
+	return true
 
 
 func _check(label: String, ok: bool, detail: String) -> void:

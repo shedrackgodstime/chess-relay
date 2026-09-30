@@ -146,7 +146,8 @@ func _hud() -> Control:
 	hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	hud.add_child(_turn_label())
-	hud.add_child(_button_bar())
+	hud.add_child(_control_column())
+	hud.add_child(_menu_button())
 	return hud
 
 
@@ -167,33 +168,64 @@ func _turn_label() -> Label:
 	return label
 
 
-func _button_bar() -> HBoxContainer:
-	var bar := HBoxContainer.new()
-	bar.name = "ButtonBar"
-	bar.add_theme_constant_override("separation", 12)
-	bar.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	bar.position = Vector2(-180.0, -84.0)
-	bar.size = Vector2(360.0, 64.0)
-	bar.alignment = BoxContainer.ALIGNMENT_CENTER
+## Icon-only buttons, stacked against the right edge and centred vertically.
+## Order is deliberate: the two rotate buttons sit together as a pair, then
+## flip, then reset, so the thumb rests in one place for the common actions.
+func _control_column() -> VBoxContainer:
+	var column := VBoxContainer.new()
+	column.name = "ControlColumn"
+	column.unique_name_in_owner = true
+	column.add_theme_constant_override("separation", 14)
+	column.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	for spec in [
-		["RotateLeftButton", "< Rotate"],
-		["RotateRightButton", "Rotate >"],
-		["FlipButton", "Flip"],
-		["ResetButton", "Reset"],
+		["RotateLeftButton", Icons.rotate_left()],
+		["RotateRightButton", Icons.rotate_right()],
+		["FlipButton", Icons.flip()],
+		["ResetButton", Icons.reset()],
 	]:
-		bar.add_child(_button(String(spec[0]), String(spec[1])))
-	return bar
+		column.add_child(_icon_button(String(spec[0]), spec[1]))
+
+	column.set_anchors_preset(Control.PRESET_CENTER_RIGHT)
+	column.position = Vector2(-84.0, -150.0)
+	column.size = Vector2(72.0, 300.0)
+	return column
 
 
-func _button(node_name: String, text: String) -> Button:
+## The menu button sits alone in the top-right corner, away from the view
+## controls so it never gets hit by accident mid-game.
+func _menu_button() -> Button:
+	var button := _icon_button("MenuButton", Icons.menu())
+	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	button.position = Vector2(-84.0, 16.0)
+	button.size = Hud.TOUCH_SIZE
+	return button
+
+
+func _icon_button(node_name: String, icon: Texture2D) -> Button:
 	var button := Button.new()
 	button.name = node_name
 	button.unique_name_in_owner = true
-	button.text = text
-	button.custom_minimum_size = Vector2(84.0, 56.0)
-	button.add_theme_font_size_override("font_size", 18)
+	button.icon = icon
+	button.custom_minimum_size = Hud.TOUCH_SIZE
+	button.expand_icon = true
+	button.focus_mode = Control.FOCUS_NONE
+	button.tooltip_text = node_name.trim_suffix("Button").to_lower()
+	button.add_theme_stylebox_override("normal", _button_box())
+	button.add_theme_stylebox_override("hover", _button_box(Color(0.16, 0.13, 0.11)))
+	button.add_theme_stylebox_override("pressed", _button_box(Color(0.26, 0.20, 0.15)))
 	return button
+
+
+## Rounded dark panel behind each icon, so the controls read as a deliberate
+## set sitting on the table rather than as default buttons.
+func _button_box(fill := Color(0.09, 0.08, 0.07, 0.72)) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.set_corner_radius_all(14)
+	box.border_color = Color(0.45, 0.34, 0.24, 0.55)
+	box.set_border_width_all(1)
+	return box
 
 
 ## The round table the board rests on. Round because the camera orbits: a
