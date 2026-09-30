@@ -24,6 +24,7 @@ func _init() -> void:
 	await process_frame
 
 	var main: Main = scene
+	main.ai_opponent = false
 	_check("registry holds the full set", main.pieces.size() == 32,
 		"pieces=%d" % main.pieces.size())
 

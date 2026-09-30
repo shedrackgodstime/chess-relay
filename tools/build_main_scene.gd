@@ -11,17 +11,8 @@ extends SceneTree
 
 const OUTPUT := "res://main.tscn"
 
-## Back-rank order, left to right from the white side.
-const BACK_RANK := [
-	PieceProfiles.Type.ROOK,
-	PieceProfiles.Type.KNIGHT,
-	PieceProfiles.Type.BISHOP,
-	PieceProfiles.Type.QUEEN,
-	PieceProfiles.Type.KING,
-	PieceProfiles.Type.BISHOP,
-	PieceProfiles.Type.KNIGHT,
-	PieceProfiles.Type.ROOK,
-]
+## Back-rank order lives on BoardState so the visual layout and the logical
+## layout share one definition of the starting position.
 
 const LIGHT := PieceMesh.LIGHT_SIDE
 const DARK := PieceMesh.DARK_SIDE
@@ -100,7 +91,7 @@ func _back_rank(rank: int, side: int, label: String, face_opponent: bool) -> Nod
 	var group := Node3D.new()
 	group.name = "%sBackRank" % label
 	for file in BoardMesh.SQUARES:
-		group.add_child(_piece(BACK_RANK[file], side, label, file, rank, face_opponent))
+		group.add_child(_piece(BoardState.BACK_RANK[file], side, label, file, rank, face_opponent))
 	return group
 
 

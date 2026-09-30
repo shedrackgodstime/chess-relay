@@ -16,9 +16,22 @@ extends Node3D
 ## Selected square as (file, rank), or (-1, -1) for nothing selected.
 var selected := Vector2i(-1, -1)
 
-## Piece on each occupied square. Main is the only owner of this mapping:
-## pieces animate themselves, but only Main decides where they stand.
+## Piece node on each occupied square. Presentation only: the authoritative
+## position of every piece lives in `game`. Main is the only owner of this
+## mapping; pieces animate themselves, but only Main decides where they stand.
 var pieces := {}
+
+## The authoritative game. Taps, the AI and later network peers all submit
+## moves here; this node only reacts to its `moved` signal.
+var game := ChessGame.new()
+
+## The AI plays Dark a short beat after every move that leaves it to move.
+## Off in tests, on for the demo; the funnel does not care who submits.
+const AI_SIDE := BoardState.DARK
+const AI_DELAY_SECONDS := 0.8
+@export var ai_opponent := true
+
+var _ai_thinking := false
 
 ## A tap is a press and release with barely any movement, so it never fights
 ## the orbit drags: anything that travels further is a camera gesture.
@@ -45,6 +58,8 @@ var _press_moved := false
 
 func _ready() -> void:
 	frame_board()
+	game.reset()
+	game.moved.connect(_on_game_moved)
 	_collect_pieces()
 
 
@@ -116,9 +131,10 @@ func _tap_move(position: Vector2) -> void:
 		_press_moved = true
 
 
-## Handles a tap. No legality yet, by design: tapping a piece selects it,
-## tapping anywhere else moves the selection there, and landing on an enemy
-## piece captures it. Same square or empty space deselects.
+## Handles a tap: selection is local intent, but every move goes through the
+## game funnel, exactly like an AI or network move will. No legality yet, by
+## design: tapping a piece selects it, tapping anywhere else submits the move,
+## and landing on an enemy piece captures it.
 func _tap(screen_position: Vector2) -> void:
 	var square := screen_to_square(screen_position)
 	if square.x < 0:
@@ -132,8 +148,9 @@ func _tap(screen_position: Vector2) -> void:
 	if square == selected:
 		_deselect()
 		return
-	_move_selected_to(square)
-	_deselect()
+	if game.apply_move(ChessMove.new(selected, square)):
+		_deselect()
+		_maybe_ai_move()
 
 
 func _deselect() -> void:
@@ -141,24 +158,41 @@ func _deselect() -> void:
 	highlight.hide_marker()
 
 
-## Moves the selected piece, capturing whatever stands on the destination.
-## The registry updates immediately; the animation only moves pixels, so game
-## state never depends on a tween finishing.
-func _move_selected_to(square: Vector2i) -> void:
-	if not pieces.has(selected):
+## Presents a committed move: updates the node registry, captures victims,
+## glides the mover. The registry updates immediately; animation only moves
+## pixels, so presentation never depends on a tween finishing.
+func _on_game_moved(move: ChessMove, _captured: int) -> void:
+	if not pieces.has(move.from_square):
 		return
-	var piece: PieceView = pieces[selected]
-	pieces.erase(selected)
-	if pieces.has(square):
-		var victim: PieceView = pieces[square]
-		pieces.erase(square)
+	var piece: PieceView = pieces[move.from_square]
+	pieces.erase(move.from_square)
+	if pieces.has(move.to_square):
+		var victim: PieceView = pieces[move.to_square]
+		pieces.erase(move.to_square)
 		victim.capture()
-	pieces[square] = piece
-	piece.home_square = square
+	pieces[move.to_square] = piece
+	piece.home_square = move.to_square
 	piece.glide_to(
-		BoardMesh.square_position(square.x, square.y),
+		BoardMesh.square_position(move.to_square.x, move.to_square.y),
 		piece.piece_type == PieceProfiles.Type.KNIGHT
 	)
+
+
+## Hands the move to the AI when it is its turn. One thinker at a time; the
+## delay is presentation pacing, not game logic.
+func _maybe_ai_move() -> void:
+	if not ai_opponent or _ai_thinking:
+		return
+	if game.state.side_to_move != AI_SIDE:
+		return
+	_ai_thinking = true
+	await get_tree().create_timer(AI_DELAY_SECONDS).timeout
+	_ai_thinking = false
+	if game.state.side_to_move != AI_SIDE:
+		return
+	var move := AiPlayer.choose_move(game, AI_SIDE)
+	if move != null:
+		game.apply_move(move)
 
 
 ## Maps a world position onto a board square. Used to register pieces from

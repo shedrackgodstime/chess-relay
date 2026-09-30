@@ -24,6 +24,7 @@ func _init() -> void:
 	await process_frame
 
 	var main: Main = scene
+	main.ai_opponent = false
 	_check("nothing selected at start", main.selected == Vector2i(-1, -1),
 		"selected=%s" % main.selected)
 	_check("highlight hidden at start", not main.highlight.visible, "")
