@@ -127,9 +127,14 @@ func _centering_checks(buttons: Array) -> void:
 func _mic_checks(main: Main, hud: Hud) -> void:
 	print("Mic control")
 	_check("mic button exists", hud.mic_button != null, "")
-	# Versus the AI there is nobody to talk to, so the cluster starts hidden.
-	_check("voice is hidden against the AI", not hud.voice_row.visible
-		and not main.ai_opponent, "ai=%s" % main.ai_opponent)
+	# Dev only: the cluster is up in every mode so it can be exercised alone.
+	# Guard the flag, so flipping it back cannot silently hide the control.
+	_check("dev flag keeps voice up", Main.DEV_SHOW_VOICE, "")
+	# Assert both modes rather than whichever one the test happens to start in.
+	for with_ai: bool in [true, false]:
+		main.ai_opponent = with_ai
+		hud.set_voice_visible(Main.DEV_SHOW_VOICE or not with_ai)
+		_check("voice visible with ai_opponent=%s" % with_ai, hud.voice_row.visible, "")
 	_check("mic sits left of the menu",
 		hud.mic_button.global_position.x < hud.menu_button.global_position.x,
 		"mic=%.0f menu=%.0f" % [

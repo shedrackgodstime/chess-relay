@@ -35,6 +35,11 @@ const AI_SIDE := BoardState.DARK
 const AI_DELAY_SECONDS := 0.8
 @export var ai_opponent := true
 
+## Dev only. The voice controls stay up in every mode so the affordance can be
+## exercised without a second device on the network. Flip this to false once the
+## transport exists and the button can gate on a connected opponent for real.
+const DEV_SHOW_VOICE := true
+
 var _ai_thinking := false
 
 ## A tap is a press and release with barely any movement, so it never fights

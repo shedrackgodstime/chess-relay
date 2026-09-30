@@ -216,7 +216,7 @@ func _voice_row() -> Control:
 	row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	row.position = Vector2(-152.0, 16.0)
 	row.size = Hud.TOUCH_SIZE
-	row.visible = false
+	row.visible = true
 
 	var ring := Panel.new()
 	ring.name = "MicRing"
