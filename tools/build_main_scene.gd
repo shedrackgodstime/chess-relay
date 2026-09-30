@@ -37,6 +37,7 @@ func _init() -> void:
 	root.add_child(world)
 
 	world.add_child(_board())
+	world.add_child(_highlight())
 	world.add_child(_pieces())
 	world.add_child(_ground())
 	world.add_child(_key_light())
@@ -74,6 +75,13 @@ func _board() -> MeshInstance3D:
 	board.name = "Board"
 	board.set_script(load("res://board/board_view.gd"))
 	return board
+
+
+func _highlight() -> MeshInstance3D:
+	var highlight := MeshInstance3D.new()
+	highlight.name = "Highlight"
+	highlight.set_script(load("res://board/square_highlight.gd"))
+	return highlight
 
 
 func _pieces() -> Node3D:

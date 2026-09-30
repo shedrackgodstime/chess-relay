@@ -66,21 +66,61 @@ static func _king_details(builder: MeshBuilder, material: Material) -> void:
 	builder.add_part(arm, material, Transform3D(Basis(), Vector3(0.0, profile_top + 0.170, 0.0)))
 
 
-## The horse head, extruded and tipped forward a little so it reads as a
-## knight from the usual three-quarter view.
+## The horse head: an extruded skull with standalone ear spikes, tipped
+## forward a little so it reads as a knight from the usual three-quarter
+## view. The parts merge into one head first so the pose applies to all of
+## them together.
 static func _knight_head(builder: MeshBuilder, material: Material) -> void:
-	var head := Extrude.build(
+	var skull := Extrude.build(
 		PieceProfiles.KNIGHT_HEAD,
 		PieceProfiles.KNIGHT_HEAD_HALF_DEPTH,
 		PieceProfiles.KNIGHT_HEAD_TAPER,
 		7,
 		PieceProfiles.KNIGHT_HEAD_PIVOT
 	)
-	if head.is_empty():
+	if skull.is_empty():
 		push_error("Knight head extrusion produced no geometry")
 		return
+	var head := MeshData.new()
+	head.append(skull)
+	head.append(_knight_mane_part(), Transform3D.IDENTITY)
+	head.append(_knight_ear(1.0), Transform3D.IDENTITY)
+	head.append(_knight_ear(-1.0), Transform3D.IDENTITY)
+	# Explicit +Z axis: Godot's Vector3.FORWARD is (0, 0, -1), and using it
+	# here once silently flipped every tilt backwards (muzzle up, ears
+	# forward). A negative angle about +Z pitches the +X-facing muzzle down.
 	var tilt := Transform3D(
-		Basis(Vector3.FORWARD, deg_to_rad(PieceProfiles.KNIGHT_HEAD_TILT_DEGREES))
+		Basis(Vector3(0.0, 0.0, 1.0), deg_to_rad(PieceProfiles.KNIGHT_HEAD_TILT_DEGREES))
 	)
-	tilt.origin = Vector3(0.0, PieceProfiles.KNIGHT_HEAD_HEIGHT, 0.0)
+	tilt.origin = Vector3(0.0, PieceProfiles.KNIGHT_HEAD_BASE_Y, 0.0)
 	builder.add_part(head, material, tilt)
+
+
+## The mane ribbon, extruded thin so it reads as a carved crest rather than
+## a second head. Lives in head-local space, so the head pose carries it.
+static func _knight_mane_part() -> MeshData:
+	return Extrude.build(
+		PieceProfiles.KNIGHT_MANE,
+		PieceProfiles.KNIGHT_MANE_HALF_DEPTH,
+		PieceProfiles.KNIGHT_MANE_TAPER,
+		5,
+		PieceProfiles.KNIGHT_MANE_PIVOT
+	)
+
+
+## One ear: a four-sided point standing on the poll, tipped back and splayed
+## outward. side is +1 for the right ear, -1 for the left.
+static func _knight_ear(side: float) -> MeshData:
+	var ear := Primitives.spike(
+		PieceProfiles.KNIGHT_EAR_RADIUS, PieceProfiles.KNIGHT_EAR_HEIGHT, 4
+	)
+	# Positive about +Z tips the ear apex towards -X, i.e. backwards.
+	var pose := Basis(Vector3(0.0, 0.0, 1.0), deg_to_rad(PieceProfiles.KNIGHT_EAR_BACK_DEGREES)) \
+		* Basis(Vector3.RIGHT, deg_to_rad(PieceProfiles.KNIGHT_EAR_SPLAY_DEGREES) * side)
+	var placed := MeshData.new()
+	placed.append(ear, Transform3D(pose, Vector3(
+		PieceProfiles.KNIGHT_EAR_X,
+		PieceProfiles.KNIGHT_EAR_Y,
+		PieceProfiles.KNIGHT_EAR_Z * side
+	)))
+	return placed

@@ -33,37 +33,80 @@ const TYPE_NAMES := {
 	Type.KING: "King",
 }
 
-## Knight head, in its own local space: X forward, Y up from the base of the
-## neck. Closed and simple, so it triangulates; Extrude handles the concavity
-## around the muzzle and between the ears.
+## Knight silhouette: neck, poll, face, muzzle, jaw and chest in one closed
+## side outline, head-local with X forward and Y up from the neck base. One
+## extrusion carries the whole horse readable-from-the-side shape; ears and
+## mane are separate parts because silhouette bumps round off while standalone
+## geometry stays crisp. Closed and simple, so it triangulates; Extrude
+## handles the concavity at the jaw and throat.
 static var KNIGHT_HEAD := PackedVector2Array([
 	Vector2(0.000, 0.000),
-	Vector2(0.000, 0.152),
-	Vector2(0.016, 0.266),
-	Vector2(0.040, 0.352),
-	Vector2(0.064, 0.409),
-	Vector2(0.088, 0.475),
-	Vector2(0.108, 0.361),
-	Vector2(0.140, 0.470),
-	Vector2(0.160, 0.380),
-	Vector2(0.200, 0.328),
-	Vector2(0.248, 0.276),
-	Vector2(0.296, 0.214),
-	Vector2(0.340, 0.157),
-	Vector2(0.360, 0.119),
-	Vector2(0.348, 0.081),
-	Vector2(0.312, 0.062),
-	Vector2(0.268, 0.052),
-	Vector2(0.240, 0.029),
-	Vector2(0.228, 0.000),
+	Vector2(0.005, 0.120),
+	Vector2(0.020, 0.240),
+	Vector2(0.045, 0.340),
+	Vector2(0.075, 0.420),
+	Vector2(0.105, 0.465),
+	Vector2(0.155, 0.475),
+	Vector2(0.185, 0.450),
+	Vector2(0.230, 0.410),
+	Vector2(0.290, 0.355),
+	Vector2(0.350, 0.290),
+	Vector2(0.415, 0.225),
+	Vector2(0.475, 0.165),
+	Vector2(0.445, 0.125),
+	Vector2(0.385, 0.105),
+	Vector2(0.335, 0.095),
+	Vector2(0.295, 0.060),
+	Vector2(0.270, 0.020),
+	Vector2(0.250, 0.000),
 ])
 
-## Where the head sits on the knight's lathed base, and how it is posed.
-const KNIGHT_HEAD_HEIGHT := 0.360
+## Mane: a jagged ribbon running down the back of the neck, in the same
+## head-local space as the skull. Teeth point backwards (-X); the front edge
+## lies against the neck so the two extrusions intersect and read as one.
+static var KNIGHT_MANE := PackedVector2Array([
+	Vector2(0.070, 0.430),
+	Vector2(0.030, 0.435),
+	Vector2(-0.020, 0.410),
+	Vector2(-0.052, 0.380),
+	Vector2(-0.020, 0.350),
+	Vector2(-0.054, 0.315),
+	Vector2(-0.022, 0.280),
+	Vector2(-0.056, 0.240),
+	Vector2(-0.024, 0.200),
+	Vector2(-0.054, 0.155),
+	Vector2(-0.022, 0.115),
+	Vector2(-0.048, 0.070),
+	Vector2(-0.015, 0.040),
+	Vector2(-0.005, 0.010),
+	Vector2(0.015, 0.010),
+	Vector2(0.010, 0.120),
+	Vector2(0.020, 0.240),
+	Vector2(0.045, 0.340),
+])
+
+## Ears: base radius, height, position on the poll (head-local), and pose.
+## The pair sits left and right of the centreline, tipped back and splayed
+## slightly outward like a real horse.
+const KNIGHT_EAR_RADIUS := 0.032
+const KNIGHT_EAR_HEIGHT := 0.085
+const KNIGHT_EAR_X := 0.130
+const KNIGHT_EAR_Y := 0.440
+const KNIGHT_EAR_Z := 0.024
+const KNIGHT_EAR_BACK_DEGREES := 15.0
+const KNIGHT_EAR_SPLAY_DEGREES := 12.0
+
+## Where the neck base sits on the knight's lathed base, and how the head is
+## posed. The silhouette bottom buries into the collar so neck and base read
+## as one continuous piece.
+const KNIGHT_HEAD_BASE_Y := 0.260
 const KNIGHT_HEAD_TILT_DEGREES := -11.0
 const KNIGHT_HEAD_HALF_DEPTH := 0.072
 const KNIGHT_HEAD_TAPER := 0.16
-const KNIGHT_HEAD_PIVOT := Vector2(0.128, 0.114)
+const KNIGHT_HEAD_PIVOT := Vector2(0.200, 0.220)
+const KNIGHT_MANE_HALF_DEPTH := 0.035
+const KNIGHT_MANE_TAPER := 0.40
+const KNIGHT_MANE_PIVOT := Vector2(0.000, 0.220)
 
 
 ## Shared foot. Every piece starts from the same sculpted base so the set looks
@@ -212,16 +255,16 @@ static func profile(type: int) -> PackedVector2Array:
 	return PackedVector2Array()
 
 
-## The knight's lathed part stops at the collar; the head is extruded on top.
+## The knight's lathed part is only foot and stem now; the extruded
+## silhouette carries the neck upwards from inside the collar.
 static func _knight_base() -> PackedVector2Array:
 	return _assemble(0.300, PackedVector2Array([
 		Vector2(0.140, 0.200),
-		Vector2(0.130, 0.255),
-		Vector2(0.180, 0.292),
-		Vector2(0.180, 0.322),
-		Vector2(0.126, 0.348),
-		Vector2(0.070, 0.372),
-		Vector2(0.000, 0.380),
+		Vector2(0.132, 0.245),
+		Vector2(0.178, 0.278),
+		Vector2(0.178, 0.300),
+		Vector2(0.120, 0.318),
+		Vector2(0.000, 0.322),
 	]))
 
 

@@ -216,6 +216,24 @@ func _extrude_checks() -> void:
 		""
 	)
 
+	# Coordinates must survive untouched: an outline drawn away from the
+	# origin has to extrude exactly there, or anything placed relative to it
+	# (like the knight's ears) ends up floating. A re-basing normaliser once
+	# broke this silently.
+	var placed := PackedVector2Array([
+		Vector2(2, 3), Vector2(4, 3), Vector2(4, 5), Vector2(2, 5),
+	])
+	var positioned := Extrude.build(placed, 0.5, 0.0, 2)
+	var bb_min := Vector3(9, 9, 9)
+	var bb_max := Vector3(-9, -9, -9)
+	for v in positioned.vertices:
+		bb_min = bb_min.min(v)
+		bb_max = bb_max.max(v)
+	_check("extrude preserves outline coordinates",
+		is_equal_approx(bb_min.x, 2.0) and is_equal_approx(bb_max.x, 4.0)
+			and is_equal_approx(bb_min.y, 3.0) and is_equal_approx(bb_max.y, 5.0),
+		"bounds x=%.2f..%.2f y=%.2f..%.2f" % [bb_min.x, bb_max.x, bb_min.y, bb_max.y])
+
 
 func _primitive_checks() -> void:
 	print("Primitives")

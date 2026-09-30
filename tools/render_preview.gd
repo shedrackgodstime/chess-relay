@@ -52,6 +52,16 @@ func _run() -> void:
 		"pieces":
 			camera = _lineup_camera()
 			draws = _lineup_draws()
+		"solo":
+			var solo_type := int(out) if out.is_valid_int() else PieceProfiles.Type.KNIGHT
+			out = "preview_solo_%d.png" % solo_type
+			camera = _solo_camera(solo_type)
+			draws = _solo_draws(solo_type)
+		"profile":
+			var profile_type := int(out) if out.is_valid_int() else PieceProfiles.Type.KNIGHT
+			out = "preview_profile_%d.png" % profile_type
+			camera = _profile_camera(profile_type)
+			draws = _solo_draws(profile_type)
 		_:
 			camera = _scene_camera()
 			draws = _scene_draws()
@@ -87,6 +97,9 @@ class Draw:
 
 
 func _collect(node: Node, out: Array) -> void:
+	# Hidden nodes (like an unselected highlight) do not render.
+	if node is VisualInstance3D and not (node as VisualInstance3D).visible:
+		return
 	if node is MeshInstance3D:
 		var instance := node as MeshInstance3D
 		var mesh := instance.mesh
@@ -174,6 +187,49 @@ func _lineup_draws() -> Array:
 			_collect_mesh(mesh, Transform3D(Basis(), Vector3(x, y, 0.0) + offset),
 				PieceProfiles.color_for(side), draws)
 	return draws
+
+
+## Frames one piece large, for judging a single silhouette while tuning.
+func _solo_draws(type: int) -> Array:
+	var draws: Array = []
+	for side in [PieceMesh.LIGHT_SIDE]:
+		var mesh := PieceMesh.build(type, side)
+		_collect_mesh(mesh, Transform3D.IDENTITY, PieceProfiles.color_for(side), draws)
+	return draws
+
+
+func _solo_camera(type: int) -> Camera3D:
+	var mesh := PieceMesh.build(type, PieceMesh.LIGHT_SIDE)
+	var aabb := mesh.get_aabb()
+	var centre := aabb.get_center()
+	var radius := maxf(aabb.size.x, aabb.size.y) * 0.5
+	var camera := Camera3D.new()
+	camera.fov = 30.0
+	camera.far = 100.0
+	root.add_child(camera)
+	var dist := radius / tan(deg_to_rad(15.0)) * 1.25
+	camera.look_at_from_position(
+		centre + Vector3(dist * 0.45, dist * 0.35, dist * 0.85), centre, Vector3.UP
+	)
+	return camera
+
+
+## Pure side view on +Z at the piece's mid height: the angle a knight lives
+## or dies by, since the whole design is a side silhouette.
+func _profile_camera(type: int) -> Camera3D:
+	var mesh := PieceMesh.build(type, PieceMesh.LIGHT_SIDE)
+	var aabb := mesh.get_aabb()
+	var centre := aabb.get_center()
+	var radius := maxf(aabb.size.x, aabb.size.y) * 0.5
+	var camera := Camera3D.new()
+	camera.fov = 22.0
+	camera.far = 100.0
+	root.add_child(camera)
+	var dist := radius / tan(deg_to_rad(11.0)) * 1.15
+	camera.look_at_from_position(
+		Vector3(centre.x, centre.y, centre.z + dist), centre, Vector3.UP
+	)
+	return camera
 
 
 func _lineup_camera() -> Camera3D:
@@ -310,7 +366,7 @@ func _rasterise(camera: Camera3D, draws: Array) -> Image:
 			var ub := _draw_uv(uvs, ib)
 			var uc := _draw_uv(uvs, ic)
 			_raster_triangle(image, depth, sa, sb, sc, ua, ub, uc,
-				_face_normal(normals, ia, ib, ic), draw.colour, draw.texture)
+				normals[ia], normals[ib], normals[ic], draw.colour, draw.texture)
 
 	print("tris=%d drawn=%d culled=%d clipped=%d" % [
 		stats["tris"], stats["drawn"], stats["culled"], stats["clipped"]
@@ -347,12 +403,17 @@ func _project(p: Vector3, aspect: float, tan_half: float) -> Vector3:
 	)
 
 
+## Vertex normals are interpolated per pixel (Gouraud), perspective-correct
+## like the UVs. Flat-shading here once exaggerated every facet and made the
+## meshes look harsher than they render in-engine, where the stored smooth
+## normals do their job.
 func _raster_triangle(
 	image: Image,
 	depth: PackedFloat32Array,
 	sa: Vector3, sb: Vector3, sc: Vector3,
 	ua: Vector2, ub: Vector2, uc: Vector2,
-	normal: Vector3, tint: Color, texture: Image
+	na: Vector3, nb: Vector3, nc: Vector3,
+	tint: Color, texture: Image
 ) -> void:
 	var min_x := maxi(0, int(floor(minf(sa.x, minf(sb.x, sc.x)))))
 	var max_x := mini(WIDTH - 1, int(ceil(maxf(sa.x, maxf(sb.x, sc.x)))))
@@ -392,8 +453,15 @@ func _raster_triangle(
 			if inv_z <= depth[offset]:
 				continue
 			depth[offset] = inv_z
-			# Perspective-correct UV: interpolate uv/z and renormalise by 1/z.
-			var frag := _shade(normal, tint)
+			# Perspective-correct attributes: interpolate value/z and
+			# renormalise by 1/z, for UVs and normals alike.
+			var nx := (na.x * sa.z * w2 + nb.x * sb.z * w1 + nc.x * sc.z * w0) / inv_z
+			var ny := (na.y * sa.z * w2 + nb.y * sb.z * w1 + nc.y * sc.z * w0) / inv_z
+			var nz := (na.z * sa.z * w2 + nb.z * sb.z * w1 + nc.z * sc.z * w0) / inv_z
+			var pixel_normal := Vector3(nx, ny, nz)
+			if pixel_normal.length_squared() < 1e-12:
+				pixel_normal = Vector3.UP
+			var frag := _shade(pixel_normal.normalized(), tint)
 			if texture != null and tex_w > 0:
 				var tu := (ua.x * sa.z * w2 + ub.x * sb.z * w1 + uc.x * sc.z * w0) / inv_z
 				var tv := (ua.y * sa.z * w2 + ub.y * sb.z * w1 + uc.y * sc.z * w0) / inv_z

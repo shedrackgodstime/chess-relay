@@ -82,8 +82,10 @@ static func _outward(from: Vector2, to: Vector2) -> Vector2:
 	return Vector2(d.y, -d.x).normalized()
 
 
-## Returns the outline wound counter-clockwise, with the first point moved to
-## (0, 0) so the result is positioned relative to its own start.
+## Returns the outline wound counter-clockwise, de-duplicated and closed.
+## Coordinates are kept exactly as authored: the caller positions the result
+## with a transform, so re-basing here would silently move the geometry away
+## from anything placed relative to the outline (like the knight's ears).
 static func _normalise(outline: PackedVector2Array) -> PackedVector2Array:
 	var ring := PackedVector2Array()
 	for p in outline:
@@ -95,11 +97,7 @@ static func _normalise(outline: PackedVector2Array) -> PackedVector2Array:
 		return PackedVector2Array()
 	if _signed_area(ring) < 0.0:
 		ring.reverse()
-	var out := PackedVector2Array()
-	var origin := ring[0]
-	for p in ring:
-		out.append(p - origin)
-	return out
+	return ring
 
 
 static func _signed_area(ring: PackedVector2Array) -> float:
