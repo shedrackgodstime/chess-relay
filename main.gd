@@ -37,6 +37,9 @@ var _ai_thinking := false
 ## the orbit drags: anything that travels further is a camera gesture.
 const TAP_MAX_DISTANCE := 12.0
 const TAP_MAX_SECONDS := 0.6
+## How far a picking ray reaches before giving up, in world units. The board
+## is 8.76 across, so this comfortably covers it from any allowed zoom.
+const PICK_RAY_LENGTH := 40.0
 
 var _press_position := Vector2.ZERO
 var _press_time := 0.0
@@ -136,7 +139,7 @@ func _tap_move(position: Vector2) -> void:
 ## design: tapping a piece selects it, tapping anywhere else submits the move,
 ## and landing on an enemy piece captures it.
 func _tap(screen_position: Vector2) -> void:
-	var square := screen_to_square(screen_position)
+	var square := _pick_square(screen_position)
 	if square.x < 0:
 		_deselect()
 		return
@@ -151,6 +154,48 @@ func _tap(screen_position: Vector2) -> void:
 	if game.apply_move(ChessMove.new(selected, square)):
 		_deselect()
 		_maybe_ai_move()
+
+
+## Which board square a screen point refers to, preferring an actual piece
+## over the board beneath it.
+##
+## The picking ray is tested against each piece's collider first, because a
+## ray aimed at the y = 0 plane alone passes straight over anything tall: a
+## tap on a king's head used to miss entirely. Only if no piece is hit does
+## the ray fall through to the board, so empty squares still work.
+func _pick_square(screen_position: Vector2) -> Vector2i:
+	if camera == null:
+		return Vector2i(-1, -1)
+	var world := get_viewport().get_camera_3d()
+	if world == null:
+		return Vector2i(-1, -1)
+
+	var origin := world.project_ray_origin(screen_position)
+	var direction := world.project_ray_normal(screen_position)
+
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(origin, origin + direction * PICK_RAY_LENGTH)
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	var hit := space.intersect_ray(query)
+	if not hit.is_empty():
+		var node := hit.get("collider") as Node
+		var owner_piece := _piece_owning(node)
+		if owner_piece != null and owner_piece.home_square.x >= 0:
+			return owner_piece.home_square
+
+	return screen_to_square(screen_position)
+
+
+## Walks up from a hit node to the PieceView that owns it, so the collider can
+## be any descendant of the piece.
+func _piece_owning(node: Node) -> PieceView:
+	var current := node
+	while current != null:
+		if current is PieceView:
+			return current as PieceView
+		current = current.get_parent()
+	return null
 
 
 func _deselect() -> void:

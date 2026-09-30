@@ -37,6 +37,11 @@ signal move_finished
 ## the scene layout at startup and updates it on every move.
 var home_square := Vector2i(-1, -1)
 
+## Pick target. A flat ray against the board plane misses everything above it,
+## so a tall piece was only clickable at its base; this area is what a picking
+## ray actually hits. Sized to the piece in fit_pick_area().
+var pick_area: Area3D
+
 ## Seconds per square glided. Slow enough to read, fast enough to not bore.
 const GLIDE_SECONDS_PER_SQUARE := 0.12
 const CAPTURE_SECONDS := 0.25
@@ -45,13 +50,46 @@ var _move_tween: Tween
 
 
 func _ready() -> void:
+	_ensure_pick_area()
 	rebuild()
+
+
+func _ensure_pick_area() -> void:
+	if pick_area != null:
+		return
+	pick_area = Area3D.new()
+	pick_area.name = "PickArea"
+	pick_area.monitoring = false
+	pick_area.monitorable = true
+	add_child(pick_area)
 
 
 ## Regenerates the piece geometry for the current type and side.
 func rebuild() -> void:
 	mesh = PieceMesh.build(piece_type, side)
 	rotation.y = PI if face_opponent else 0.0
+	fit_pick_area()
+
+
+## Fits the pick collider to the generated mesh: a cylinder covering the
+## piece's footprint and height, which is generous enough to be easy to tap on
+## a phone without needing the real silhouette.
+func fit_pick_area() -> void:
+	_ensure_pick_area()
+	if mesh == null or mesh.get_surface_count() == 0:
+		return
+	var bounds := mesh.get_aabb()
+	var radius := maxf(bounds.size.x, bounds.size.z) * 0.5
+	var height := maxf(bounds.size.y, 0.05)
+	var shape := CylinderShape3D.new()
+	shape.radius = radius
+	shape.height = height
+	var collider := CollisionShape3D.new()
+	collider.name = "PickShape"
+	collider.shape = shape
+	pick_area.add_child(collider)
+	# CylinderShape3D is centred on its own origin, so lift it half a height.
+	collider.position = Vector3(0.0, bounds.position.y + height * 0.5, 0.0)
 
 
 ## True while a glide or capture animation is running.

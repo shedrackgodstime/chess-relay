@@ -87,11 +87,16 @@ func _init() -> void:
 	quit(1 if _failures > 0 else 0)
 
 
-## Taps the screen position of a square's centre.
+## Taps a square the way a finger would: on the piece's body when one is
+## there. Tapping the bare square centre is not equivalent, because from the
+## default camera a piece in front can legitimately occlude it, and picking
+## now resolves to what is actually visible at that pixel.
 func _tap_square(main: Main, square: Vector2i) -> void:
-	var screen := main.camera.unproject_position(
-		BoardMesh.square_position(square.x, square.y))
-	main._tap(screen)
+	var point: Vector3 = BoardMesh.square_position(square.x, square.y)
+	if main.pieces.has(square):
+		var piece: PieceView = main.pieces[square]
+		point.y = piece.mesh.get_aabb().size.y * 0.6
+	main._tap(main.camera.unproject_position(point))
 
 
 ## Waits until a piece settles near its target, up to ~2 seconds of frames.

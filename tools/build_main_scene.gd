@@ -30,7 +30,8 @@ func _init() -> void:
 	world.add_child(_board())
 	world.add_child(_highlight())
 	world.add_child(_pieces())
-	world.add_child(_ground())
+	world.add_child(_table())
+	world.add_child(_floor())
 	world.add_child(_key_light())
 	world.add_child(_fill_light())
 	world.add_child(_environment())
@@ -127,18 +128,25 @@ func square_name(file: int, rank: int) -> String:
 	return "%s%d" % [file_letter, rank + 1]
 
 
-func _ground() -> MeshInstance3D:
-	var ground := MeshInstance3D.new()
-	ground.name = "Ground"
+## The round table the board rests on. Round because the camera orbits: a
+## wall or a corner would break as soon as the player spun past it.
+func _table() -> MeshInstance3D:
+	var table := MeshInstance3D.new()
+	table.name = "Table"
+	table.set_script(load("res://surroundings/table_view.gd"))
+	return table
+
+
+## Distant floor, visible only as the horizon behind the table.
+func _floor() -> MeshInstance3D:
+	var floor_node := MeshInstance3D.new()
+	floor_node.name = "Floor"
 	var plane := PlaneMesh.new()
-	plane.size = Vector2(60.0, 60.0)
-	ground.mesh = plane
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color(0.115, 0.130, 0.150)
-	material.roughness = 0.85
-	ground.material_override = material
-	ground.position = Vector3(0.0, -BoardMesh.PLINTH_DEPTH - 0.01, 0.0)
-	return ground
+	plane.size = Vector2(TableMesh.FLOOR_SIZE, TableMesh.FLOOR_SIZE)
+	floor_node.mesh = plane
+	floor_node.material_override = TableMesh.floor_material()
+	floor_node.position = Vector3(0.0, TableMesh.FLOOR_Y, 0.0)
+	return floor_node
 
 
 func _key_light() -> DirectionalLight3D:

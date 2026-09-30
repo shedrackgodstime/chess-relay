@@ -75,7 +75,7 @@ func _init() -> void:
 				or (square.x >= 0 and square.x < 8 and square.y >= 0 and square.y < 8),
 			"square=%s" % square)
 
-	var mesh := SquareHighlight.build_mesh()
+	var 	mesh := SquareHighlight.build_mesh()
 	_check("highlight builds one surface", mesh.get_surface_count() == 1, "")
 	var arrays := mesh.surface_get_arrays(0)
 	var indices: PackedInt32Array = arrays[Mesh.ARRAY_INDEX]
@@ -86,13 +86,45 @@ func _init() -> void:
 		aabb.size.x > 0.8 and aabb.size.x <= 1.0 and aabb.size.z > 0.8 and aabb.size.z <= 1.0,
 		"size=%s" % aabb.size)
 
+	_picking_checks(main, view_size)
+
 	scene.queue_free()
 	if _failures == 0:
 		print("selection: all checks passed")
-
 	else:
 		printerr("selection: %d check(s) failed" % _failures)
 	quit(1 if _failures > 0 else 0)
+
+
+## Picking must hit the piece itself, not the board under it. A ray tested
+## only against the y = 0 plane sails over anything tall, so a tap on a king's
+## head used to miss entirely and return no square at all.
+func _picking_checks(main: Main, view_size: Vector2) -> void:
+	print("Picking")
+	var king: PieceView = main.pieces[Vector2i(4, 0)]
+	var height: float = king.mesh.get_aabb().size.y
+	# The near base can legitimately hit the pawn in front of it from this
+	# camera, so only the upper body is asserted here.
+	for fraction in [0.45, 0.7, 0.9]:
+		var point := king.position + Vector3(0.0, height * float(fraction), 0.0)
+		var square := main._pick_square(main.camera.unproject_position(point))
+		_check("king body at %d%% is pickable" % int(fraction * 100.0),
+			square == Vector2i(4, 0), "square=%s" % square)
+
+	var pawn: PieceView = main.pieces[Vector2i(0, 1)]
+	var pawn_mid: Vector3 = pawn.position + Vector3(0.0, pawn.mesh.get_aabb().size.y * 0.5, 0.0)
+	_check("pawn body is pickable",
+		main._pick_square(main.camera.unproject_position(pawn_mid)) == Vector2i(0, 1), "")
+
+	_check("empty square still picks through the board",
+		main._pick_square(
+			main.camera.unproject_position(BoardMesh.square_position(4, 4))
+		) == Vector2i(4, 4), "")
+	_check("off-board picks nothing",
+		main._pick_square(Vector2(-50.0, -50.0)) == Vector2i(-1, -1), "")
+	_check("board centre picks an empty square",
+		main._pick_square(view_size * 0.5) == Vector2i(4, 4),
+		"got %s" % main._pick_square(view_size * 0.5))
 
 
 func _check(label: String, ok: bool, detail: String) -> void:
