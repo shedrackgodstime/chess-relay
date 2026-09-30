@@ -26,6 +26,12 @@ signal menu_requested
 ## affordance is settled before the audio plumbing lands.
 signal mic_toggled(enabled: bool)
 
+## The voice controls are hidden entirely when there is nobody to talk to, so
+## the solo board keeps the space for the board itself.
+@onready var voice_row: Control = %VoiceRow
+@onready var mic_ring: Panel = %MicRing
+@onready var remote_dot: Panel = %RemoteDot
+
 @onready var turn_label: Label = %TurnLabel
 @onready var control_column: VBoxContainer = %ControlColumn
 @onready var rotate_left_button: Button = %RotateLeftButton
@@ -37,6 +43,9 @@ signal mic_toggled(enabled: bool)
 
 ## Whether the mic control is currently presenting as live.
 var mic_enabled := false
+
+## Voice controls only appear once a real opponent is on the other end.
+var voice_visible := false
 
 ## Icon-only buttons still need a comfortable tap target.
 const TOUCH_SIZE := Vector2(64.0, 64.0)
@@ -110,6 +119,28 @@ func set_mic_enabled(enabled: bool) -> void:
 	var glyph := mic_button.get_node_or_null("Glyph") as TextureRect
 	if glyph != null:
 		glyph.texture = Icons.mic() if enabled else Icons.mic_off()
+	# The ring is a second, non-colour channel for the same fact, so the state
+	# still reads if the glyph is hard to make out against the board.
+	if mic_ring != null:
+		mic_ring.visible = enabled
+
+
+## Shows or hides the whole voice cluster. Turning it off also mutes, so the
+## mic can never come back live behind a hidden button.
+func set_voice_visible(shown: bool) -> void:
+	voice_visible = shown
+	if voice_row != null:
+		voice_row.visible = shown
+	if not shown:
+		set_mic_enabled(false)
+		set_remote_speaking(false)
+
+
+## Lights the dot that shows the opponent is transmitting. Kept separate from
+## the mic glyph so you can tell 'they are talking' from 'I am unmuted'.
+func set_remote_speaking(speaking: bool) -> void:
+	if remote_dot != null:
+		remote_dot.visible = speaking and voice_visible
 
 
 func _on_mic() -> void:

@@ -147,7 +147,7 @@ func _hud() -> Control:
 
 	hud.add_child(_turn_label())
 	hud.add_child(_control_column())
-	hud.add_child(_mic_button())
+	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
 	return hud
 
@@ -206,12 +206,64 @@ func _menu_button() -> Button:
 ## Voice chat, between the move count in the middle and the menu at the far
 ## right. Deliberately bare: no panel, so it reads as a status affordance
 ## rather than a control competing with the view buttons.
-func _mic_button() -> Button:
+##
+## Grouped so the whole cluster can be hidden when there is no opponent; the
+## menu keeps its own slot rather than shifting when voice disappears.
+func _voice_row() -> Control:
+	var row := Control.new()
+	row.name = "VoiceRow"
+	row.unique_name_in_owner = true
+	row.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	row.position = Vector2(-152.0, 16.0)
+	row.size = Hud.TOUCH_SIZE
+	row.visible = false
+
+	var ring := Panel.new()
+	ring.name = "MicRing"
+	ring.unique_name_in_owner = true
+	ring.set_anchors_preset(Control.PRESET_FULL_RECT)
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.visible = false
+	ring.add_theme_stylebox_override("panel", _ring_box())
+	row.add_child(ring)
+
 	var button := _bare_icon_button("MicButton", Icons.mic_off())
-	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	button.position = Vector2(-152.0, 16.0)
-	button.size = Hud.TOUCH_SIZE
-	return button
+	button.set_anchors_preset(Control.PRESET_FULL_RECT)
+	row.add_child(button)
+
+	var dot := Panel.new()
+	dot.name = "RemoteDot"
+	dot.unique_name_in_owner = true
+	dot.position = Vector2(Hud.TOUCH_SIZE.x - 14.0, Hud.TOUCH_SIZE.y - 14.0)
+	dot.size = Vector2(11.0, 11.0)
+	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	dot.visible = false
+	dot.add_theme_stylebox_override("panel", _dot_box())
+	row.add_child(dot)
+
+	return row
+
+
+## A hairline outline that appears only while the mic is live. Carries the same
+## information as the glyph so the state survives a hard-to-read icon.
+func _ring_box() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0, 0, 0, 0)
+	box.border_color = Color(1.0, 0.88, 0.62, 0.62)
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(Hud.TOUCH_SIZE.x / 2.0)
+	return box
+
+
+## Activity light for the opponent transmitting. Placed at the far corner from
+## the mic glyph so it cannot be read as your own state.
+func _dot_box() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.55, 0.92, 0.62, 0.92)
+	box.set_corner_radius_all(6)
+	box.set_border_width_all(1)
+	box.border_color = Color(0.1, 0.14, 0.1, 0.85)
+	return box
 
 
 ## An icon button with no panel behind it.

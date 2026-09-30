@@ -127,12 +127,44 @@ func _centering_checks(buttons: Array) -> void:
 func _mic_checks(main: Main, hud: Hud) -> void:
 	print("Mic control")
 	_check("mic button exists", hud.mic_button != null, "")
+	# Versus the AI there is nobody to talk to, so the cluster starts hidden.
+	_check("voice is hidden against the AI", not hud.voice_row.visible
+		and not main.ai_opponent, "ai=%s" % main.ai_opponent)
 	_check("mic sits left of the menu",
-		hud.mic_button.position.x < hud.menu_button.position.x,
-		"mic=%.0f menu=%.0f" % [hud.mic_button.position.x, hud.menu_button.position.x])
-	_check("mic is in the top band", hud.mic_button.position.y < 100.0,
-		"y=%.0f" % hud.mic_button.position.y)
+		hud.mic_button.global_position.x < hud.menu_button.global_position.x,
+		"mic=%.0f menu=%.0f" % [
+			hud.mic_button.global_position.x, hud.menu_button.global_position.x])
+	_check("mic is in the top band", hud.mic_button.global_position.y < 100.0,
+		"y=%.0f" % hud.mic_button.global_position.y)
 	_check("mic has no panel behind it", hud.mic_button.flat, "")
+
+	# The ring and the dot are separate channels, so neither may be the only
+	# way to read the state.
+	var ring := hud.mic_ring
+	var dot := hud.remote_dot
+	hud.set_voice_visible(true)
+	_check("neither indicator starts visible", not ring.visible and not dot.visible, "")
+	hud.set_mic_enabled(true)
+	_check("ring shows while live", ring.visible and not dot.visible, "")
+	hud.set_mic_enabled(false)
+	_check("ring clears when muted", not ring.visible, "")
+	hud.set_remote_speaking(true)
+	_check("dot shows the opponent transmitting", dot.visible, "")
+	hud.set_remote_speaking(false)
+	_check("dot clears when they stop", not dot.visible, "")
+
+	# Hidden voice must not leave a live mic behind it.
+	hud.set_remote_speaking(false)
+	hud.set_mic_enabled(true)
+	hud.set_voice_visible(false)
+	_check("hiding voice hides the row", not hud.voice_row.visible, "")
+	_check("hiding voice forces muted", not hud.mic_enabled, "")
+	hud.set_remote_speaking(true)
+	_check("hiding voice clears the opponent dot", not dot.visible, "")
+	hud.set_voice_visible(true)
+	_check("showing voice reveals the row", hud.voice_row.visible, "")
+	hud.set_remote_speaking(false)
+	hud.set_mic_enabled(false)
 
 	var glyph := hud.mic_button.get_node_or_null("Glyph") as TextureRect
 	_check("mic carries a glyph", glyph != null and glyph.texture != null, "")
