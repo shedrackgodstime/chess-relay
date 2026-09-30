@@ -213,15 +213,17 @@ func _voice_row() -> Control:
 	var row := Control.new()
 	row.name = "VoiceRow"
 	row.unique_name_in_owner = true
-	# Dead centre between the move count and the menu, not merely near them.
-	# The turn label is anchored top-centre so it sits at 0.5*W; the menu sits
-	# at W-52 (84 from the edge, half a touch target back). The midpoint of
-	# those is 0.75*W - 26, which is an anchor rather than a pixel offset, so
-	# the placement holds at every width instead of only the one it was tuned
-	# on. A fixed offset from the right edge drifts as the screen narrows,
-	# which is what made it read as 'not really in the middle'.
-	row.anchor_left = 0.75
-	row.anchor_right = 0.75
+	# Anchored rather than offset, so the placement holds at every width
+	# instead of only the one it was tuned on. A fixed offset from the right
+	# edge drifts as the screen narrows, which is what made it read as 'not
+	# really in the middle' to begin with.
+	#
+	# 0.75 is the exact midpoint between the move count at 0.5*W and the menu
+	# at W-52; VOICE_ANCHOR sits past that because the label is a wide text
+	# block and the menu is a small button.
+	var centre := Hud.VOICE_ANCHOR
+	row.anchor_left = centre
+	row.anchor_right = centre
 	row.anchor_top = 0.0
 	row.anchor_bottom = 0.0
 	row.offset_left = -26.0 - Hud.TOUCH_SIZE.x * 0.5

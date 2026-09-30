@@ -57,6 +57,13 @@ const TOUCH_SIZE := Vector2(64.0, 64.0)
 ## construction, at any texture resolution.
 const ICON_INSET := 12.0
 
+## Where the voice control sits horizontally, as a fraction of the screen
+## width. The exact midpoint of the move count and the menu is 0.75; this is
+## deliberately past it, because the label is a wide block of text while the
+## menu is a small button, so a true 50/50 reads as closer to the label than
+## it actually is. Tuning, not derivation, hence a named value.
+const VOICE_ANCHOR := 0.78
+
 
 func _ready() -> void:
 	bind()

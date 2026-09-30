@@ -141,10 +141,15 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 	var label_mid := label.global_position.x + label.size.x * 0.5
 	var menu_mid := hud.menu_button.global_position.x + hud.menu_button.size.x * 0.5
 	var mic_mid := hud.mic_button.global_position.x + hud.mic_button.size.x * 0.5
-	var wanted := (label_mid + menu_mid) * 0.5
-	_check("mic is centred between the move count and the menu",
-		absf(mic_mid - wanted) <= 1.0,
-		"mic=%.0f wanted=%.0f label=%.0f menu=%.0f" % [mic_mid, wanted, label_mid, menu_mid])
+	# Between the two references, and leaning toward the menu rather than
+	# sitting on the exact midpoint. Asserting the midpoint instead would
+	# forbid the very tuning this placement was moved to allow.
+	var between := mic_mid > label_mid and mic_mid < menu_mid
+	var toward_menu := (menu_mid - mic_mid) < (mic_mid - label_mid)
+	_check("mic sits between the move count and the menu, leaning right",
+		between and toward_menu,
+		"mic=%.0f label=%.0f menu=%.0f anchor=%.2f" % [
+			mic_mid, label_mid, menu_mid, Hud.VOICE_ANCHOR])
 	_check("mic is in the top band", hud.mic_button.global_position.y < 100.0,
 		"y=%.0f" % hud.mic_button.global_position.y)
 	_check("mic has no panel behind it", hud.mic_button.flat, "")
