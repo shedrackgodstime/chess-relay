@@ -198,7 +198,7 @@ func _control_column() -> VBoxContainer:
 func _menu_button() -> Button:
 	var button := _icon_button("MenuButton", Icons.menu())
 	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	button.position = Vector2(-84.0, 16.0)
+	button.position = Vector2(-Hud.MENU_INSET, 16.0)
 	button.size = Hud.TOUCH_SIZE
 	return button
 
@@ -213,21 +213,19 @@ func _voice_row() -> Control:
 	var row := Control.new()
 	row.name = "VoiceRow"
 	row.unique_name_in_owner = true
-	# Anchored rather than offset, so the placement holds at every width
-	# instead of only the one it was tuned on. A fixed offset from the right
-	# edge drifts as the screen narrows, which is what made it read as 'not
-	# really in the middle' to begin with.
+	# Measured from the menu rather than from the screen, because the two are
+	# one corner cluster and must keep their spacing at any width.
 	#
-	# 0.75 is the exact midpoint between the move count at 0.5*W and the menu
-	# at W-52; VOICE_ANCHOR sits past that because the label is a wide text
-	# block and the menu is a small button.
-	var centre := Hud.VOICE_ANCHOR
-	row.anchor_left = centre
-	row.anchor_right = centre
+	# The menu centre is MENU_INSET back from the right edge, less half a touch
+	# target; the mic centre is a further VOICE_GAP to the left of that.
+	var menu_centre := Hud.MENU_INSET - Hud.TOUCH_SIZE.x * 0.5
+	var mic_centre := menu_centre + Hud.VOICE_GAP
+	row.anchor_left = 1.0
+	row.anchor_right = 1.0
 	row.anchor_top = 0.0
 	row.anchor_bottom = 0.0
-	row.offset_left = -26.0 - Hud.TOUCH_SIZE.x * 0.5
-	row.offset_right = -26.0 + Hud.TOUCH_SIZE.x * 0.5
+	row.offset_left = -mic_centre - Hud.TOUCH_SIZE.x * 0.5
+	row.offset_right = -mic_centre + Hud.TOUCH_SIZE.x * 0.5
 	row.offset_top = 16.0
 	row.offset_bottom = 16.0 + Hud.TOUCH_SIZE.y
 	row.visible = true

@@ -57,12 +57,16 @@ const TOUCH_SIZE := Vector2(64.0, 64.0)
 ## construction, at any texture resolution.
 const ICON_INSET := 12.0
 
-## Where the voice control sits horizontally, as a fraction of the screen
-## width. The exact midpoint of the move count and the menu is 0.75; this is
-## deliberately past it, because the label is a wide block of text while the
-## menu is a small button, so a true 50/50 reads as closer to the label than
-## it actually is. Tuning, not derivation, hence a named value.
-const VOICE_ANCHOR := 0.82
+## How far the menu button sits in from the right edge.
+const MENU_INSET := 84.0
+
+## Distance from the centre of the mic to the centre of the menu.
+##
+## Deliberately a gap rather than a fraction of screen width: the two controls
+## belong to the same corner, so they should hold their spacing as the screen
+## narrows. An anchor fraction drifts away from the menu on narrow displays,
+## which is the same complaint as the original fixed offset.
+const VOICE_GAP := 160.0
 
 
 func _ready() -> void:
