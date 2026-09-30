@@ -135,10 +135,16 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 		main.ai_opponent = with_ai
 		hud.set_voice_visible(Main.DEV_SHOW_VOICE or not with_ai)
 		_check("voice visible with ai_opponent=%s" % with_ai, hud.voice_row.visible, "")
-	_check("mic sits left of the menu",
-		hud.mic_button.global_position.x < hud.menu_button.global_position.x,
-		"mic=%.0f menu=%.0f" % [
-			hud.mic_button.global_position.x, hud.menu_button.global_position.x])
+	# Not "left of the menu" but exactly between the two references, measured
+	# rather than assumed so a resize cannot quietly undo it.
+	var label := hud.get_node("TurnLabel") as Label
+	var label_mid := label.global_position.x + label.size.x * 0.5
+	var menu_mid := hud.menu_button.global_position.x + hud.menu_button.size.x * 0.5
+	var mic_mid := hud.mic_button.global_position.x + hud.mic_button.size.x * 0.5
+	var wanted := (label_mid + menu_mid) * 0.5
+	_check("mic is centred between the move count and the menu",
+		absf(mic_mid - wanted) <= 1.0,
+		"mic=%.0f wanted=%.0f label=%.0f menu=%.0f" % [mic_mid, wanted, label_mid, menu_mid])
 	_check("mic is in the top band", hud.mic_button.global_position.y < 100.0,
 		"y=%.0f" % hud.mic_button.global_position.y)
 	_check("mic has no panel behind it", hud.mic_button.flat, "")
