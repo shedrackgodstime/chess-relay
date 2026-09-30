@@ -21,10 +21,19 @@ signal reset_view_requested
 signal flip_requested
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
-## Emitted when the mic button is toggled, with the requested state. Voice
-## transport is not built yet, so nothing listens; the control exists so the
-## affordance is settled before the audio plumbing lands.
-signal mic_toggled(enabled: bool)
+## The three states the mic control can present. Requesting is separate from
+## live on purpose: asking for voice and speaking are different things, and
+## collapsing them would leave the player unsure whether anyone heard them.
+enum VoiceState {
+	OFF,          ## muted, no voice
+	REQUESTING,   ## asking the other side for voice
+	LIVE,         ## transmitting
+}
+
+## Emitted whenever the mic control changes state. Voice transport is not built
+## yet, so nothing listens; the control exists so the affordance is settled
+## before the audio plumbing lands.
+signal voice_state_changed(state: VoiceState)
 
 ## The voice controls are hidden entirely when there is nobody to talk to, so
 ## the solo board keeps the space for the board itself.
@@ -41,8 +50,8 @@ signal mic_toggled(enabled: bool)
 @onready var menu_button: Button = %MenuButton
 @onready var mic_button: Button = %MicButton
 
-## Whether the mic control is currently presenting as live.
-var mic_enabled := false
+## Current presentation state of the mic control.
+var voice_state := VoiceState.OFF
 
 ## Voice controls only appear once a real opponent is on the other end.
 var voice_visible := false
@@ -93,7 +102,7 @@ func bind() -> void:
 	_connect(flip_button, _on_flip)
 	_connect(reset_button, _on_reset)
 	_connect(menu_button, _on_menu)
-	_connect(mic_button, _on_mic)
+	_connect(mic_button, _on_voice)
 
 
 func _connect(button: Button, method: Callable) -> void:
@@ -123,17 +132,34 @@ func _on_menu() -> void:
 
 ## Swaps the glyph between live and muted rather than tinting one, so "you are
 ## not speaking" cannot be misread as a styling state.
-func set_mic_enabled(enabled: bool) -> void:
-	mic_enabled = enabled
-	if mic_button == null:
-		return
-	var glyph := mic_button.get_node_or_null("Glyph") as TextureRect
-	if glyph != null:
-		glyph.texture = Icons.mic() if enabled else Icons.mic_off()
-	# The ring is a second, non-colour channel for the same fact, so the state
-	# still reads if the glyph is hard to make out against the board.
+func set_voice_state(state: VoiceState) -> void:
+	voice_state = state
+	if mic_button != null:
+		var glyph := mic_button.get_node_or_null("Glyph") as TextureRect
+		if glyph != null:
+			match state:
+				VoiceState.REQUESTING:
+					glyph.texture = Icons.mic_signal()
+				VoiceState.LIVE:
+					glyph.texture = Icons.mic()
+				_:
+					glyph.texture = Icons.mic_off()
+	# The ring marks live only. A request must not look like a live mic, or
+	# the other player will talk over someone who is merely asking.
 	if mic_ring != null:
-		mic_ring.visible = enabled
+		mic_ring.visible = state == VoiceState.LIVE
+
+
+func is_voice_live() -> bool:
+	return voice_state == VoiceState.LIVE
+
+
+func _on_voice() -> void:
+	# Off, then asking, then transmitting. Requesting sits in the middle so the
+	# common single tap asks for voice instead of silently transmitting, which
+	# is the less surprising thing to do to the opponent.
+	set_voice_state(voice_state + 1 if voice_state < VoiceState.LIVE else VoiceState.OFF)
+	voice_state_changed.emit(voice_state)
 
 
 ## Shows or hides the whole voice cluster. Turning it off also mutes, so the
@@ -143,7 +169,7 @@ func set_voice_visible(shown: bool) -> void:
 	if voice_row != null:
 		voice_row.visible = shown
 	if not shown:
-		set_mic_enabled(false)
+		set_voice_state(VoiceState.OFF)
 		set_remote_speaking(false)
 
 
@@ -152,8 +178,3 @@ func set_voice_visible(shown: bool) -> void:
 func set_remote_speaking(speaking: bool) -> void:
 	if remote_dot != null:
 		remote_dot.visible = speaking and voice_visible
-
-
-func _on_mic() -> void:
-	set_mic_enabled(not mic_enabled)
-	mic_toggled.emit(mic_enabled)

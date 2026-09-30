@@ -156,23 +156,47 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 	_check("mic has no panel behind it", hud.mic_button.flat, "")
 
 	# The ring and the dot are separate channels, so neither may be the only
-	# way to read the state.
+	# way to read the state. The ring means live only: a request must never be
+	# mistakable for an open mic, or the opponent talks over someone asking.
+	hud.set_voice_visible(true)
 	var ring := hud.mic_ring
 	var dot := hud.remote_dot
-	hud.set_voice_visible(true)
-	_check("neither indicator starts visible", not ring.visible and not dot.visible, "")
-	hud.set_mic_enabled(true)
-	_check("ring shows while live", ring.visible and not dot.visible, "")
-	hud.set_mic_enabled(false)
-	_check("ring clears when muted", not ring.visible, "")
+	_check("nothing shows at rest", not ring.visible and not dot.visible, "")
+
+	var states: Array[int] = []
+	hud.voice_state_changed.connect(func(st: Hud.VoiceState) -> void: states.append(st))
+
+	# One tap from rest must ask, not transmit.
+	hud.mic_button.emit_signal("pressed")
+	_check("first tap requests voice",
+		hud.voice_state == Hud.VoiceState.REQUESTING and states == [Hud.VoiceState.REQUESTING],
+		"state=%d" % hud.voice_state)
+	_check("a request shows no ring", not ring.visible, "")
+	_check("a request is not live", not hud.is_voice_live(), "")
+	var requesting_texture: Texture2D = (hud.mic_button.get_node("Glyph") as TextureRect).texture
+
+	hud.mic_button.emit_signal("pressed")
+	_check("second tap goes live", hud.is_voice_live(), "")
+	_check("live shows the ring", ring.visible, "")
+	var live_texture: Texture2D = (hud.mic_button.get_node("Glyph") as TextureRect).texture
+	_check("live uses a different glyph from requesting", live_texture != requesting_texture, "")
+
+	hud.mic_button.emit_signal("pressed")
+	_check("third tap returns to off",
+		hud.voice_state == Hud.VoiceState.OFF and states.size() == 3, "n=%d" % states.size())
+	_check("off clears the ring", not ring.visible, "")
+	var off_texture: Texture2D = (hud.mic_button.get_node("Glyph") as TextureRect).texture
+	_check("all three states use distinct glyphs",
+		off_texture != requesting_texture and requesting_texture != live_texture
+			and off_texture != live_texture, "")
+
 	hud.set_remote_speaking(true)
 	_check("dot shows the opponent transmitting", dot.visible, "")
 	hud.set_remote_speaking(false)
 	_check("dot clears when they stop", not dot.visible, "")
 
 	# Hidden voice must not leave a live mic behind it.
-	hud.set_remote_speaking(false)
-	hud.set_mic_enabled(true)
+	hud.set_voice_state(Hud.VoiceState.LIVE)
 	hud.set_voice_visible(false)
 	_check("hiding voice hides the row", not hud.voice_row.visible, "")
 	_check("hiding voice forces muted", not hud.mic_enabled, "")
@@ -181,24 +205,10 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 	hud.set_voice_visible(true)
 	_check("showing voice reveals the row", hud.voice_row.visible, "")
 	hud.set_remote_speaking(false)
-	hud.set_mic_enabled(false)
+	hud.set_voice_state(Hud.VoiceState.OFF)
 
-	var glyph := hud.mic_button.get_node_or_null("Glyph") as TextureRect
-	_check("mic carries a glyph", glyph != null and glyph.texture != null, "")
-	# The scene stores the generated texture, so the button starts with a
-	# deserialised copy rather than the instance Icons caches in this process.
-	# Identity is therefore only meaningful after a toggle.
-	var muted_texture: Texture2D = glyph.texture
-
-	var fired: Array[bool] = []
-	hud.mic_toggled.connect(func(on: bool) -> void: fired.append(on))
-	hud.mic_button.emit_signal("pressed")
-	_check("mic toggles on and announces it",
-		fired.size() == 1 and fired[0] and hud.mic_enabled, "fired=%d" % fired.size())
-	_check("live and muted use different glyphs", glyph.texture != muted_texture, "")
-	hud.mic_button.emit_signal("pressed")
-	_check("mic toggles back off", not hud.mic_enabled and fired.size() == 2, "")
-	_check("muted glyph is restored", glyph.texture == Icons.mic_off(), "")
+	_check("mic carries a glyph",
+		hud.mic_button.get_node_or_null("Glyph") is TextureRect, "")
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.
@@ -304,7 +314,8 @@ func _turn_checks(main: Main, hud: Hud) -> void:
 ## viewBox and raster size the importer needs.
 func _asset_checks() -> void:
 	print("Icon assets")
-	for name in ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings", "mic", "mic_off"]:
+	for name in ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings",
+		"mic", "mic_off", "mic_signal"]:
 		var path := "res://ui/icons/%s.svg" % name
 		var exists := FileAccess.file_exists(path)
 		_check("svg present: %s" % name, exists, path)
@@ -322,9 +333,10 @@ func _asset_checks() -> void:
 	# Every icon resolves to a real texture here, via SVG or the drawn fallback.
 	var resolved: Array[Texture2D] = [
 		Icons.rotate_left(), Icons.rotate_right(), Icons.flip(), Icons.reset(),
-		Icons.menu(), Icons.settings(), Icons.mic(), Icons.mic_off(),
+		Icons.menu(), Icons.settings(), Icons.mic(), Icons.mic_off(), Icons.mic_signal(),
 	]
-	var names := ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings", "mic", "mic_off"]
+	var names := ["rotate_left", "rotate_right", "flip", "reset", "menu", "settings",
+		"mic", "mic_off", "mic_signal"]
 	for i in resolved.size():
 		_check("icon resolves: %s" % names[i], resolved[i] != null, "")
 

@@ -57,6 +57,12 @@ static func mic_off() -> Texture2D:
 	return _icon("mic_off", _fallback_mic)
 
 
+## Asking for voice, distinct from having it. Broadcasting rather than merely
+## muted, so it must not be confusable with the off state.
+static func mic_signal() -> Texture2D:
+	return _icon("mic_signal", _fallback_mic_signal)
+
+
 static func clear_cache() -> void:
 	_cache.clear()
 
@@ -150,6 +156,15 @@ static func _fallback_menu() -> Image:
 
 ## Capsule plus stand: close enough to a microphone that the button is never
 ## ambiguous before the real icon has been imported.
+static func _fallback_mic_signal() -> Image:
+	var img := _fallback_mic()
+	# Two radiating arcs either side, signalling a request going out.
+	var y := CANVAS * 0.40
+	_arc(img, Vector2(CANVAS * 0.24, y), CANVAS * 0.22, CANVAS * 0.05, 250.0, 290.0, 1.0)
+	_arc(img, Vector2(CANVAS * 0.76, y), CANVAS * 0.22, CANVAS * 0.05, 250.0, 290.0, -1.0)
+	return img
+
+
 static func _fallback_mic() -> Image:
 	var img := _blank()
 	var width := CANVAS * 0.17
