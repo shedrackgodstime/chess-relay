@@ -206,19 +206,37 @@ func _icon_button(node_name: String, icon: Texture2D) -> Button:
 	var button := Button.new()
 	button.name = node_name
 	button.unique_name_in_owner = true
-	button.icon = icon
+	button.icon = null
 	button.custom_minimum_size = Hud.TOUCH_SIZE
-	# expand_icon scales the glyph to the button, which can overshoot and leave
-	# it hanging over the edge; icon_max_width caps it so there is even padding
-	# inside the rounded panel.
-	button.expand_icon = true
-	button.add_theme_constant_override("icon_max_width", Hud.ICON_SIZE)
+	button.add_child(_glyph(icon))
 	button.focus_mode = Control.FOCUS_NONE
 	button.tooltip_text = node_name.trim_suffix("Button").to_lower()
 	button.add_theme_stylebox_override("normal", _button_box())
 	button.add_theme_stylebox_override("hover", _button_box(Color(0.16, 0.13, 0.11)))
 	button.add_theme_stylebox_override("pressed", _button_box(Color(0.26, 0.20, 0.15)))
 	return button
+
+
+## The glyph itself, in a rect inset from the button on all four sides and
+## scaled to fit without distorting. KEEP_ASPECT_CENTERED guarantees the
+## artwork is optically centred whatever size the texture imported at, which
+## is the whole point: the Android and desktop imports can differ in size and
+## the button must not care.
+func _glyph(icon: Texture2D) -> TextureRect:
+	var rect := TextureRect.new()
+	rect.name = "Glyph"
+	rect.texture = icon
+	rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The rect fills the button apart from a fixed inset, so the glyph is
+	# centred in the button rather than wherever the icon layout puts it.
+	rect.set_anchors_preset(Control.PRESET_FULL_RECT)
+	rect.offset_left = Hud.ICON_INSET
+	rect.offset_top = Hud.ICON_INSET
+	rect.offset_right = -Hud.ICON_INSET
+	rect.offset_bottom = -Hud.ICON_INSET
+	return rect
 
 
 ## Rounded dark panel behind each icon, so the controls read as a deliberate

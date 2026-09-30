@@ -47,17 +47,18 @@ func _layout_checks(hud: Hud) -> void:
 			touch += 1
 	_check("buttons meet phone touch size", touch == 4, "ok=%d/4" % touch)
 
-	# Icon-only: no text, but a tooltip and a real icon.
+	# Icon-only: no text, but a tooltip, and a real glyph on the button.
 	var labelled := 0
 	var with_icon := 0
-	for button in view_buttons + [hud.menu_button]:
-		if button.icon != null:
-			with_icon += 1
+	for button: Button in view_buttons + [hud.menu_button]:
 		if button.text == "" and button.tooltip_text != "":
 			labelled += 1
+		var glyph := button.get_node_or_null("Glyph") as TextureRect
+		if glyph != null and glyph.texture != null:
+			with_icon += 1
 	_check("all buttons are icon-only with tooltips", labelled == 5,
 		"ok=%d/5" % labelled)
-	_check("all buttons have generated icons", with_icon == 5, "ok=%d/5" % with_icon)
+	_check("all buttons carry a generated icon", with_icon == 5, "ok=%d/5" % with_icon)
 
 	# Vertical column, right-aligned, in a deliberate order.
 	var column := hud.control_column
@@ -69,23 +70,55 @@ func _layout_checks(hud: Hud) -> void:
 			and column.get_child(1).name == "RotateRightButton"
 			and column.get_child(2).name == "FlipButton"
 			and column.get_child(3).name == "ResetButton",
-		"%s" % _child_names(column))
+		str(_child_names(column)))
 	# Anchors, not absolute pixels: the layout must hold at any resolution,
 	# which is the point of anchoring in the first place.
-	# Padding: the glyph must be capped smaller than the button it sits in, or
-	# expand_icon overshoots and the icon hangs over the panel edge.
-	var capped := 0
-	for button in view_buttons:
-		var limit: int = button.get_theme_constant("icon_max_width")
-		if limit > 0 and Vector2(limit, limit) < button.custom_minimum_size:
-			capped += 1
-	_check("icons are padded inside their buttons", capped == 4, "ok=%d/4" % capped)
+	_centering_checks(view_buttons)
 
 	_check("column is anchored to the right edge", column.anchor_left >= 0.9,
 		"anchor_left=%.2f" % column.anchor_left)
 	_check("column is vertically centred",
 		absf(column.anchor_top - 0.5) < 0.01 and absf(column.anchor_bottom - 0.5) < 0.01,
 		"top=%.2f bottom=%.2f" % [column.anchor_top, column.anchor_bottom])
+
+
+## Centring must not depend on Button's own icon layout. expand_icon sizes
+## the icon from the button rect and clamps afterwards, so the draw offset can
+## be derived from the pre-clamp size and land off-centre. The glyph instead
+## lives in an inset rect, which is centred by construction.
+func _centering_checks(buttons: Array) -> void:
+	print("Icon centring")
+	var checked := 0
+	for button in buttons:
+		if button == null:
+			continue
+		var glyph := button.get_node_or_null("Glyph") as TextureRect
+		if glyph == null:
+			continue
+		checked += 1
+		# Symmetric insets on every side, so the glyph sits dead centre.
+		var symmetric: bool = is_equal_approx(glyph.offset_left, -glyph.offset_right) \
+			and is_equal_approx(glyph.offset_top, -glyph.offset_bottom)
+		# A real inset, so the glyph does not touch the panel edge.
+		var padded: bool = glyph.offset_left > 0.0 and glyph.offset_top > 0.0
+		# Aspect preserved and centred whatever size the texture imported at.
+		var centred: bool = glyph.stretch_mode == TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		# The button must not also be doing its own icon layout.
+		var button_has_icon: Texture2D = button.icon
+		var not_on_button: bool = button_has_icon == null and not button.expand_icon
+		# Clicks must reach the button through the glyph.
+		var clickable: bool = glyph.mouse_filter == Control.MOUSE_FILTER_IGNORE
+		if symmetric and padded and centred and not_on_button and clickable:
+			continue
+		_check("%s glyph centred" % button.name, false,
+			"symmetric=%s padded=%s centred=%s offButton=%s clickable=%s" % [
+				symmetric, padded, centred, not_on_button, clickable
+			])
+	if checked == 4:
+		_check("all four view glyphs are centred and padded", true,
+			"inset=%.0f" % Hud.ICON_INSET)
+	_check("all four view buttons use the inset glyph",
+		checked == 4, "found=%d" % checked)
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.
