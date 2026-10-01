@@ -53,7 +53,9 @@ func _snapshot_checks() -> void:
 	print("Snapshots")
 	var state := BoardState.new()
 	var snap := state.to_array()
-	_check("snapshot is 65 values", snap.size() == 65, "size=%d" % snap.size())
+	# 64 squares, side to move, castling rights, and the en passant square.
+	_check("snapshot carries the whole position", snap.size() == 68,
+		"size=%d" % snap.size())
 
 	var restored := BoardState.new()
 	_check("snapshot restores", restored.from_array(snap), "")

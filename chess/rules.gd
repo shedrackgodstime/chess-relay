@@ -57,8 +57,8 @@ static func pseudo_legal_moves(state: BoardState, square: Vector2i) -> Array[Vec
 		PieceProfiles.Type.KNIGHT:
 			_step_moves(state, square, piece.y, KNIGHT_STEPS, moves)
 		PieceProfiles.Type.KING:
-			_step_moves(state, square, piece.y,
-				ROOK_DIRS + BISHOP_DIRS, moves)
+			_step_moves(state, square, piece.y, ROOK_DIRS + BISHOP_DIRS, moves)
+			_castling_moves(state, square, piece.y, moves)
 		PieceProfiles.Type.ROOK:
 			_slide_moves(state, square, piece.y, ROOK_DIRS, moves)
 		PieceProfiles.Type.BISHOP:
@@ -162,6 +162,93 @@ static func king_square(state: BoardState, side: int) -> Vector2i:
 	return Vector2i(-1, -1)
 
 
+## Whether this side may still castle kingside, ignoring where the king currently
+## is. Rights plus the pieces being home.
+##
+## Separated from the full test on purpose: the castling indicator needs to know
+## whether castling is available at all, which is this, while legality also
+## depends on the board in front of the king.
+static func can_castle_kingside(state: BoardState, side: int) -> bool:
+	return _has_castling_right(state, side, true)
+
+
+static func can_castle_queenside(state: BoardState, side: int) -> bool:
+	return _has_castling_right(state, side, false)
+
+
+static func _has_castling_right(state: BoardState, side: int, kingside: bool) -> bool:
+	var bit := (BoardState.CASTLE_DARK_KINGSIDE if side == BoardState.DARK
+		else BoardState.CASTLE_WHITE_KINGSIDE) if kingside else \
+		(BoardState.CASTLE_DARK_QUEENSIDE if side == BoardState.DARK
+		else BoardState.CASTLE_WHITE_QUEENSIDE)
+	if (state.castling_rights & bit) == 0:
+		return false
+	# The king must still be home and the rook must still be beside it. A rook
+	# captured on its home square loses the right through ChessGame, but a state
+	# built by hand may not have gone through that.
+	if state.at(BoardState.KING_HOME[side].x, BoardState.KING_HOME[side].y) \
+			!= BoardState.encode(PieceProfiles.Type.KING, side):
+		return false
+	var rook_square: Vector2i = BoardState.ROOK_HOME[side][kingside]
+	return state.at(rook_square.x, rook_square.y) \
+		== BoardState.encode(PieceProfiles.Type.ROOK, side)
+
+
+## Castling destinations, when the whole thing is actually available.
+##
+## Every condition is checked here rather than left to is_legal, because is_legal
+## only evaluates the square the king ends on. The squares it passes through are
+## the ones it would miss, and a king that may not cross an attacked square must
+## not be able to.
+static func _castling_moves(state: BoardState, from: Vector2i, side: int,
+		moves: Array[Vector2i]) -> void:
+	if from != BoardState.KING_HOME[side]:
+		return
+	if Rules.is_in_check(state, side):
+		return
+	for kingside in [true, false]:
+		if not _has_castling_right(state, side, kingside):
+			continue
+		var rook_square: Vector2i = BoardState.ROOK_HOME[side][kingside]
+		var destination := Vector2i(BoardState.CASTLE_KING_TO[kingside].x, from.y)
+		# Nothing between the king and its rook, and nothing where the king lands.
+		if not _span_is_clear(state, from, rook_square, destination):
+			continue
+		# The king crosses every square it passes, and each must be safe. The
+		# board still has the king on its home square here, which is correct:
+		# what matters is whether that square attacked, not whether the king could
+		# legally stand on it.
+		var step := 1 if kingside else -1
+		var transit := from
+		while transit.x != destination.x:
+			transit.x += step
+			if transit == destination:
+				continue
+			if is_attacked(state, transit, 1 - side):
+				transit = Vector2i(-1, -1)
+				break
+		if transit.x < 0:
+			continue
+		moves.append(destination)
+
+
+static func _span_is_clear(state: BoardState, from: Vector2i, rook: Vector2i,
+		destination: Vector2i) -> bool:
+	# Starting one square along, not at the king: the king's own square is
+	# occupied by the king, so testing it would always fail and castling would
+	# never be generated at all.
+	var step := signi(rook.x - from.x)
+	var x := from.x + step
+	while x != rook.x:
+		if state.at(x, from.y) != BoardState.EMPTY:
+			return false
+		x += step
+	# The square the king lands on is between it and the rook, so the loop above
+	# already covers it; kept explicit here because it is the square that
+	# matters most and relying on the loop's path to reach it is too subtle.
+	return state.at(destination.x, from.y) == BoardState.EMPTY
+
+
 static func is_in_check(state: BoardState, side: int) -> bool:
 	var king := king_square(state, side)
 	if king.x < 0:
@@ -224,11 +311,18 @@ static func _pawn_moves(state: BoardState, from: Vector2i, side: int,
 				and BoardState.is_inside(from.x, two_rank) \
 				and state.at(from.x, two_rank) == BoardState.EMPTY:
 			moves.append(Vector2i(from.x, two_rank))
-	# Captures are diagonal only, and only onto an occupied enemy square. This
-	# is why pawns cannot move diagonally into empty space.
+	# Captures are diagonal only, and onto an occupied enemy square. This is why
+	# pawns cannot move diagonally into empty space.
 	for step in [-1, 1]:
 		var capture := Vector2i(from.x + step, next_rank)
 		if not BoardState.is_inside(capture.x, capture.y):
+			continue
+		# En passant: the one diagonal move onto an empty square a pawn has,
+		# landing behind a pawn that has just gone two squares. The sole exception
+		# to the rule below, so it is checked before the occupied-square test
+		# rather than folded into it.
+		if state.en_passant_square == capture:
+			moves.append(capture)
 			continue
 		var code := state.at(capture.x, capture.y)
 		if code == BoardState.EMPTY:
@@ -344,52 +438,4 @@ static func _at(squares: PackedInt32Array, square: Vector2i) -> int:
 	if not BoardState.is_inside(square.x, square.y):
 		return BoardState.EMPTY
 	return squares[square.y * BoardState.BOARD_SIZE + square.x]
-
-
-## Counts the leaf nodes reachable in exactly `depth` plies.
-##
-## The standard correctness check for a move generator, and the reason this
-## exists as a method rather than living in a test file: the published node
-## counts are fixed, well known numbers, so a generator that disagrees with one
-## is wrong in a way no hand-written assertion will reliably describe. A single
-## wrong castling or en-passant case shifts the count and every other count with
-## it.
-##
-## Applies and undoes moves in place rather than copying the board each ply,
-## because a copy per node is most of the cost at depth five.
-##
-## Castling and en passant are not implemented, so counts for positions that
-## depend on them will not match. The opening counts below do not reach either,
-## which is why they can be trusted as they stand.
-static func perft(state: BoardState, depth: int) -> int:
-	if state == null or depth <= 0:
-		return 1
-	var moves := legal_moves(state, state.side_to_move)
-	if depth == 1:
-		return moves.size()
-	var nodes := 0
-	for move in moves:
-		var from := move.from_square.y * BoardState.BOARD_SIZE + move.from_square.x
-		var to := move.to_square.y * BoardState.BOARD_SIZE + move.to_square.x
-		var moved := state.squares[from]
-		var captured := state.squares[to]
-		# Read before clearing: landing_code inspects the origin square to know
-		# what is moving, and clearing first made every move land a light pawn.
-		# Depth 2 still matched by luck because leaf counting never looks at the
-		# piece that arrived.
-		var landing := landing_code(state, move)
-		state.squares[from] = BoardState.EMPTY
-		state.squares[to] = landing
-		state.side_to_move = 1 - state.side_to_move
-
-		nodes += perft(state, depth - 1)
-
-		state.side_to_move = 1 - state.side_to_move
-		state.squares[from] = moved
-		state.squares[to] = captured
-	return nodes
-
-
-## Node counts for the opening position, which are published constants rather
-## than anything this code chose.
-const PERFT_STARTPOS := {1: 20, 2: 400, 3: 8902, 4: 197281, 5: 4865609}
+## Whether this move is fully legal, king safety included.

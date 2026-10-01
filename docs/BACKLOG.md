@@ -108,19 +108,34 @@ Two possible fixes, not yet decided:
 - Make picking prefer a piece that is behind a nearer blocker. Riskier: it changes
   what every tap means, not just this one case.
 
+## Open bug
+
+### Perft position 3 is two moves over
+
+`8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -` should give 191 at depth 2 and we give
+**193**. Depth 1 is exact at 14, Kiwipete is exact at 48 and 2039, and the direct
+en passant tests pass, so the en passant mechanism itself works: the square is
+recorded behind a double push, the capture is offered, the victim is removed from
+where it stood rather than where it was taken, and the capture is counted.
+
+So something else in this position over-generates. Position 3 is the standard
+test for en passant captures that expose a king along a rank, which is the first
+thing to look at. The suite asserts 193 rather than 191 so the number is visible
+and cannot quietly drift further, and the assertion is named so it reads as
+known-broken rather than as a passing test.
+
 ## Rules not yet implemented
 
 The move generator refuses these rather than mishandling them, which is safe but
 incomplete. `Rules` is the only place that needs to change.
 
-- **Castling.** Needs castling rights tracked on `BoardState` (has the king or the
-  relevant rook moved), and it is why the king's own square currently has no
-  long move. Also needs the spaces between to be empty and unattacked, which the
-  existing attack detection already covers. The castling indicator above waits
-  on `can_castle_kingside()` and `can_castle_queenside()`, so add those with it.
-- **En passant.** Needs the previous move, or an en-passant square on `BoardState`.
-  The capture is a pawn stepping diagonally onto a square that is empty, which is
-  why `Rules._pawn_moves` currently never generates it.
+- **Castling.** Done. Rights live on `BoardState` and are part of `hash` and
+  `to_array`, because two peers can agree on every square and still be in
+  different games. `can_castle_kingside()` and `can_castle_queenside()` exist for
+  the indicator. The rook moves with the king and the right is spent.
+- **En passant.** Done, apart from the perft position 3 bug above. The square is
+  recorded on a double push, captured on landing, and cleared by everything else.
+
 - **Draws.** Threefold repetition, the fifty-move rule, and insufficient material.
   All three are cheap on top of a move history that already exists
   (`ChessGame.history`), except insufficient material, which is a piece-count test.
