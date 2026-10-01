@@ -53,6 +53,7 @@ func _init() -> void:
 	await _capture_and_knight_checks()
 
 	await _promotion_checks()
+	await _selection_checks()
 
 	scene.queue_free()
 	await _side_ownership_checks()
@@ -120,6 +121,57 @@ func _capture_and_knight_checks() -> void:
 		knight.position.distance_to(BoardMesh.square_position(2, 2)) < 0.01,
 		"pos=%s" % knight.position)
 	_check("knight registry follows", knight.home_square == Vector2i(2, 2), "")
+
+	scene.queue_free()
+	await process_frame
+
+
+## Selection switching, on its own scene.
+##
+## The pawn on a4 from the slide test is not reusable here: tapping another of
+## your own pieces to re-select needs the held piece to stay put, and a move in
+## between would change what is on the board.
+func _selection_checks() -> void:
+	print("Selection")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+
+	# b2 and c2, because a2 is moved later in this sequence and these two are
+	# not touched by it.
+	_tap_square(main, Vector2i(1, 1))
+	_check("the first piece selects", main.selected == Vector2i(1, 1),
+		"selected=%s" % main.selected)
+
+	# A different piece of your own: the selection should move, not attempt a
+	# move from the held piece and refuse.
+	_tap_square(main, Vector2i(2, 1))
+	_check("tapping another of your own pieces re-selects it",
+		main.selected == Vector2i(2, 1), "selected=%s" % main.selected)
+	_check("the first piece did not move", main.pieces.has(Vector2i(1, 1)), "")
+
+	# Tapping the held piece again is still how you deselect.
+	_tap_square(main, Vector2i(2, 1))
+	_check("tapping the selected piece deselects it",
+		main.selected == Vector2i(-1, -1), "selected=%s" % main.selected)
+
+	# An empty square is a destination, not a change of mind.
+	_tap_square(main, Vector2i(2, 1))
+	_tap_square(main, Vector2i(2, 2))
+	_check("an empty square is still moved to",
+		main.selected == Vector2i(-1, -1) and main.pieces.has(Vector2i(2, 2)),
+		"selected=%s" % main.selected)
+
+	# Re-selection must not swallow a capture either. The capture check above
+	# covers the taking; what matters here is that holding one piece and tapping
+	# another side's piece is read as a move and not as a change of mind.
+	_tap_square(main, Vector2i(1, 1))
+	_tap_square(main, Vector2i(1, 2))
+	_check("a held piece still moves to an empty square with another held first",
+		main.pieces.has(Vector2i(1, 2)), "selected=%s" % main.selected)
 
 	scene.queue_free()
 	await process_frame

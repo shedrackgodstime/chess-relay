@@ -93,9 +93,12 @@ func _ready() -> void:
 	game.moved.connect(_on_game_moved)
 	_collect_pieces()
 	_connect_hud()
+	if game.finished != null:
+		game.finished.connect(_on_game_finished)
 	if hud.promotion_picker != null:
 		hud.promotion_picker.chosen.connect(_on_promotion_chosen)
 	hud.bind()
+	_on_game_finished(game.result())
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Voice is a property of the mode, so it is decided once here rather than
 	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
@@ -236,6 +239,15 @@ func _tap(screen_position: Vector2) -> void:
 	if square == selected:
 		_deselect()
 		return
+	# Tapping a second piece of your own re-selects it rather than being read as
+	# "move the held piece here". The square-below branch cannot tell the two
+	# apart on its own, so ownership is checked first: if the new square holds a
+	# piece you may pick up, the intent is to change your mind.
+	if _holds_pickup_piece(square):
+		_deselect()
+		selected = square
+		highlight.show_at(square.x, square.y)
+		return
 	# A piece already in hand can only be released on a legal turn. Without
 	# this the player could move their own pieces while it was the opponent's
 	# move, which puts two sides in the same game.
@@ -256,6 +268,24 @@ func _tap(screen_position: Vector2) -> void:
 	if game.apply_move(move):
 		_deselect()
 		_maybe_ai_move()
+
+
+## Announces the end, and stops the game being played on.
+##
+## The board already refuses the moves; this is the part the board cannot say,
+## because a position with nowhere to go looks the same whether or not anyone
+## has noticed.
+func _on_game_finished(result: ChessGame.Result) -> void:
+	_deselect()
+	match result:
+		ChessGame.Result.WHITE_WINS:
+			hud.set_game_over("CHECKMATE  ·  White wins")
+		ChessGame.Result.BLACK_WINS:
+			hud.set_game_over("CHECKMATE  ·  Black wins")
+		ChessGame.Result.DRAW_BY_STALEMATE:
+			hud.set_game_over("STALEMATE  ·  draw")
+		_:
+			hud.set_game_over("")
 
 
 ## The promotion waiting on the player's answer, if any.
@@ -290,6 +320,21 @@ func _on_promotion_chosen(type: int) -> void:
 ## The side the opponent plays: always the one the player is not.
 func opponent_side() -> int:
 	return 1 - player_side
+
+
+## Whether this square holds a piece the player is allowed to pick up.
+##
+## Kept separate from _may_take because that one also asks whether it is their
+## turn, and re-selecting has to work mid-thought, not only on your own move.
+func _holds_pickup_piece(square: Vector2i) -> bool:
+	if not pieces.has(square):
+		return false
+	var piece: PieceView = pieces[square]
+	if ai_opponent:
+		return piece.side == player_side
+	# With no opponent both sides are playable, but re-selection must still not
+	# swallow captures: it only applies to the piece the turn belongs to.
+	return piece.side == game.state.side_to_move
 
 
 ## Whether this square may be picked up right now.

@@ -27,6 +27,7 @@ func _init() -> void:
 	_promotion_checks()
 	_pin_checks()
 	_endgame_checks()
+	_game_over_checks()
 	if _failures == 0:
 		print("rules: all checks passed")
 	else:
@@ -360,6 +361,79 @@ func _pin_checks() -> void:
 	_check("a pinned bishop may still move along the diagonal",
 		_permits(diag, Vector2i(5, 5), Vector2i(6, 6))
 			or _permits(diag, Vector2i(5, 5), Vector2i(4, 3)), "")
+
+
+## The game has to actually stop. Without this the board carries on being
+## playable after mate, so the losing side moves again and is answered, and the
+## AI appears to keep playing a finished game.
+func _game_over_checks() -> void:
+	print("Game over")
+	var game := ChessGame.new()
+	game.state.squares.fill(BoardState.EMPTY)
+	game.state.set_square(6, 6, BoardState.encode(PieceProfiles.Type.QUEEN, BoardState.LIGHT))
+	game.state.set_square(5, 5, BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	game.state.set_square(7, 7, BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	game.state.side_to_move = BoardState.DARK
+	_check("a position with legal moves is still going",
+		not ChessGame.new().is_over(), "")
+	_check("checkmate is reported as a win for the other side",
+		game.result() == ChessGame.Result.WHITE_WINS, "")
+
+	var moves := Rules.legal_moves(game.state, game.state.side_to_move)
+	_check("the mated side has nothing to play", moves.is_empty(), "")
+
+	# The refusal that matters: nothing may be played once it is over.
+	var accepted := 0
+	for mv in moves:
+		if game.apply_move(mv):
+			accepted += 1
+	_check("no move is accepted after mate", accepted == 0, "accepted=%d" % accepted)
+	_check("still over after the attempt", game.is_over(), "")
+	_check("the AI has nothing to offer after mate",
+		AiPlayer.choose_move(game, game.state.side_to_move) == null, "")
+
+	# And it must be announced exactly once.
+	var seen: Array[int] = []
+	game.finished.connect(func(r: ChessGame.Result) -> void: seen.append(r))
+	game.state.side_to_move = BoardState.DARK
+	game.apply_move(ChessMove.new(Vector2i(0, 0), Vector2i(0, 1)))
+	_check("no finish signal for a game that was never played", seen.is_empty(),
+		"seen=%d" % seen.size())
+
+	# Ra1-a8 is the mating move: it checks along the eighth, and Kg6 covers the
+	# king's three ways off it. Built before the move rather than after, since a
+	# king cannot be captured and so could never be the thing taken.
+	var mating := ChessGame.new()
+	mating.state.squares.fill(BoardState.EMPTY)
+	mating.state.set_square(0, 0, BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT))
+	mating.state.set_square(6, 5, BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	mating.state.set_square(7, 7, BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	mating.state.side_to_move = BoardState.LIGHT
+	var finishes: Array[int] = []
+	mating.finished.connect(func(r: ChessGame.Result) -> void: finishes.append(r))
+	_check("the position before the move is still going",
+		mating.result() == ChessGame.Result.ONGOING, "")
+	_check("Ra1-a8 applies", mating.apply_move(ChessMove.new(Vector2i(0, 0), Vector2i(0, 7))),
+		"")
+	# White mated Black here, so it is White who wins.
+	_check("a back-rank mate is detected",
+		mating.result() == ChessGame.Result.WHITE_WINS,
+		"%d" % mating.result())
+	_check("finishing is signalled once, when the mating move lands",
+		finishes.size() == 1 and finishes[0] == ChessGame.Result.WHITE_WINS,
+		"signals=%d" % finishes.size())
+	_check("nothing is played after the mating move",
+		not mating.apply_move(ChessMove.new(Vector2i(7, 7), Vector2i(6, 6))), "")
+
+	# Stalemate is not a win for anyone.
+	var stale := ChessGame.new()
+	stale.state.squares.fill(BoardState.EMPTY)
+	stale.state.set_square(6, 5, BoardState.encode(PieceProfiles.Type.QUEEN, BoardState.LIGHT))
+	stale.state.set_square(5, 5, BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	stale.state.set_square(7, 7, BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	stale.state.side_to_move = BoardState.DARK
+	_check("stalemate is a draw, not a win",
+		stale.result() == ChessGame.Result.DRAW_BY_STALEMATE, "")
 
 
 func _endgame_checks() -> void:

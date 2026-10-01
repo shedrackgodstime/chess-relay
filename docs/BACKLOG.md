@@ -5,6 +5,41 @@ quietly dropped. Ordered by what is likely to bite the player next.
 
 ## Open
 
+### Indicator vocabulary
+
+Agreed: the indicator means **"this square is a legal destination"**, not one
+special effect per rule. A castling square gets the normal dot; an en-passant
+square gets the normal capture indicator; only promotion needs a popup, because
+the destination alone does not say which piece the pawn becomes. The unusual
+parts belong to the rules engine, not to the visuals.
+
+| Situation | Indicator |
+| --- | --- |
+| Empty legal destination | small dot |
+| Legal capture | ring or outlined dot, or highlight the piece |
+| Selected piece | highlighted square, border or glow |
+| Castling | an ordinary destination dot |
+| En passant | an ordinary capture indicator |
+| Promotion | piece-selection popup, already built |
+| Last move | subtle highlight on both squares |
+| King in check | strong highlight on the king's square, then the ordinary escape dots |
+| Checkmate | no indicators at all; the game-over banner, already built |
+| Illegal attempt | a brief shake or flash. No indicator for it |
+
+Indicators should be toggleable in settings. Worth deciding the default, and
+whether the last-move highlight is part of the same toggle or separate, since it
+is the one players tend to want permanently.
+
+Legal-move hints are already available: `Rules.pseudo_legal_moves` gives the
+destinations and `Rules.is_attacked` tells a capture from a quiet move, so the
+whole table above needs no rules work.
+
+Castling indicator specifically: when the king on its own square is selected, the
+kingside and queenside destinations get ordinary destination dots. That needs
+`can_castle_kingside()` and `can_castle_queenside()` on `Rules`, which do not
+exist yet because castling is not written. Noted so it is not forgotten when it
+is.
+
 ### Selection should switch, not wait
 
 Tapping one of your own pieces while a different one of yours is already selected
@@ -27,9 +62,15 @@ see what happened last without remembering it. Squares are already highlightable
 Related and probably wanted in the same pass: mark the piece that is check, and
 the last piece that moved. The turn label already says whose move it is.
 
-### Promotion is a choice, not an automatic queen
+### Promotion
 
-**This is the current task.** See below.
+Done. The move is held until the player chooses, and the pawn is rebuilt in place
+as the chosen piece.
+
+### The game should end
+
+Done. `ChessGame.result()` reports the outcome from the position, `apply_move`
+refuses once it is over, and the HUD shows a banner.
 
 ### The e-file cannot be tapped at the default pitch
 
@@ -51,7 +92,8 @@ incomplete. `Rules` is the only place that needs to change.
 - **Castling.** Needs castling rights tracked on `BoardState` (has the king or the
   relevant rook moved), and it is why the king's own square currently has no
   long move. Also needs the spaces between to be empty and unattacked, which the
-  existing attack detection already covers.
+  existing attack detection already covers. The castling indicator above waits
+  on `can_castle_kingside()` and `can_castle_queenside()`, so add those with it.
 - **En passant.** Needs the previous move, or an en-passant square on `BoardState`.
   The capture is a pawn stepping diagonally onto a square that is empty, which is
   why `Rules._pawn_moves` currently never generates it.

@@ -21,6 +21,17 @@ signal reset_view_requested
 signal flip_requested
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
+## Shows the end of the game over the board, or clears it.
+##
+## Checkmate is the one outcome that has to be said plainly: the board itself
+## does not tell you the game is over, only that there is nowhere to go.
+func set_game_over(text: String) -> void:
+	if game_over_label == null:
+		return
+	game_over_label.text = text
+	game_over_label.visible = text != ""
+
+
 ## Asks the player which piece a pawn becomes. Routed through the HUD because
 ## the picker is presentation and Main should not have to know it exists.
 func ask_promotion(promoting_side: int) -> void:
@@ -63,6 +74,7 @@ signal voice_state_changed(state: VoiceState)
 @onready var reset_button: Button = %ResetButton
 @onready var menu_button: Button = %MenuButton
 @onready var promotion_picker: PromotionPicker = %PromotionPicker
+@onready var game_over_label: Label = %GameOverLabel
 @onready var mic_button: Button = %MicButton
 
 ## Current presentation state of the mic control.

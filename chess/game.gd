@@ -15,6 +15,18 @@ extends RefCounted
 
 signal moved(move: ChessMove, captured: int)
 
+## Emitted once, when the game stops being playable.
+signal finished(result: Result)
+
+## Why the game is or is not still going. Stalemate is the only draw recognised
+## so far; threefold, fifty-move and insufficient material are still owed.
+enum Result {
+	ONGOING,
+	WHITE_WINS,
+	BLACK_WINS,
+	DRAW_BY_STALEMATE,
+}
+
 var state := BoardState.new()
 var history: Array[ChessMove] = []
 
@@ -35,6 +47,7 @@ func reset() -> void:
 	history.clear()
 	captured_by_light = []
 	captured_by_dark = []
+	_finished = false
 
 
 ## Pieces this side has taken, oldest first.
@@ -66,6 +79,11 @@ func apply_move(move: ChessMove) -> bool:
 		return false
 	if state.at(move.from_square.x, move.from_square.y) == BoardState.EMPTY:
 		return false
+	# A finished game accepts nothing further. Without this the board carries on
+	# being playable after mate, so the losing side could move again and be
+	# answered, and nothing ever looked like an ending.
+	if result() != Result.ONGOING:
+		return false
 	if not is_legal(move):
 		return false
 
@@ -86,7 +104,13 @@ func apply_move(move: ChessMove) -> bool:
 	state.side_to_move = BoardState.DARK if state.side_to_move == BoardState.LIGHT else BoardState.LIGHT
 	history.append(move)
 	moved.emit(move, captured)
+	if result() != Result.ONGOING and not _finished:
+		_finished = true
+		finished.emit(result())
 	return true
+
+
+var _finished := false
 
 
 ## Legality, delegated to the rules engine.
@@ -98,6 +122,25 @@ func apply_move(move: ChessMove) -> bool:
 ## decides.
 func is_legal(move: ChessMove) -> bool:
 	return Rules.is_legal(state, move)
+
+
+## Whether the game is still playable, and if not, how it ended.
+##
+## Decided on demand from the position rather than recorded as events, so it
+## cannot fall out of step with the board the way an incrementally tracked flag
+## would. The side to move having nothing left is the end of it: in check is
+## checkmate, not in check is stalemate.
+func result() -> Result:
+	if Rules.has_legal_move(state, state.side_to_move):
+		return Result.ONGOING
+	if not Rules.is_in_check(state, state.side_to_move):
+		return Result.DRAW_BY_STALEMATE
+	return Result.WHITE_WINS if state.side_to_move == BoardState.DARK \
+		else Result.BLACK_WINS
+
+
+func is_over() -> bool:
+	return result() != Result.ONGOING
 
 
 ## Every legal move for the side to move. The AI chooses from this rather than

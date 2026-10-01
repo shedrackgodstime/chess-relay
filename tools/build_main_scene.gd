@@ -151,6 +151,7 @@ func _hud() -> Control:
 	hud.add_child(_control_column())
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
+	hud.add_child(_game_over_label())
 	hud.add_child(_promotion_picker())
 	return hud
 
@@ -198,6 +199,25 @@ func _control_column() -> VBoxContainer:
 
 ## The menu button sits in the top-right corner, away from the view controls
 ## so it never gets hit by accident mid-game.
+## The end-of-game banner. Above the board, below the promotion overlay, and
+## hidden until there is something to say.
+func _game_over_label() -> Label:
+	var label := Label.new()
+	label.name = "GameOverLabel"
+	label.unique_name_in_owner = true
+	label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	label.position = Vector2(-190.0, 168.0)
+	label.size = Vector2(380.0, 56.0)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.visible = false
+	label.add_theme_font_size_override("font_size", 34)
+	label.add_theme_color_override("font_color", Color(1.0, 0.90, 0.72))
+	label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
+	label.add_theme_constant_override("outline_size", 8)
+	return label
+
+
 ## The promote-what-to overlay. Added last so it paints over everything, and
 ## starts hidden because it is only shown while a promotion is pending.
 func _promotion_picker() -> Control:
