@@ -292,7 +292,13 @@ func _network_indicator() -> TextureRect:
 	indicator.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	indicator.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	indicator.texture = Icons.signal_bars(0, Color(0.62, 0.60, 0.58, 1.0))
+	# Shown as GOOD, not IDLE, and temporarily. There is no transport, so IDLE is the
+	# truthful state, but IDLE is four faint bars and no live ones, which cannot show
+	# whether the frame is fainter than the bars it sits behind. One of these two
+	# things has to give and the display is more useful lit. Recorded in the
+	# temporary-values table alongside the hints and the voice control.
+	var preview: Array = Hud.NETWORK_VISUALS[Hud.NetworkState.GOOD]
+	indicator.texture = Icons.signal_bars(preview[0], preview[1])
 	# Right-anchored, a gap left of the menu: the menu's right edge is MENU_INSET in,
 	# it is one touch target wide, and the indicator is half that again.
 	var right := Hud.MENU_INSET + Hud.TOUCH_SIZE.x + 14.0

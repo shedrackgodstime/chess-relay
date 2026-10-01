@@ -435,9 +435,9 @@ func _network_checks(hud: Hud) -> void:
 		# bound only has to keep the number out of the range already known to fail;
 		# where inside that range it belongs is judged by eye.
 		_check("state %d draws its frame opaquely enough to see" % state,
-			Icons.SIGNAL_GHOST.a >= 0.28, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
+			Icons.SIGNAL_GHOST.a >= 0.22, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
 		_check("and the frame stays behind the live bars",
-			Icons.SIGNAL_GHOST.a <= 0.38, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
+			Icons.SIGNAL_GHOST.a <= 0.30, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
 		_check("and the live bars stay clearly brighter than the frame",
 			Icons.NETWORK_LIT_ALPHA - Icons.SIGNAL_GHOST.a > 0.4,
 			"ghost=%.2f lit=%.2f" % [Icons.SIGNAL_GHOST.a, Icons.NETWORK_LIT_ALPHA])
@@ -459,6 +459,13 @@ func _network_checks(hud: Hud) -> void:
 			> int(lit_counts[Hud.NetworkState.CONNECTING]),
 		"connecting=%d degraded=%d" % [int(lit_counts[Hud.NetworkState.CONNECTING]),
 			int(lit_counts[Hud.NetworkState.DEGRADED])])
+	_check("good lights more than degraded",
+		int(lit_counts[Hud.NetworkState.GOOD]) > int(lit_counts[Hud.NetworkState.DEGRADED]),
+		"degraded=%d good=%d" % [int(lit_counts[Hud.NetworkState.DEGRADED]),
+			int(lit_counts[Hud.NetworkState.GOOD])])
+	_check("and idle is the only state with nothing lit",
+		int(lit_counts[Hud.NetworkState.IDLE]) == 0
+			and int(lit_counts[Hud.NetworkState.LOST]) > 0, "")
 	_check("lost and connecting light the same bars, so only colour tells them apart",
 		int(lit_counts[Hud.NetworkState.LOST]) == int(lit_counts[Hud.NetworkState.CONNECTING]),
 		"lost=%d connecting=%d" % [int(lit_counts[Hud.NetworkState.LOST]),

@@ -84,16 +84,17 @@ const SIGNAL_BARS := 4
 
 ## The unlit frame. White at low opacity rather than a state colour, so it reads as
 ## capacity and can never be mistaken for a level.
-## Judged by eye on a real screen, twice, and the window turned out to be narrow:
-## 0.22 read as nothing at all, 0.42 read as too strong and competed with the live
-## bars. 0.32 sits between them. Alpha is not perceived linearly, so this is a probe
-## rather than a midpoint, and the next observation is still worth more than the
-## arithmetic here.
+## Judged by eye on a real screen, three times, and the window has proved narrow and
+## not where arithmetic says: 0.22 read as nothing, 0.42 too strong, 0.32 still too
+## strong. At 0.26. Alpha is not perceived linearly and the low end is much harder to
+## see than the high end, which is why two steps in from the bottom overshot while
+## the midpoint did not. The strokes were widened and the control enlarged between the
+## first reading and this one, so 0.26 now is not the same thing 0.22 was.
 ##
 ## The lesson worth keeping from the search: the first value was wrong in the
 ## invisible direction and the correction overshot into prominence, which means a
 ## number chosen without seeing the result is wrong in both directions at once.
-const SIGNAL_GHOST := Color(1.0, 1.0, 1.0, 0.32)
+const SIGNAL_GHOST := Color(1.0, 1.0, 1.0, 0.26)
 
 ## The live bars. Opaque, so the two are separable by brightness alone, which is what
 ## lets the test tell capacity from level without reading hues.

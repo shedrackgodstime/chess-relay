@@ -92,16 +92,22 @@ signal voice_state_changed(state: VoiceState)
 
 ## What the connection to the other player is doing.
 ##
-## Four states rather than three colours, because "connecting" and "not connected"
+## Five states rather than three colours, because "connecting" and "not connected"
 ## are not the same thing and amber cannot honestly mean both. Idle is deliberately
 ## a neutral grey rather than a fourth colour: there is nothing to judge yet, and
 ## painting that as a status would cry wolf every time the game opened.
-enum NetworkState { IDLE, CONNECTING, DEGRADED, LOST }
+enum NetworkState { IDLE, CONNECTING, DEGRADED, GOOD, LOST }
 
 ## Bar count and colour for each state. The bar count is the real channel and colour
 ## is the reinforcement, not the message: red and green are not separable for
 ## everyone, and this board has already decided that brightness and shape carry
 ## meaning with hue only ever adding to it.
+##
+## GOOD was missing until the frame went faint and the meter became unreadable at
+## IDLE alone. It is the state the player actually spends their time in, and without
+## it the only thing ever on screen was four faint bars, which said nothing about the
+## live ones because there were none. Three bars rather than four: a peer link has no
+## meaningful distinction between good and excellent, and a fifth bar would imply one.
 ##
 ## LOST deliberately shares one bar with CONNECTING and differs only in colour and
 ## hue position, because it is the state that must not be mistaken for progress. It
@@ -110,6 +116,7 @@ const NETWORK_VISUALS := {
 	NetworkState.IDLE: [0, Color(0.62, 0.60, 0.58, 1.0)],
 	NetworkState.CONNECTING: [1, Color(1.0, 0.85, 0.25, 1.0)],
 	NetworkState.DEGRADED: [2, Color(1.0, 0.85, 0.25, 1.0)],
+	NetworkState.GOOD: [3, Color(0.42, 0.92, 0.52, 1.0)],
 	NetworkState.LOST: [1, Color(1.0, 0.27, 0.20, 1.0)],
 }
 @onready var mic_button: Button = %MicButton
