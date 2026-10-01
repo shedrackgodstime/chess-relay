@@ -60,6 +60,10 @@ const TAP_MAX_SECONDS := 0.6
 ## is 8.76 across, so this comfortably covers it from any allowed zoom.
 const PICK_RAY_LENGTH := 40.0
 
+## Yaw the reset view sits at: looking in from the player's own side, so their
+## pieces are at the bottom of the screen and the opponent's at the top.
+const DEFAULT_YAW := 180.0
+
 var _press_position := Vector2.ZERO
 var _press_time := 0.0
 var _press_active := false
@@ -149,10 +153,18 @@ func _register_subtree(node: Node) -> void:
 ## The height/distance ratios convert to an orbit pitch and distance, so the
 ## default view survives a change to BoardMesh's dimensions. Changing either
 ## export resets a user-moved camera back to this framing.
+## Default view: the player's own pieces at the bottom of the screen, the
+## opponent's at the top.
+##
+## Yaw 180 puts the camera on the -Z side, which is where rank 1 is, so White's
+## back rank sits nearest the viewer. Yaw 0 looked from +Z instead, which put
+## rank 8 at the bottom: the player's pieces were at the top and, because squares
+## are named A1 to H8 with White on ranks 1 and 2, the labels were upside down
+## relative to what was on screen.
 func frame_board() -> void:
 	if camera == null:
 		return
-	camera.reset_view(Vector3.ZERO, 0.0, _framing_pitch(), _framing_distance())
+	camera.reset_view(Vector3.ZERO, DEFAULT_YAW, _framing_pitch(), _framing_distance())
 
 
 ## Pitch and distance that frame the board, derived from the exported ratios

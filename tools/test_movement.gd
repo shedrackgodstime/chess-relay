@@ -139,6 +139,37 @@ func _side_ownership_checks() -> void:
 	_check("opponent is the other side", main.opponent_side() == BoardState.DARK,
 		"opponent=%d" % main.opponent_side())
 
+	# Orientation: the player's own pieces belong at the bottom of the screen,
+	# the opponent's at the top. Measured from the camera rather than from the
+	# yaw number, so the assertion describes what the player sees.
+	main.frame_board()
+	await process_frame
+	var cam_z: float = main.camera.global_position.z
+	var mine: float = _mean_square_z(main, main.player_side)
+	var theirs: float = _mean_square_z(main, main.opponent_side())
+	_check("player sits on the near side of the board", cam_z < 0.0, "cam z=%.2f" % cam_z)
+	_check("own pieces are nearer the camera than the opponent's",
+		mine < theirs, "own=%.2f theirs=%.2f" % [mine, theirs])
+	_check("own pieces are on the lower half of the board", mine < 0.0,
+		"own z=%.2f" % mine)
+	_check("opponent pieces are on the upper half", theirs > 0.0,
+		"theirs z=%.2f" % theirs)
+
+	# Flip should put the far side nearest, and must not move ownership.
+	main.camera.reset_view(Vector3.ZERO, 0.0, 41.9, 10.81)
+	await process_frame
+	# Distance, not board position: flipping moves the camera, not the pieces, so
+	# only distance from the camera can say which side is now nearest.
+	_check("flipping brings the other side nearest",
+		_mean_camera_distance(main, main.opponent_side())
+			< _mean_camera_distance(main, main.player_side),
+		"own=%.2f theirs=%.2f" % [_mean_camera_distance(main, main.player_side),
+			_mean_camera_distance(main, main.opponent_side())])
+	_check("flipping still does not change your side",
+		main.player_side == BoardState.LIGHT, "")
+	main.frame_board()
+	await process_frame
+
 	# Flipping is a camera move and must not reassign sides. Checked while it is
 	# still the player's turn, since that is the only time a piece is pickable.
 	main.camera.reset_view(Vector3.ZERO, 180.0, 41.9, 10.81)
@@ -181,3 +212,31 @@ func _side_ownership_checks() -> void:
 
 	scene.queue_free()
 	await process_frame
+
+
+## Mean world Z of a side's pieces, which is what decides whether they read as
+## the bottom or the top of the screen.
+func _mean_square_z(main: Main, side: int) -> float:
+	var total := 0.0
+	var count := 0
+	for square: Vector2i in main.pieces:
+		if main.pieces[square].side != side:
+			continue
+		var world: Vector3 = BoardMesh.square_position(square.x, square.y)
+		total += world.z
+		count += 1
+	return total / float(count) if count > 0 else 0.0
+
+
+## Mean distance from the camera to a side's pieces, which is what decides which
+## side reads as nearest and therefore as the bottom of the screen.
+func _mean_camera_distance(main: Main, side: int) -> float:
+	var eye := main.camera.global_position
+	var total := 0.0
+	var count := 0
+	for square: Vector2i in main.pieces:
+		if main.pieces[square].side != side:
+			continue
+		total += eye.distance_to(BoardMesh.square_position(square.x, square.y))
+		count += 1
+	return total / float(count) if count > 0 else 0.0
