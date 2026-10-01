@@ -314,28 +314,16 @@ func _castling_view_checks() -> void:
 		Vector2i(7, 0): BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT),
 		Vector2i(4, 7): BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK),
 		Vector2i(0, 5): BoardState.encode(PieceProfiles.Type.ROOK, BoardState.DARK)}))
-	# Views built directly rather than by re-collecting, since the generated scene
-	# holds a full set of pieces and _collect_pieces reads those nodes rather than
-	# the position. What is under test here is the bookkeeping in _on_game_moved.
-	main.pieces.clear()
-	for child in main.get_node("World/Pieces").get_children():
-		child.queue_free()
-	for square: Vector2i in [
-		Vector2i(4, 0), Vector2i(7, 0), Vector2i(4, 7), Vector2i(0, 5)]:
-		var code := main.game.state.at(square.x, square.y)
-		var view := PieceView.new()
-		view.piece_type = BoardState.decode(code).x
-		view.side = BoardState.decode(code).y
-		main.get_node("World/Pieces").add_child(view)
-		view.position = BoardMesh.square_position(square.x, square.y)
-		main.pieces[square] = view
-	await process_frame
+	await _populate_views(main)
 
-	var castle := ChessMove.new(Vector2i(4, 0), Vector2i(6, 0))
-	_check("the castle is offered",
-		main.game.is_legal(castle), "")
-	main.game.apply_move(castle)
-	main._on_game_moved(castle, BoardState.EMPTY)
+	# Castled the way a player does it: pick the king up, then tap where it lands.
+	# Going through the tap handler rather than apply_move is the point, because
+	# that is the only path a player has.
+	_tap_square(main, Vector2i(4, 0))
+	_check("the king is in hand", main.selected == Vector2i(4, 0),
+		"selected=%s" % str(main.selected))
+	_tap_square(main, Vector2i(6, 0))
+	await _settle(main.pieces.get(Vector2i(6, 0)), Vector3.ZERO)
 	await process_frame
 	_check("the king has moved in the position",
 		main.game.state.at(6, 0)
@@ -349,7 +337,65 @@ func _castling_view_checks() -> void:
 	_check("the view and the position agree square for square",
 		_views_match_state(main), "")
 
+	# And the other side, queenside, where the destination is on the other side of
+	# the king, so the rook crosses towards it rather than away.
+	var other := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(other)
+	await process_frame
+	await process_frame
+	var mirror: Main = other
+	mirror.ai_opponent = false
+	mirror.game.load_position(_position_with({
+		Vector2i(4, 0): BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(0, 0): BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT),
+		Vector2i(4, 7): BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(0, 5): BoardState.encode(PieceProfiles.Type.ROOK, BoardState.DARK)}))
+	await _populate_views(mirror)
+	_tap_square(mirror, Vector2i(4, 0))
+	print("    diag legal=%s rights=%d selected=%s pick=%s" % [
+		str(mirror.game.is_legal(ChessMove.new(Vector2i(4, 0), Vector2i(2, 0)))),
+		mirror.game.state.castling_rights, str(mirror.selected),
+		str(mirror._pick_square(mirror.camera.unproject_position(
+			BoardMesh.square_position(2, 0))))])
+	_tap_square(mirror, Vector2i(2, 0))
+	await process_frame
+	_check("queenside puts the king on c1",
+		mirror.game.state.at(2, 0)
+			== BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT), "")
+	_check("and the rook on d1",
+		mirror.game.state.at(3, 0)
+			== BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT), "")
+	_check("and the views agree there as well",
+		_views_match_state(mirror), "")
+	other.queue_free()
+	await process_frame
+
 	scene.queue_free()
+	await process_frame
+
+
+## Replaces the scene's pieces with exactly the ones the position holds.
+##
+## Built directly rather than through _collect_pieces, which reads the existing
+## nodes and so would report the generated full set rather than the position under
+## test. Leaving a stale set in place is its own trap: the opening has a bishop on
+## c1, so a tap meant for a queenside castle would land on it and be read as
+## picking the bishop up instead.
+func _populate_views(main: Main) -> void:
+	main.pieces.clear()
+	for child in main.get_node("World/Pieces").get_children():
+		child.queue_free()
+	for rank in BoardState.BOARD_SIZE:
+		for file in BoardState.BOARD_SIZE:
+			var code := main.game.state.at(file, rank)
+			if code == BoardState.EMPTY:
+				continue
+			var view := PieceView.new()
+			view.piece_type = BoardState.decode(code).x
+			view.side = BoardState.decode(code).y
+			main.get_node("World/Pieces").add_child(view)
+			view.position = BoardMesh.square_position(file, rank)
+			main.pieces[Vector2i(file, rank)] = view
 	await process_frame
 
 
