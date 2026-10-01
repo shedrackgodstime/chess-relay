@@ -33,7 +33,12 @@ extends Camera3D
 		_apply()
 
 @export var min_distance := 5.5
-@export var max_distance := 20.0
+
+## Capped so the camera can never end up outside the room, nor poking through
+## its ceiling. At the shallowest pitch the reach is distance*cos(12), and at
+## the steepest it is distance*sin(85); RoomMesh.RADIUS and RoomMesh.CEILING_Y
+## are sized against both, and the surroundings tests assert it.
+@export var max_distance := 12.0
 @export var min_pitch_degrees := 12.0
 @export var max_pitch_degrees := 85.0
 

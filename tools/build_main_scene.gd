@@ -33,7 +33,7 @@ func _init() -> void:
 	world.add_child(_table())
 	world.add_child(_tray("TrayLight", LIGHT))
 	world.add_child(_tray("TrayDark", DARK))
-	world.add_child(_floor())
+	world.add_child(_room())
 	world.add_child(_key_light())
 	world.add_child(_fill_light())
 	world.add_child(_environment())
@@ -377,16 +377,12 @@ func _tray(node_name: String, capturer: int) -> Node3D:
 	return tray
 
 
-## Distant floor, visible only as the horizon behind the table.
-func _floor() -> MeshInstance3D:
-	var floor_node := MeshInstance3D.new()
-	floor_node.name = "Floor"
-	var plane := PlaneMesh.new()
-	plane.size = Vector2(TableMesh.FLOOR_SIZE, TableMesh.FLOOR_SIZE)
-	floor_node.mesh = plane
-	floor_node.material_override = TableMesh.floor_material()
-	floor_node.position = Vector3(0.0, TableMesh.FLOOR_Y, 0.0)
-	return floor_node
+## The round room enclosing the table.
+func _room() -> Node3D:
+	var room := Node3D.new()
+	room.name = "Room"
+	room.set_script(load("res://surroundings/room_view.gd"))
+	return room
 
 
 func _key_light() -> DirectionalLight3D:

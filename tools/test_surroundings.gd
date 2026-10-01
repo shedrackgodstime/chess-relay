@@ -9,6 +9,73 @@ var _failures := 0
 
 ## The tray has to fit on the table without touching either the board frame or
 ## the rim, since it sits in the gap between them.
+## The room has to contain the camera at every angle it can reach, which is the
+## whole reason it is a cylinder rather than a box. Both constraints are asserted
+## directly, because either one failing puts the camera outside its own room.
+func _room_checks() -> void:
+	print("Room")
+	var camera := OrbitCamera.new()
+
+	# Furthest the camera gets sideways, at the shallowest pitch it allows.
+	var side_reach: float = camera.max_distance * cos(deg_to_rad(camera.min_pitch_degrees))
+	_check("camera stays inside the wall at its widest reach",
+		side_reach < RoomMesh.RADIUS - 1.0,
+		"reach=%.1f radius=%.1f" % [side_reach, RoomMesh.RADIUS])
+
+	# And it must not rise through the ceiling at the steepest pitch.
+	var up_reach: float = camera.max_distance * sin(deg_to_rad(camera.max_pitch_degrees))
+	_check("camera stays under the ceiling at its highest reach",
+		up_reach < RoomMesh.CEILING_Y - 1.0,
+		"reach=%.1f ceiling=%.1f" % [up_reach, RoomMesh.CEILING_Y])
+
+	_check("room is wider than the table it holds",
+		RoomMesh.RADIUS > TableMesh.RADIUS + 2.0,
+		"room=%.1f table=%.1f" % [RoomMesh.RADIUS, TableMesh.RADIUS])
+	_check("ceiling is above the table surface",
+		RoomMesh.CEILING_Y > 0.0, "y=%.1f" % RoomMesh.CEILING_Y)
+
+	var parts := {
+		"floor": RoomMesh.build_floor(),
+		"wall": RoomMesh.build_wall(),
+		"ceiling": RoomMesh.build_ceiling(),
+		"skirting": RoomMesh.build_skirting(),
+		"rail": RoomMesh.build_rail(),
+	}
+	for part_name: String in parts:
+		var mesh: ArrayMesh = parts[part_name]
+		_check("room %s builds" % part_name,
+			mesh.get_surface_count() >= 1 and mesh.get_aabb().size.length() > 0.0,
+			"surfaces=%d" % mesh.get_surface_count())
+
+	# Normals must face the room. An inside-out wall is lit from behind, which
+	# looks wrong from some orbit angles and is exactly the sort of thing that
+	# only ever shows up in a render.
+	var wall: ArrayMesh = RoomMesh.build_wall()
+	var arrays := wall.surface_get_arrays(0)
+	var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+	var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+	var inward := 0
+	var sampled: int = mini(verts.size(), norms.size())
+	for i in sampled:
+		var radial := Vector2(verts[i].x, verts[i].z)
+		if radial.length() < 0.001:
+			continue
+		if radial.normalized().dot(Vector2(norms[i].x, norms[i].z)) < 0.0:
+			inward += 1
+	_check("wall normals point into the room", inward > 0,
+		"inward=%d of %d" % [inward, sampled])
+
+	var view := RoomView.new()
+	root.add_child(view)
+	await process_frame
+	_check("room view builds its parts",
+		view.get_node_or_null("Wall") != null
+			and view.get_node_or_null("Ceiling") != null
+			and view.get_node_or_null("Floor") != null, "")
+	view.queue_free()
+	await process_frame
+
+
 func _tray_geometry_checks() -> void:
 	print("Capture tray mesh")
 	var body := TrayMesh.build()
@@ -115,6 +182,7 @@ func _tray_view_checks() -> void:
 
 func _init() -> void:
 	Quality.set_preset(Quality.Preset.MEDIUM)
+	_room_checks()
 	_tray_geometry_checks()
 	_tray_view_checks()
 	var mesh := TableMesh.build()
