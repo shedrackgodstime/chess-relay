@@ -97,7 +97,6 @@ signal voice_state_changed(state: VoiceState)
 @onready var game_over_label: Label = %GameOverLabel
 @onready var network_indicator: TextureRect = %NetworkIndicator
 @onready var menu_panel: Control = %MenuPanel
-@onready var menu_backdrop: Control = %MenuBackdrop
 @onready var menu_new_game_button: Button = %MenuNewGame
 @onready var menu_resign_button: Button = %MenuResign
 @onready var menu_exit_button: Button = %MenuExit
@@ -217,11 +216,6 @@ func bind() -> void:
 					_on_quality_selected):
 			menu_quality_option.item_selected.connect(_on_quality_selected)
 		refresh_menu_settings()
-		# A tap on the dimmed board closes the menu. Without this it could only be left
-		# by choosing something, which is a trap rather than a menu.
-		if menu_backdrop != null \
-				and not menu_backdrop.gui_input.is_connected(_on_backdrop_input):
-			menu_backdrop.gui_input.connect(_on_backdrop_input)
 	_connect(mic_button, _on_voice)
 
 
@@ -301,39 +295,6 @@ func _confirm(action: MenuAction, question: String) -> void:
 
 func _on_menu() -> void:
 	toggle_menu()
-
-
-## Closes the menu when the player taps outside it. Guarded, because this fires for
-## every event the backdrop receives, including ones that are not a decision to close
-## anything.
-func _on_backdrop_input(event: InputEvent) -> void:
-	var pressed: bool = false
-	if event is InputEventMouseButton:
-		pressed = event.pressed and event.button_index == MOUSE_BUTTON_LEFT
-	elif event is InputEventScreenTouch:
-		pressed = event.pressed
-	if not pressed:
-		return
-	if not menu_panel.visible:
-		return
-	if menu_confirm_label != null and menu_confirm_label.visible:
-		# A confirmation has to be answered or dismissed, not silently dropped by a
-		# stray tap on the board.
-		_show_menu_rows()
-		return
-	toggle_menu()
-
-
-## Closes the menu on the back gesture or Escape. Returns whether it consumed it, so
-## the board can decide whether that means anything else.
-func handle_cancel() -> bool:
-	if menu_panel == null or not menu_panel.visible:
-		return false
-	if menu_confirm_label != null and menu_confirm_label.visible:
-		_show_menu_rows()
-	else:
-		toggle_menu()
-	return true
 
 
 func _on_menu_new_game() -> void:
