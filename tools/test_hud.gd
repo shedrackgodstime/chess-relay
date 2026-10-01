@@ -25,6 +25,7 @@ func _init() -> void:
 	_flip_checks(main)
 	_reset_checks(main)
 	_turn_checks(main, hud)
+	await _capture_signal_check()
 
 	scene.queue_free()
 	if _failures == 0:
@@ -200,7 +201,7 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 	hud.set_voice_state(Hud.VoiceState.LIVE)
 	hud.set_voice_visible(false)
 	_check("hiding voice hides the row", not hud.voice_row.visible, "")
-	_check("hiding voice forces muted", not hud.mic_enabled, "")
+	_check("hiding voice forces muted", hud.voice_state == Hud.VoiceState.OFF, "")
 	hud.set_remote_speaking(true)
 	_check("hiding voice clears the opponent dot", not dot.visible, "")
 	hud.set_voice_visible(true)
@@ -230,7 +231,7 @@ func _capture_tray_checks(main: Main, hud: Hud) -> void:
 		light_tray.get_child_count() == 0 and dark_tray.get_child_count() == 0, "")
 
 	# Take three: two knights and a pawn, then one rook.
-	var taken := [
+	var taken: Array[int] = [
 		BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK),
 		BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK),
 		BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT),
@@ -253,11 +254,12 @@ func _capture_tray_checks(main: Main, hud: Hud) -> void:
 		types.all(func(t: Texture2D) -> bool: return t != null), "")
 
 	# Grouped by type, so pawns lead regardless of the order they fell.
+	# Sorted by type ascending, so the pawn leads and the knights sit together.
 	_check("tray is grouped by piece type",
-		types[0] == types[1] and types[1] != types[2], "pawn should lead")
+		types[0] != types[1] and types[1] == types[2], "pawn should lead")
 
 	# Repainting replaces rather than appends.
-	hud.set_captured([taken[0]], [])
+	hud.set_captured([taken[0]] as Array[int], [])
 	_check("repainting replaces the row",
 		light_tray.get_child_count() == 1, "n=%d" % light_tray.get_child_count())
 
@@ -273,7 +275,60 @@ func _capture_tray_checks(main: Main, hud: Hud) -> void:
 	hud.set_captured(all_dark, [])
 	_check("a full tray renders every piece", light_tray.get_child_count() == 6,
 		"n=%d" % light_tray.get_child_count())
+
 	hud.set_captured([], [])
+
+
+## Runs last, on its own freshly instantiated scene.
+##
+## It has to be last because it plays real moves, which would pollute any check
+## that counts moves or reads the position. It needs its own scene because by
+## the time it runs, the shared one has already been moved around and no longer
+## has the opening position this capture needs.
+func _capture_signal_check() -> void:
+	print("Capture wiring")
+	var fresh := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(fresh)
+	await process_frame
+	await process_frame
+	var main: Main = fresh
+	main.ai_opponent = false
+	var light_tray: HFlowContainer = main.hud.captured_light
+	var before := light_tray.get_child_count()
+	_check("a fresh scene starts with an empty tray", before == 0, "n=%d" % before)
+
+	# e4, d5, exd5: a real capture through the normal path, so Main's piece
+	# registry stays in step. Faking board state instead would leave the
+	# registry stale and _on_game_moved would bail out early.
+	var quiet := [ChessMove.new(Vector2i(4, 1), Vector2i(4, 3)),
+		ChessMove.new(Vector2i(3, 6), Vector2i(3, 4))]
+	for mv in quiet:
+		main.game.apply_move(mv)
+	_check("quiet moves put nothing in the tray",
+		light_tray.get_child_count() == before,
+		"n=%d" % light_tray.get_child_count())
+
+	var captured := main.game.apply_move(ChessMove.new(Vector2i(4, 3), Vector2i(3, 4)))
+	_check("the capture itself applies", captured, "")
+	_check("a played capture reaches the tray unaided",
+		light_tray.get_child_count() == before + 1,
+		"n=%d was=%d" % [light_tray.get_child_count(), before])
+	_check("the tray matches the authoritative capture list",
+		light_tray.get_child_count() == main.game.captures_by(BoardState.LIGHT).size(),
+		"tray=%d game=%d" % [light_tray.get_child_count(),
+			main.game.captures_by(BoardState.LIGHT).size()])
+
+	main.game.reset()
+	main._collect_pieces()
+	main.hud.set_captured(main.game.captures_by(BoardState.LIGHT),
+		main.game.captures_by(BoardState.DARK))
+	await process_frame
+	_check("reset empties the tray",
+		light_tray.get_child_count() == 0,
+		"n=%d" % light_tray.get_child_count())
+
+	fresh.queue_free()
+	await process_frame
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.

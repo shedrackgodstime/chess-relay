@@ -21,20 +21,25 @@ var history: Array[ChessMove] = []
 ## Piece codes taken by each side, in the order they fell. Tracked as data
 ## derived from the move sequence rather than pushed in by the view, so two
 ## P2P peers applying the same moves build identical trays without any extra
-## replication. Keyed by BoardState.LIGHT / DARK.
-var captured_by := {BoardState.LIGHT: [] as Array[int], BoardState.DARK: [] as Array[int]}
+## replication.
+##
+## Two explicitly typed arrays rather than a Dictionary keyed by side: a
+## Dictionary lookup yields an untyped Array, which cannot satisfy an
+## Array[int] return and fails at runtime instead of at parse time.
+var captured_by_light: Array[int] = []
+var captured_by_dark: Array[int] = []
 
 
 func reset() -> void:
 	state = BoardState.new()
 	history.clear()
-	captured_by[BoardState.LIGHT] = []
-	captured_by[BoardState.DARK] = []
+	captured_by_light = []
+	captured_by_dark = []
 
 
 ## Pieces this side has taken, oldest first.
 func captures_by(side: int) -> Array[int]:
-	return captured_by.get(side, [] as Array[int])
+	return captured_by_light if side == BoardState.LIGHT else captured_by_dark
 
 
 ## Total material captured by a side, counting pawns as 1 and the rest as 3.
@@ -67,7 +72,11 @@ func apply_move(move: ChessMove) -> bool:
 	var captured := state.at(move.to_square.x, move.to_square.y)
 	# Recorded before the side flip, since captures_by is keyed by the taker.
 	if captured != BoardState.EMPTY:
-		(captured_by[state.side_to_move] as Array).append(captured)
+		# Before the side flip below, so this is still the capturing side.
+		if state.side_to_move == BoardState.LIGHT:
+			captured_by_light.append(captured)
+		else:
+			captured_by_dark.append(captured)
 	state.set_square(move.to_square.x, move.to_square.y,
 		state.at(move.from_square.x, move.from_square.y))
 	state.set_square(move.from_square.x, move.from_square.y, BoardState.EMPTY)

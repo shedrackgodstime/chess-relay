@@ -76,6 +76,10 @@ func _ready() -> void:
 	_connect_hud()
 	hud.bind()
 	hud.set_turn(game.state.side_to_move, game.history.size())
+	# Voice is a property of the mode, so it is decided once here rather than
+	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
+	hud.set_voice_visible(DEV_SHOW_VOICE or not ai_opponent)
+	hud.set_captured(game.captures_by(BoardState.LIGHT), game.captures_by(BoardState.DARK))
 
 
 ## The HUD emits intents; this is the only place that decides what they mean.
@@ -270,6 +274,7 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	pieces[move.to_square] = piece
 	piece.home_square = move.to_square
 	hud.set_turn(game.state.side_to_move, game.history.size())
+	hud.set_captured(game.captures_by(BoardState.LIGHT), game.captures_by(BoardState.DARK))
 	piece.glide_to(
 		BoardMesh.square_position(move.to_square.x, move.to_square.y),
 		piece.piece_type == PieceProfiles.Type.KNIGHT
