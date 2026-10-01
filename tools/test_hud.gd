@@ -20,6 +20,7 @@ func _init() -> void:
 
 	_asset_checks()
 	await _network_checks(hud)
+	await _menu_checks(main, hud)
 	_layout_checks(main, hud)
 	_menu_check(main, hud)
 	_rotate_checks(main, hud)
@@ -479,6 +480,84 @@ func _network_checks(hud: Hud) -> void:
 			and tint[Hud.NetworkState.CONNECTING].b < 0.6,
 		"connecting=%s" % str(tint[Hud.NetworkState.CONNECTING]))
 	hud.set_network_state(Hud.NetworkState.IDLE)
+
+
+## The in-game menu. Checked for what it does while hidden as much as while open,
+## because the earlier version of a new-game button failed by being present at all.
+func _menu_checks(main: Main, hud: Hud) -> void:
+	print("In-game menu")
+	_check("the panel exists", hud.menu_panel != null, "")
+	if hud.menu_panel == null:
+		return
+	_check("and is hidden while a game is being played", not hud.menu_panel.visible, "")
+	_check("the backdrop stops taps rather than letting them fall to the board",
+		(hud.menu_panel.get_node("Backdrop") as Control).mouse_filter
+			== Control.MOUSE_FILTER_STOP, "")
+
+	var got := {"new_game": 0, "resign": 0, "exit": 0}
+	hud.new_game_requested.connect(func() -> void: got["new_game"] += 1)
+	hud.resign_requested.connect(func() -> void: got["resign"] += 1)
+	hud.exit_requested.connect(func() -> void: got["exit"] += 1)
+
+	hud.toggle_menu()
+	await process_frame
+	_check("opening it shows it", hud.menu_panel.visible, "")
+	_check("with the rows rather than a question",
+		hud.menu_rows.visible and not hud.menu_confirm_label.visible, "")
+
+	# Nothing destructive fires on the first tap. This is the whole reason the menu
+	# exists rather than three more buttons.
+	hud.menu_new_game_button.pressed.emit()
+	await process_frame
+	_check("new game asks first", hud.menu_confirm_label.visible
+		and not hud.menu_rows.visible, "")
+	_check("and has not fired yet", int(got["new_game"]) == 0, "fired=%d"
+		% int(got["new_game"]))
+	_check("confirming fires it", _press(hud.menu_confirm_button), "")
+	_check("and closes the menu", not hud.menu_panel.visible, "")
+	_check("exactly once", int(got["new_game"]) == 1, "fired=%d"
+		% int(got["new_game"]))
+
+	# Change of mind must be free and must not leave the menu stuck on a question.
+	hud.toggle_menu()
+	hud.menu_resign_button.pressed.emit()
+	await process_frame
+	_check("resign asks first too", hud.menu_confirm_label.visible, "")
+	hud.menu_cancel_button.pressed.emit()
+	await process_frame
+	_check("cancelling does not resign", int(got["resign"]) == 0, "")
+	_check("and puts the rows back", hud.menu_rows.visible
+		and not hud.menu_confirm_label.visible, "")
+	hud.toggle_menu()
+
+	hud.toggle_menu()
+	hud.menu_exit_button.pressed.emit()
+	await process_frame
+	_check("exit asks first as well", hud.menu_confirm_label.visible, "")
+	_check("cancelling exit closes the menu instead, since there is nowhere to go",
+		_press(hud.menu_cancel_button) or not hud.menu_panel.visible, "")
+
+	# The settings rows must report what is already set, so the menu never offers to
+	# change something to the value it already holds.
+	hud.refresh_menu_settings()
+	_check("the hints toggle reflects the setting",
+		hud.menu_hints_toggle.button_pressed == Indicators.show_legal_moves(), "")
+	hud.menu_hints_toggle.button_pressed = not Indicators.show_legal_moves()
+	hud.menu_hints_toggle.toggled.emit(hud.menu_hints_toggle.button_pressed)
+	_check("moving it writes the setting",
+		hud.menu_hints_toggle.button_pressed == Indicators.show_legal_moves(), "")
+	_check("and the quality option reflects the tier",
+		hud.menu_quality_option.selected == Quality.preset(), "")
+	hud.toggle_menu()
+	Indicators.set_show_legal_moves(false)
+
+
+## Presses a button the way a finger would and reports whether it was pressed.
+func _press(button: Button) -> bool:
+	if button == null or not button.visible:
+		return false
+	button.pressed.emit()
+	return true
 
 
 ## How far apart two mean colours are, so "distinguishable" is a number and not a

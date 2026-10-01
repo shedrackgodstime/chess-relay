@@ -137,6 +137,9 @@ func _ready() -> void:
 	# Voice is a property of the mode, so it is decided once here rather than
 	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
 	hud.set_voice_visible(DEV_SHOW_VOICE or not ai_opponent)
+	hud.new_game_requested.connect(start_new_game)
+	hud.resign_requested.connect(_on_resign)
+	hud.exit_requested.connect(_on_exit)
 	_refresh_trays()
 
 
@@ -178,6 +181,75 @@ func _on_flip_requested() -> void:
 
 ## Registers every piece by the square it stands on. Positions come from the
 ## scene layout, so the generator stays the single source of placement.
+## Quits. There is no main screen yet, so this leaves the process rather than going
+## somewhere. When there is one, this is the single line that changes.
+func _on_exit() -> void:
+	get_tree().quit()
+
+
+## Gives up the game on behalf of whoever is to move, and says so on the board.
+func _on_resign() -> void:
+	game.resign()
+	_deselect()
+
+
+## Starts again from the opening position.
+##
+## Resetting the game alone is not enough, and the reason is the captures. Taking a
+## piece frees its node, so a finished game leaves the scene holding fewer than
+## thirty-two and the registry holding whatever survived. Reset the position without
+## rebuilding the views and the board shows the last game's pieces standing on the new
+## opening: the same state-against-view disagreement as a refused promotion becoming a
+## looking queen.
+##
+## Everything the game accumulated is put back, not just the position.
+func start_new_game() -> void:
+	game.reset()
+	_deselect()
+	highlight.hide_marker()
+	last_move_from.hide_marker()
+	last_move_to.hide_marker()
+	_update_check_marker()
+	_hide_legal_markers()
+	_rebuild_pieces()
+	hud.set_game_over("")
+	hud.set_turn(game.state.side_to_move, game.history.size())
+	_refresh_trays()
+
+
+## Throws away every piece view and builds one per piece in the position.
+##
+## Driven from the position rather than from a fixed opening, so it also serves a FEN
+## and so the two cannot disagree about what is on the board.
+##
+## face_opponent matches the generator exactly, because piece meshes are cached
+## globally by type and side: whichever variant is asked for first is the one every
+## later scene receives. Building them any other way does not just look wrong here,
+## it hands the wrong mesh to every scene created afterwards.
+func _rebuild_pieces() -> void:
+	var holder := world.get_node_or_null("Pieces")
+	if holder == null:
+		return
+	for child in holder.get_children():
+		child.queue_free()
+	pieces.clear()
+	for rank in BoardState.BOARD_SIZE:
+		for file in BoardState.BOARD_SIZE:
+			var code := game.state.at(file, rank)
+			if code == BoardState.EMPTY:
+				continue
+			var piece_type := BoardState.decode(code).x
+			var side := BoardState.decode(code).y
+			var view := PieceView.new()
+			view.piece_type = piece_type
+			view.side = side
+			view.face_opponent = side == BoardState.DARK \
+				and rank == BoardMesh.SQUARES - 1
+			holder.add_child(view)
+			view.position = BoardMesh.square_position(file, rank)
+			pieces[Vector2i(file, rank)] = view
+
+
 func _collect_pieces() -> void:
 	pieces.clear()
 	_register_subtree(world)

@@ -188,22 +188,28 @@ incomplete. `Rules` is the only place that needs to change.
 - **Voice.** The button cycles off, requesting, live and emits
   `voice_state_changed`, which has no listener. Needs capture, an encode path,
   transport, and `RECORD_AUDIO` on Android.
-- **New game / rematch.** Attempted and **reverted, not shipped**, because it could
-  not be made to pass. `Main.start_new_game()` was written and worked by hand:
-  `game.reset()` plus a full rebuild of the piece views, clearing selection, last
-  move, check marker, destination hints, capture trays and the banner. `game.reset()`
-  alone is genuinely not enough, since a capture frees the victim node and a finished
-  game leaves the scene short of the thirty-two it began with.
-  What is stuck: one failure in `_side_ownership_checks`, which runs *first* in the
-  suite and so cannot be caused by code added later in it. Ruled out: `face_opponent`
-  on rebuilt pieces (piece meshes are cached globally, so it was a fair suspect, but
-  matching the generator exactly changed nothing); the new button intercepting taps
-  (`set_game_over` never runs in that path, so it was never visible); and moving the
-  button clear of the board. Two other failures were cross-scene pollution from a
-  destructive test running mid-sequence and were fixed by running it last.
-  Next thing to try: run the new-game section alone in a fresh process, to tell a
-  global cache problem apart from genuine order dependence, before touching
-  `_rebuild_pieces` again.
+- **The in-game menu exists.** Menu button, hidden-while-playing panel: New game
+  (confirmed), Resign (confirmed), a legal-hints toggle, a graphics-quality option, and
+  Exit (confirmed). Nothing destructive fires on the first tap; the confirmation
+  occupies the space the list just vacated, so there is nothing else on screen to hit
+  by mistake. Exit quits the process for now, since there is no main screen, and that
+  one line is all that changes later.
+  Still deferred from the discussion, recorded so they are not rediscovered: sound,
+  coordinates, undo (no meaning against a human, so a permanently awkward button),
+  draw offer (nothing to offer against today), animation speed, and a how-to-play
+  rules reference (cheap, and people forget castling exists). The menu is not yet
+  connection-aware, which it needs to be once there is an opponent.
+- **New game: works, but its test is blocked.** `Main.start_new_game()` resets the
+  position and rebuilds every piece view, clearing selection, last move, check marker,
+  destination hints, trays and banner. A test that plays a capture and then rebuilds
+  passes on its own but makes `_side_ownership_checks` fail later with the wrong piece
+  selected, so it is not in the suite. Earlier I blamed an always-present new-game
+  button intercepting taps; that was **wrong**, and putting the action in the menu
+  fixed a different problem. The real cause is still unknown and it is shared-state
+  pollution from `_rebuild_pieces`, most likely piece meshes or pick areas cached
+  globally across scenes. Next thing to try: rebuild in one scene, then assert a piece
+  built in a *second* fresh scene has the same mesh and pick area.
+
 - **Move list / notation.** None. The last-move markers are the only record of what
   has been played.
 - **Illegal-move feedback.** Nothing happens when a tap is refused. Agreed in the

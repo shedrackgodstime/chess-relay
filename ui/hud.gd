@@ -32,8 +32,15 @@ func set_network_state(state: NetworkState) -> void:
 	network_indicator.texture = Icons.signal_bars(visual[0], visual[1])
 
 
-## Emitted by the menu button. The settings screen will listen to this.
+## Emitted by the menu button when it wants to be opened or closed. The board
+## listens, because whether a tap lands on a square depends on whether the panel is
+## up, and the panel is hidden whenever play is live.
 signal menu_requested
+
+## What the player chose from the menu.
+signal new_game_requested
+signal resign_requested
+signal exit_requested
 ## Shows the end of the game over the board, or clears it.
 ##
 ## Checkmate is the one outcome that has to be said plainly: the board itself
@@ -89,6 +96,21 @@ signal voice_state_changed(state: VoiceState)
 @onready var promotion_picker: PromotionPicker = %PromotionPicker
 @onready var game_over_label: Label = %GameOverLabel
 @onready var network_indicator: TextureRect = %NetworkIndicator
+@onready var menu_panel: Control = %MenuPanel
+@onready var menu_new_game_button: Button = %MenuNewGame
+@onready var menu_resign_button: Button = %MenuResign
+@onready var menu_exit_button: Button = %MenuExit
+@onready var menu_hints_toggle: CheckButton = %MenuHints
+@onready var menu_quality_option: OptionButton = %MenuQuality
+@onready var menu_confirm_label: Label = %MenuConfirmLabel
+@onready var menu_confirm_button: Button = %MenuConfirm
+@onready var menu_cancel_button: Button = %MenuCancel
+@onready var menu_rows: Control = %MenuRows
+
+## The action a confirmation is asking about, or MENU_NONE when nothing is pending.
+enum MenuAction { NONE, NEW_GAME, RESIGN, EXIT }
+
+var _menu_pending := MenuAction.NONE
 
 ## What the connection to the other player is doing.
 ##
@@ -176,6 +198,24 @@ func bind() -> void:
 	_connect(flip_button, _on_flip)
 	_connect(reset_button, _on_reset)
 	_connect(menu_button, _on_menu)
+	if menu_new_game_button != null:
+		_connect(menu_new_game_button, _on_menu_new_game)
+		_connect(menu_resign_button, _on_menu_resign)
+		_connect(menu_exit_button, _on_menu_exit)
+		_connect(menu_confirm_button, _on_menu_confirm)
+		_connect(menu_cancel_button, _on_menu_cancel)
+		# Connected to their own signals rather than through _connect, which is typed
+		# to Button and wires pressed. A CheckButton's pressed carries no arguments and
+		# an OptionButton's says nothing about which entry was chosen, so both would
+		# have been connected to the wrong thing and quietly done nothing.
+		if menu_hints_toggle != null \
+				and not menu_hints_toggle.toggled.is_connected(_on_hints_toggled):
+			menu_hints_toggle.toggled.connect(_on_hints_toggled)
+		if menu_quality_option != null \
+				and not menu_quality_option.item_selected.is_connected(
+					_on_quality_selected):
+			menu_quality_option.item_selected.connect(_on_quality_selected)
+		refresh_menu_settings()
 	_connect(mic_button, _on_voice)
 
 
@@ -200,7 +240,110 @@ func _on_reset() -> void:
 	reset_view_requested.emit()
 
 
+## Opens or closes the panel. Closing is always allowed, including mid-confirmation:
+## a player who opened a confirmation and changed their mind must never be trapped.
+func toggle_menu() -> void:
+	if menu_panel == null:
+		menu_requested.emit()
+		return
+	menu_panel.visible = not menu_panel.visible
+	if menu_panel.visible:
+		_show_menu_rows()
+	else:
+		_clear_confirmation()
+	menu_requested.emit()
+
+
+## Puts the panel back to its question, dropping any pending confirmation.
+func _show_menu_rows() -> void:
+	_clear_confirmation()
+	if menu_rows != null:
+		menu_rows.visible = true
+
+
+func _clear_confirmation() -> void:
+	_menu_pending = MenuAction.NONE
+	if menu_rows != null:
+		menu_rows.visible = true
+	if menu_confirm_label != null:
+		menu_confirm_label.visible = false
+	if menu_confirm_button != null:
+		menu_confirm_button.visible = false
+	if menu_cancel_button != null:
+		menu_cancel_button.visible = false
+
+
+## Asks before doing the things that cannot be undone.
+##
+## A second tap rather than a modal dialog, and the reason is that a confirmation is
+## itself a place to tap the wrong thing. Here the question and its two answers occupy
+## the space the list just vacated, so there is nothing else on screen to hit, and the
+## row that asked is still the one under the player's thumb.
+func _confirm(action: MenuAction, question: String) -> void:
+	if menu_rows == null:
+		return
+	menu_rows.visible = false
+	_menu_pending = action
+	if menu_confirm_label != null:
+		menu_confirm_label.text = question
+		menu_confirm_label.visible = true
+	if menu_confirm_button != null:
+		menu_confirm_button.visible = true
+	if menu_cancel_button != null:
+		menu_cancel_button.visible = true
+
+
 func _on_menu() -> void:
+	toggle_menu()
+
+
+func _on_menu_new_game() -> void:
+	_confirm(MenuAction.NEW_GAME, "Abandon this game and start again?")
+
+
+func _on_menu_resign() -> void:
+	_confirm(MenuAction.RESIGN, "Resign and lose this game?")
+
+
+func _on_menu_exit() -> void:
+	_confirm(MenuAction.EXIT, "Leave the game?")
+
+
+func _on_menu_confirm() -> void:
+	match _menu_pending:
+		MenuAction.NEW_GAME:
+			toggle_menu()
+			new_game_requested.emit()
+		MenuAction.RESIGN:
+			toggle_menu()
+			resign_requested.emit()
+		MenuAction.EXIT:
+			exit_requested.emit()
+		_:
+			pass
+	_clear_confirmation()
+
+
+func _on_menu_cancel() -> void:
+	_show_menu_rows()
+
+
+## Reflects the live settings in the menu, so it never offers to change something to
+## the value it already holds.
+func refresh_menu_settings() -> void:
+	if menu_hints_toggle != null:
+		menu_hints_toggle.set_pressed_no_signal(Indicators.show_legal_moves())
+	if menu_quality_option != null:
+		menu_quality_option.select(Quality.preset())
+
+
+func _on_hints_toggled(pressed: bool) -> void:
+	Indicators.set_show_legal_moves(pressed)
+	menu_requested.emit()
+
+
+func _on_quality_selected(index: int) -> void:
+	Quality.set_preset(index)
 	menu_requested.emit()
 
 

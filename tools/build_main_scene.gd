@@ -213,6 +213,7 @@ func _hud() -> Control:
 	hud.add_child(_menu_button())
 	hud.add_child(_game_over_label())
 	hud.add_child(_network_indicator())
+	hud.add_child(_menu_panel())
 	hud.add_child(_promotion_picker())
 	return hud
 
@@ -315,6 +316,104 @@ func _network_indicator() -> TextureRect:
 	indicator.offset_top = 16.0 + (Hud.TOUCH_SIZE.y - side) * 0.5
 	indicator.offset_bottom = indicator.offset_top + side
 	return indicator
+
+
+## The in-game menu, hidden whenever play is live.
+##
+## A backdrop that swallows taps and a centred column of rows. The backdrop matters:
+## while the panel is up, a tap that missed must not fall through to the board and
+## move a piece, which is the same failure the first attempt at a new-game button had
+## in a permanent form. Hidden by default rather than merely inert, so nothing of it
+## is over the board at all while a player is playing.
+##
+## New game, resign and exit live in here rather than on permanent buttons for the
+## reason this is a menu at all: they destroy the game, so they must not be one tap
+## from the view controls. The settings rows are here because they change how the game
+## looks while it is being played, which is exactly when a player wants to change
+## them.
+func _menu_panel() -> Control:
+	var panel := Control.new()
+	panel.name = "MenuPanel"
+	panel.unique_name_in_owner = true
+	panel.set_anchors_preset(Control.PRESET_FULL_RECT)
+	panel.visible = false
+
+	var backdrop := ColorRect.new()
+	backdrop.name = "Backdrop"
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.05, 0.04, 0.03, 0.72)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.add_child(backdrop)
+
+	var column := VBoxContainer.new()
+	column.name = "Column"
+	column.set_anchors_preset(Control.PRESET_CENTER)
+	column.position = Vector2(-190.0, -150.0)
+	column.size = Vector2(380.0, 300.0)
+	column.add_theme_constant_override("separation", 10)
+	panel.add_child(column)
+
+	var rows := VBoxContainer.new()
+	rows.name = "MenuRows"
+	rows.unique_name_in_owner = true
+	rows.add_theme_constant_override("separation", 8)
+	column.add_child(rows)
+
+	rows.add_child(_menu_row("MenuNewGame", "New game"))
+	rows.add_child(_menu_row("MenuResign", "Resign"))
+	var hints := CheckButton.new()
+	hints.name = "MenuHints"
+	hints.unique_name_in_owner = true
+	hints.text = "Show legal moves"
+	hints.focus_mode = Control.FOCUS_NONE
+	hints.custom_minimum_size = Vector2(0.0, 44.0)
+	rows.add_child(hints)
+	var quality := OptionButton.new()
+	quality.name = "MenuQuality"
+	quality.unique_name_in_owner = true
+	quality.focus_mode = Control.FOCUS_NONE
+	quality.custom_minimum_size = Vector2(0.0, 44.0)
+	for name: String in ["Low", "Medium", "High"]:
+		quality.add_item(name)
+	rows.add_child(quality)
+	rows.add_child(_menu_row("MenuExit", "Exit"))
+
+	var question := Label.new()
+	question.name = "MenuConfirmLabel"
+	question.unique_name_in_owner = true
+	question.text = ""
+	question.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	question.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	question.custom_minimum_size = Vector2(0.0, 56.0)
+	question.add_theme_font_size_override("font_size", 20)
+	question.add_theme_color_override("font_color", Color(1.0, 0.90, 0.72))
+	question.visible = false
+	column.add_child(question)
+
+	var confirm := _menu_row("MenuConfirm", "Confirm")
+	confirm.visible = false
+	column.add_child(confirm)
+	var cancel := _menu_row("MenuCancel", "Cancel")
+	cancel.visible = false
+	column.add_child(cancel)
+	return panel
+
+
+## One full-width row of the menu. Text rather than an icon, because these are the
+## game's most destructive actions and a label says what they do without being read.
+func _menu_row(node_name: String, text: String) -> Button:
+	var button := Button.new()
+	button.name = node_name
+	button.unique_name_in_owner = true
+	button.text = text
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(0.0, 48.0)
+	button.add_theme_font_size_override("font_size", 20)
+	button.add_theme_color_override("font_color", Color(1.0, 0.90, 0.72))
+	button.add_theme_stylebox_override("normal", _button_box())
+	button.add_theme_stylebox_override("hover", _button_box(Color(0.16, 0.13, 0.11)))
+	button.add_theme_stylebox_override("pressed", _button_box(Color(0.26, 0.20, 0.15)))
+	return button
 
 
 ## The promote-what-to overlay. Added last so it paints over everything, and

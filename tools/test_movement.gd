@@ -400,6 +400,28 @@ func _populate_views(main: Main) -> void:
 	await process_frame
 
 
+
+
+## Whether the pawn on e2 can be picked at the default camera.
+##
+## Measured rather than assumed, because this was believed on a device and never
+## tested, and the test says something different from the belief.
+##
+## Two targets. A tap on the pawn's own body reaches the pawn at both 45 and 50,
+## which is the tap a player actually makes. A tap on the bare centre of the e2
+## square reaches the king at both angles: the king stands between the camera and
+## the centre, and raising the pitch does not change that, because both pieces are
+## centred on their own squares and the ray still passes through the king's body.
+##
+## So the e2 difficulty is the square centre being behind a piece, which picking by
+## ray alone cannot fix. It is not fixed here, and the framing was moved to 50 to
+## be looked at rather than because it was ever going to solve this.
+## Whether tapping a square selects it, used to prove the board is still live.
+func _can_tap(main: Main, square: Vector2i) -> bool:
+	_tap_square(main, square)
+	return main.selected == square
+
+
 ## Whether every piece the board state holds is on the square the view registry
 ## says it is, and nothing is on a square the state has emptied.
 func _views_match_state(main: Main) -> bool:
@@ -435,6 +457,91 @@ func _views_match_state(main: Main) -> bool:
 ## So the e2 difficulty is the square centre being behind a piece, which picking by
 ## ray alone cannot fix. It is not fixed here, and the framing was moved to 50 to
 ## be looked at rather than because it was ever going to solve this.
+## New game, driven from the menu rather than by calling it, and run last because
+## it frees and rebuilds every piece in the scene.
+func _new_game_checks() -> void:
+	print("New game")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+	_check("a new board has all thirty-two pieces",
+		main.pieces.size() == 32, "pieces=%d" % main.pieces.size())
+
+	# e2-e4, d7-d5, exd5: a capture, so the scene is genuinely short a piece before
+	# anything is rebuilt.
+	for sequence: Array in [
+		[Vector2i(4, 1), Vector2i(4, 3)],
+		[Vector2i(3, 6), Vector2i(3, 4)],
+		[Vector2i(4, 3), Vector2i(3, 4)],
+	]:
+		for square: Vector2i in sequence:
+			_tap_square(main, square)
+		await process_frame
+	_check("a capture really happened",
+		main.game.history.size() == 3 and main.pieces.size() == 31,
+		"moves=%d pieces=%d" % [main.game.history.size(), main.pieces.size()])
+
+	main.hud.set_game_over("CHECKMATE  ·  test")
+	main.start_new_game()
+	await process_frame
+	await process_frame
+	_check("the position is the opening again",
+		main.game.history.size() == 0
+			and main.game.state.at(4, 1)
+				== BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT), "")
+	_check("all thirty-two views are back", main.pieces.size() == 32,
+		"pieces=%d" % main.pieces.size())
+	_check("every view sits where the position says",
+		_views_match_state(main), "")
+	_check("and is actually there rather than merely registered",
+		_views_sit_on_their_squares(main), "")
+	_check("the banner is gone", not main.hud.game_over_label.visible, "")
+	_check("nothing is selected", main.selected.x < 0, "")
+	_check("no last move is shown", _last_move_shown(main) == 0,
+		"shown=%d" % _last_move_shown(main))
+	_check("no destination hints are showing", main.legal_marked.is_empty(), "")
+	_check("the trays are empty again",
+		main.tray_light.pieces.is_empty() and main.tray_dark.pieces.is_empty(), "")
+	_check("and the board still responds", _can_tap(main, Vector2i(1, 1)), "")
+
+	# Resigning ends it, refuses a second time, and says who gave up.
+	main._on_resign()
+	await process_frame
+	_check("resigning ends the game", main.game.result() == ChessGame.Result.RESIGNATION,
+		"result=%d" % main.game.result())
+	_check("and names the side that gave up", main.game.state.side_to_move
+		== BoardState.LIGHT, "")
+	_check("the banner says so", "resigns" in main.hud.game_over_label.text.to_lower(),
+		"banner=%s" % main.hud.game_over_label.text)
+	_check("no further moves are accepted",
+		not main.game.apply_move(ChessMove.new(Vector2i(4, 1), Vector2i(4, 3))), "")
+	_check("and resigning again changes nothing",
+		main.game.result() == ChessGame.Result.RESIGNATION, "")
+	main.start_new_game()
+	await process_frame
+	await process_frame
+	_check("a new game clears the resignation",
+		main.game.result() == ChessGame.Result.ONGOING,
+		"result=%d" % main.game.result())
+
+	scene.queue_free()
+	await process_frame
+
+
+## Whether every view has reached its square, as opposed to being merely registered
+## there: rebuilt at the right place but still animating towards a stale one is a
+## different failure from a view in the wrong registry slot.
+func _views_sit_on_their_squares(main: Main) -> bool:
+	for square: Vector2i in main.pieces:
+		var view := main.pieces[square] as PieceView
+		if view.position.distance_to(BoardMesh.square_position(square.x, square.y)) > 0.01:
+			return false
+	return true
+
+
 func _e2_reachability_checks() -> void:
 	print("e2 reachability")
 	for pitch: float in [45.0, 50.0]:

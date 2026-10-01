@@ -28,6 +28,7 @@ enum Result {
 	DRAW_BY_REPETITION,
 	DRAW_BY_FIFTY_MOVE,
 	DRAW_BY_INSUFFICIENT_MATERIAL,
+	RESIGNATION,
 }
 
 ## Half-moves since the last capture or pawn move. Not position state: it is
@@ -38,6 +39,9 @@ var halfmove_clock := 0
 ## How many times each position has been seen, keyed by BoardState.repetition_key.
 ## Seeded with the opening so the first repetition is counted against it.
 var position_counts := {}
+
+## Whether the game was given up rather than played out.
+var _resigned := false
 
 var state := BoardState.new()
 var history: Array[ChessMove] = []
@@ -62,6 +66,7 @@ func reset() -> void:
 	captured_by_light = []
 	captured_by_dark = []
 	_finished = false
+	_resigned = false
 
 
 ## Pieces this side has taken, oldest first.
@@ -197,6 +202,7 @@ func load_position(from: BoardState) -> void:
 	captured_by_dark = []
 	halfmove_clock = 0
 	_finished = false
+	_resigned = false
 	position_counts = {state.repetition_key(): 1}
 
 
@@ -207,6 +213,10 @@ func load_position(from: BoardState) -> void:
 ## would. The side to move having nothing left is the end of it: in check is
 ## checkmate, not in check is stalemate.
 func result() -> Result:
+	# A resignation outranks everything, because the position it left behind may well
+	# still look playable and the game was over the moment it was offered.
+	if _resigned:
+		return Result.RESIGNATION
 	# Checkmate and stalemate first. They are the outcomes a player is watching
 	# for, and a mating move that also completed fifty full moves is a mate, not a
 	# draw.
@@ -235,6 +245,21 @@ func result_for(another: BoardState) -> Result:
 	if Rules.has_insufficient_material(another):
 		return Result.DRAW_BY_INSUFFICIENT_MATERIAL
 	return Result.ONGOING
+
+
+## Gives the game up on behalf of the side to move.
+##
+## Recorded separately from the position, because a resignation is not something the
+## board can be seen to have done. Whichever side resigns is the side that was to
+## move, so side_to_move is the losing side afterwards and the banner can say so
+## without a second field. Refused once the game is already over, like any other
+## attempt to play on.
+func resign() -> void:
+	if _finished or _resigned:
+		return
+	_resigned = true
+	_finished = true
+	finished.emit(Result.RESIGNATION)
 
 
 func is_over() -> bool:
@@ -326,6 +351,7 @@ func _snapshot() -> Dictionary:
 		"light": captured_by_light.size(),
 		"dark": captured_by_dark.size(),
 		"finished": _finished,
+		"resigned": _resigned,
 	}
 
 
@@ -345,6 +371,7 @@ func _restore(saved: Dictionary) -> void:
 	captured_by_light.resize(int(saved["light"]))
 	captured_by_dark.resize(int(saved["dark"]))
 	_finished = saved["finished"]
+	_resigned = bool(saved.get("resigned", false))
 
 
 ## Every legal move for the side to move. The AI chooses from this rather than
