@@ -298,6 +298,82 @@ func _last_move_and_side_checks() -> void:
 ## The legal-destination hints, which are a lobby setting rather than part of
 ## playing a game. Off by default, and when on they must agree with the rules
 ## exactly, since a hint that marks an illegal square is worse than none.
+## Castling moves two pieces, and the board state and the views have to agree
+## about both of them. This checks the whole registry against the position rather
+## than one square, so a rook left behind is caught wherever it ends up.
+func _castling_view_checks() -> void:
+	print("Castling view")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+	main.game.load_position(_position_with({
+		Vector2i(4, 0): BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 0): BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT),
+		Vector2i(4, 7): BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(0, 5): BoardState.encode(PieceProfiles.Type.ROOK, BoardState.DARK)}))
+	# Views built directly rather than by re-collecting, since the generated scene
+	# holds a full set of pieces and _collect_pieces reads those nodes rather than
+	# the position. What is under test here is the bookkeeping in _on_game_moved.
+	main.pieces.clear()
+	for child in main.get_node("World/Pieces").get_children():
+		child.queue_free()
+	for square: Vector2i in [
+		Vector2i(4, 0), Vector2i(7, 0), Vector2i(4, 7), Vector2i(0, 5)]:
+		var code := main.game.state.at(square.x, square.y)
+		var view := PieceView.new()
+		view.piece_type = BoardState.decode(code).x
+		view.side = BoardState.decode(code).y
+		main.get_node("World/Pieces").add_child(view)
+		view.position = BoardMesh.square_position(square.x, square.y)
+		main.pieces[square] = view
+	await process_frame
+
+	var castle := ChessMove.new(Vector2i(4, 0), Vector2i(6, 0))
+	_check("the castle is offered",
+		main.game.is_legal(castle), "")
+	main.game.apply_move(castle)
+	main._on_game_moved(castle, BoardState.EMPTY)
+	await process_frame
+	_check("the king has moved in the position",
+		main.game.state.at(6, 0)
+			== BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT), "")
+	_check("the rook has moved in the position",
+		main.game.state.at(5, 0)
+			== BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT), "")
+	_check("the rook has moved in the views too", main.pieces.has(Vector2i(5, 0))
+		and not main.pieces.has(Vector2i(7, 0)),
+		"pieces=%s" % str(main.pieces.keys()))
+	_check("the view and the position agree square for square",
+		_views_match_state(main), "")
+
+	scene.queue_free()
+	await process_frame
+
+
+## Whether every piece the board state holds is on the square the view registry
+## says it is, and nothing is on a square the state has emptied.
+func _views_match_state(main: Main) -> bool:
+	var want := {}
+	for rank in BoardState.BOARD_SIZE:
+		for file in BoardState.BOARD_SIZE:
+			var code := main.game.state.at(file, rank)
+			if code != BoardState.EMPTY:
+				want[Vector2i(file, rank)] = code
+	if want.size() != main.pieces.size():
+		return false
+	for square: Vector2i in want:
+		var view := main.pieces.get(square) as PieceView
+		if view == null:
+			return false
+		if view.side != BoardState.decode(want[square]).y \
+				or view.piece_type != BoardState.decode(want[square]).x:
+			return false
+	return true
+
+
 func _legal_marker_checks() -> void:
 	print("Legal markers")
 	var scene := (load("res://main.tscn") as PackedScene).instantiate()
@@ -646,6 +722,7 @@ func _promotion_checks() -> void:
 
 	await _promotion_refusal_checks()
 	await _legal_marker_checks()
+	await _castling_view_checks()
 	scene.queue_free()
 	await process_frame
 

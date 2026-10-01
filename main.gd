@@ -512,6 +512,23 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 		victim.capture()
 	pieces[move.to_square] = piece
 	piece.home_square = move.to_square
+	# Castling moves a rook as well, and the board state already has it on its new
+	# square. Only animating the king would leave the rook standing on h1 in the
+	# registry and in front of the player while the position says f1, which is the
+	# same class of disagreement as a refused promotion looking like a queen.
+	var rook: PieceView = null
+	if piece.piece_type == PieceProfiles.Type.KING \
+			and absi(move.to_square.x - move.from_square.x) == 2:
+		var kingside: bool = move.to_square.x > move.from_square.x
+		var rook_from: Vector2i = BoardState.ROOK_HOME[move.from_square.y][kingside]
+		var rook_to := Vector2i(
+			move.to_square.x - 1 if kingside else move.to_square.x + 1,
+			move.from_square.y)
+		if pieces.has(rook_from):
+			rook = pieces[rook_from]
+			pieces.erase(rook_from)
+			pieces[rook_to] = rook
+			rook.home_square = rook_to
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Both ends of the move, so an opponent's reply can be seen to land where it
 	# was expected to rather than having to be remembered.
@@ -523,6 +540,11 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 		BoardMesh.square_position(move.to_square.x, move.to_square.y),
 		piece.piece_type == PieceProfiles.Type.KNIGHT
 	)
+	# The rook crosses the board the other way at the same time, so it gets the
+	# same animation rather than snapping across after the king lands.
+	if rook != null:
+		rook.glide_to(BoardMesh.square_position(rook.home_square.x,
+			rook.home_square.y), false)
 
 
 ## Marks the king that is in check, or clears the marker.
