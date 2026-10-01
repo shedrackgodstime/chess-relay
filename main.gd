@@ -13,6 +13,8 @@ extends Node3D
 @onready var camera: OrbitCamera = $World/Camera
 @onready var highlight: SquareHighlight = $World/Highlight
 @onready var hud: Hud = $UILayer/Hud
+@onready var tray_light: TrayView = $World/TrayLight
+@onready var tray_dark: TrayView = $World/TrayDark
 
 ## Degrees of orbit per press of a rotate button.
 const HUD_ROTATE_STEP := 22.5
@@ -79,7 +81,7 @@ func _ready() -> void:
 	# Voice is a property of the mode, so it is decided once here rather than
 	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
 	hud.set_voice_visible(DEV_SHOW_VOICE or not ai_opponent)
-	hud.set_captured(game.captures_by(BoardState.LIGHT), game.captures_by(BoardState.DARK))
+	_refresh_trays()
 
 
 ## The HUD emits intents; this is the only place that decides what they mean.
@@ -274,11 +276,22 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	pieces[move.to_square] = piece
 	piece.home_square = move.to_square
 	hud.set_turn(game.state.side_to_move, game.history.size())
-	hud.set_captured(game.captures_by(BoardState.LIGHT), game.captures_by(BoardState.DARK))
+	_refresh_trays()
 	piece.glide_to(
 		BoardMesh.square_position(move.to_square.x, move.to_square.y),
 		piece.piece_type == PieceProfiles.Type.KNIGHT
 	)
+
+
+## Repaints both capture trays from the game's capture lists.
+##
+## Read from the game rather than pushed to the trays as moves happen, so a tray
+## can never show pieces the board state no longer has.
+func _refresh_trays() -> void:
+	if tray_light != null:
+		tray_light.refresh_from(game)
+	if tray_dark != null:
+		tray_dark.refresh_from(game)
 
 
 ## Hands the move to the AI when it is its turn. One thinker at a time; the

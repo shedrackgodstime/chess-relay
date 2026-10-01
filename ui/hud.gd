@@ -40,8 +40,6 @@ signal voice_state_changed(state: VoiceState)
 @onready var voice_row: Control = %VoiceRow
 @onready var mic_ring: Panel = %MicRing
 @onready var remote_dot: Panel = %RemoteDot
-@onready var captured_light: HFlowContainer = %CapturedLight
-@onready var captured_dark: HFlowContainer = %CapturedDark
 
 @onready var turn_label: Label = %TurnLabel
 @onready var control_column: VBoxContainer = %ControlColumn
@@ -173,45 +171,6 @@ func set_voice_visible(shown: bool) -> void:
 	if not shown:
 		set_voice_state(VoiceState.OFF)
 		set_remote_speaking(false)
-
-
-## Size of one captured-piece silhouette in a tray.
-const CAPTURED_SIZE := Vector2(32.0, 32.0)
-
-## Repaints both capture trays from scratch.
-##
-## Trays are keyed by the side that *did the capturing*, and the glyphs are
-## tinted for the piece that was taken, so the colour of the silhouettes alone
-## tells you who took what without needing a label.
-func set_captured(took_light: Array[int], took_dark: Array[int]) -> void:
-	_fill_capture_row(captured_light, took_light)
-	_fill_capture_row(captured_dark, took_dark)
-
-
-func _fill_capture_row(row: HFlowContainer, codes: Array[int]) -> void:
-	if row == null:
-		return
-	for child in row.get_children():
-		row.remove_child(child)
-		child.queue_free()
-	# Grouped by piece type rather than capture order: a row that reshuffles
-	# every time an unrelated piece falls is harder to count at a glance, and
-	# the order things died in is not what the tray is for.
-	var grouped := codes.duplicate()
-	grouped.sort_custom(func(a: int, b: int) -> bool:
-		return BoardState.decode(a).x < BoardState.decode(b).x)
-	for code in grouped:
-		var decoded := BoardState.decode(code)
-		if decoded.x < 0:
-			continue
-		var icon := TextureRect.new()
-		icon.texture = PieceGlyphs.glyph(decoded.x)
-		icon.custom_minimum_size = CAPTURED_SIZE
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		icon.modulate = PieceGlyphs.tint_for(decoded.y)
-		row.add_child(icon)
 
 
 ## Lights the dot that shows the opponent is transmitting. Kept separate from

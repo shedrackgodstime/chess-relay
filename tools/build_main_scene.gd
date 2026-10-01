@@ -31,6 +31,8 @@ func _init() -> void:
 	world.add_child(_highlight())
 	world.add_child(_pieces())
 	world.add_child(_table())
+	world.add_child(_tray("TrayLight", LIGHT))
+	world.add_child(_tray("TrayDark", DARK))
 	world.add_child(_floor())
 	world.add_child(_key_light())
 	world.add_child(_fill_light())
@@ -149,8 +151,6 @@ func _hud() -> Control:
 	hud.add_child(_control_column())
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
-	hud.add_child(_capture_tray("CapturedLight"))
-	hud.add_child(_capture_tray("CapturedDark"))
 	return hud
 
 
@@ -264,50 +264,6 @@ func _voice_row() -> Control:
 ## once both sides have taken pieces, and neither collides with the control
 ## column, which owns the middle of the right edge. A flow container rather
 ## than a row so sixteen pieces wrap instead of running off a narrow screen.
-func _capture_tray(node_name: String) -> PanelContainer:
-	var panel := PanelContainer.new()
-	panel.name = node_name + "Panel"
-	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_theme_stylebox_override("panel", _tray_box())
-	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	panel.offset_top = -104.0
-	panel.offset_bottom = -12.0
-	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	if node_name == "CapturedLight":
-		panel.offset_left = 10.0
-		panel.offset_right = -330.0
-	else:
-		panel.offset_left = 330.0
-		panel.offset_right = -10.0
-
-	# A flow container inside, so sixteen pieces wrap to a second row rather
-	# than running off the side of a narrow screen.
-	var tray := HFlowContainer.new()
-	tray.name = node_name
-	tray.unique_name_in_owner = true
-	tray.alignment = FlowContainer.ALIGNMENT_BEGIN
-	tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tray.add_theme_constant_override("h_separation", 3)
-	tray.add_theme_constant_override("v_separation", 3)
-	panel.add_child(tray)
-	return panel
-
-
-## The tray surface. Without it an empty tray is literally nothing on screen,
-## so there is no way to tell the feature exists until the first capture lands.
-func _tray_box() -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = Color(0.09, 0.08, 0.07, 0.55)
-	box.set_corner_radius_all(10)
-	box.set_border_width_all(1)
-	box.border_color = Color(1.0, 0.88, 0.62, 0.16)
-	box.content_margin_left = 10.0
-	box.content_margin_right = 10.0
-	box.content_margin_top = 6.0
-	box.content_margin_bottom = 6.0
-	return box
-
-
 ## A hairline outline that appears only while the mic is live. Carries the same
 ## information as the glyph so the state survives a hard-to-read icon.
 func _ring_box() -> StyleBoxFlat:
@@ -399,6 +355,26 @@ func _table() -> MeshInstance3D:
 	table.name = "Table"
 	table.set_script(load("res://surroundings/table_view.gd"))
 	return table
+
+
+## A capture tray lying on the table, one each side of the board.
+##
+## The trays hold pieces by the colour that was taken, so the tray on a given
+## side always shows the opponent's pieces. They are keyed to a board side
+## rather than to the camera, so orbiting the board never swaps them.
+func _tray(node_name: String, capturer: int) -> Node3D:
+	var tray := Node3D.new()
+	tray.name = node_name
+	tray.set_script(load("res://surroundings/tray_view.gd"))
+	tray.set("capturer", capturer)
+	# Clear of the board frame, level with the table surface, long axis across
+	# the board's depth so both trays flank it symmetrically.
+	var side := -1.0 if capturer == LIGHT else 1.0
+	tray.position = Vector3(side * TrayMesh.TRAY_X, TableMesh.TOP_Y, 0.0)
+	if capturer == DARK:
+		# Mirrored so the row of wells faces the board from both sides.
+		tray.scale = Vector3(-1.0, 1.0, 1.0)
+	return tray
 
 
 ## Distant floor, visible only as the horizon behind the table.

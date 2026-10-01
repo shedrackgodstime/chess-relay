@@ -25,7 +25,6 @@ func _init() -> void:
 	_flip_checks(main)
 	_reset_checks(main)
 	_turn_checks(main, hud)
-	await _capture_signal_check()
 
 	scene.queue_free()
 	if _failures == 0:
@@ -76,7 +75,6 @@ func _layout_checks(main: Main, hud: Hud) -> void:
 	# which is the point of anchoring in the first place.
 	_centering_checks(view_buttons)
 	_mic_checks(main, hud)
-	_capture_tray_checks(main, hud)
 
 	_check("column is anchored to the right edge", column.anchor_left >= 0.9,
 		"anchor_left=%.2f" % column.anchor_left)
@@ -211,124 +209,6 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 
 	_check("mic carries a glyph",
 		hud.mic_button.get_node_or_null("Glyph") is TextureRect, "")
-
-
-## Trays are rebuilt from the game's capture lists, so the view can never
-## disagree with the authoritative state.
-func _capture_tray_checks(main: Main, hud: Hud) -> void:
-	print("Capture trays")
-	var light_tray := hud.captured_light
-	var dark_tray := hud.captured_dark
-	_check("both trays exist", light_tray != null and dark_tray != null, "")
-	_check("trays start empty",
-		light_tray.get_child_count() == 0 and dark_tray.get_child_count() == 0,
-		"light=%d dark=%d" % [light_tray.get_child_count(), dark_tray.get_child_count()])
-
-	# At the starting position nothing has been taken.
-	hud.set_captured(main.game.captures_by(BoardState.LIGHT),
-		main.game.captures_by(BoardState.DARK))
-	_check("starting position fills no tray",
-		light_tray.get_child_count() == 0 and dark_tray.get_child_count() == 0, "")
-
-	# Take three: two knights and a pawn, then one rook.
-	var taken: Array[int] = [
-		BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK),
-		BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK),
-		BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT),
-	]
-	hud.set_captured(taken, [])
-	_check("tray shows one silhouette per captured piece",
-		light_tray.get_child_count() == 3, "n=%d" % light_tray.get_child_count())
-	_check("the untouched tray stays empty", dark_tray.get_child_count() == 0, "")
-
-	# Silhouettes are tinted for the piece that died, not the capturer.
-	var tints := {}
-	var types := []
-	for icon in light_tray.get_children():
-		var rect := icon as TextureRect
-		tints[rect.modulate.to_html(false)] = true
-		types.append(rect.texture)
-	_check("captured colour is distinct per side",
-		tints.size() == 2, "distinct=%d" % tints.size())
-	_check("every silhouette carries a glyph",
-		types.all(func(t: Texture2D) -> bool: return t != null), "")
-
-	# Grouped by type, so pawns lead regardless of the order they fell.
-	# Sorted by type ascending, so the pawn leads and the knights sit together.
-	_check("tray is grouped by piece type",
-		types[0] != types[1] and types[1] == types[2], "pawn should lead")
-
-	# Repainting replaces rather than appends.
-	hud.set_captured([taken[0]] as Array[int], [])
-	_check("repainting replaces the row",
-		light_tray.get_child_count() == 1, "n=%d" % light_tray.get_child_count())
-
-	hud.set_captured([], [])
-	_check("trays can be emptied", light_tray.get_child_count() == 0, "")
-
-	# A full tray is the worst case a game can reach.
-	var all_dark: Array[int] = []
-	for type in [PieceProfiles.Type.PAWN, PieceProfiles.Type.PAWN,
-			PieceProfiles.Type.KNIGHT, PieceProfiles.Type.BISHOP,
-			PieceProfiles.Type.ROOK, PieceProfiles.Type.QUEEN]:
-		all_dark.append(BoardState.encode(type, BoardState.DARK))
-	hud.set_captured(all_dark, [])
-	_check("a full tray renders every piece", light_tray.get_child_count() == 6,
-		"n=%d" % light_tray.get_child_count())
-
-	hud.set_captured([], [])
-
-
-## Runs last, on its own freshly instantiated scene.
-##
-## It has to be last because it plays real moves, which would pollute any check
-## that counts moves or reads the position. It needs its own scene because by
-## the time it runs, the shared one has already been moved around and no longer
-## has the opening position this capture needs.
-func _capture_signal_check() -> void:
-	print("Capture wiring")
-	var fresh := (load("res://main.tscn") as PackedScene).instantiate()
-	root.add_child(fresh)
-	await process_frame
-	await process_frame
-	var main: Main = fresh
-	main.ai_opponent = false
-	var light_tray: HFlowContainer = main.hud.captured_light
-	var before := light_tray.get_child_count()
-	_check("a fresh scene starts with an empty tray", before == 0, "n=%d" % before)
-
-	# e4, d5, exd5: a real capture through the normal path, so Main's piece
-	# registry stays in step. Faking board state instead would leave the
-	# registry stale and _on_game_moved would bail out early.
-	var quiet := [ChessMove.new(Vector2i(4, 1), Vector2i(4, 3)),
-		ChessMove.new(Vector2i(3, 6), Vector2i(3, 4))]
-	for mv in quiet:
-		main.game.apply_move(mv)
-	_check("quiet moves put nothing in the tray",
-		light_tray.get_child_count() == before,
-		"n=%d" % light_tray.get_child_count())
-
-	var captured := main.game.apply_move(ChessMove.new(Vector2i(4, 3), Vector2i(3, 4)))
-	_check("the capture itself applies", captured, "")
-	_check("a played capture reaches the tray unaided",
-		light_tray.get_child_count() == before + 1,
-		"n=%d was=%d" % [light_tray.get_child_count(), before])
-	_check("the tray matches the authoritative capture list",
-		light_tray.get_child_count() == main.game.captures_by(BoardState.LIGHT).size(),
-		"tray=%d game=%d" % [light_tray.get_child_count(),
-			main.game.captures_by(BoardState.LIGHT).size()])
-
-	main.game.reset()
-	main._collect_pieces()
-	main.hud.set_captured(main.game.captures_by(BoardState.LIGHT),
-		main.game.captures_by(BoardState.DARK))
-	await process_frame
-	_check("reset empties the tray",
-		light_tray.get_child_count() == 0,
-		"n=%d" % light_tray.get_child_count())
-
-	fresh.queue_free()
-	await process_frame
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.
