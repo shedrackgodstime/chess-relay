@@ -300,6 +300,17 @@ func _promotion_checks() -> void:
 		ChessMove.new(Vector2i(1, 6), Vector2i(1, 7), PieceProfiles.Type.KNIGHT))
 	_check("an explicit promotion choice is honoured",
 		BoardState.decode(chosen).x == PieceProfiles.Type.KNIGHT, "")
+	_check("is_promotion recognises a pawn on the far rank",
+		Rules.is_promotion(pawn, ChessMove.new(Vector2i(1, 6), Vector2i(1, 7))), "")
+	_check("is_promotion is false for a pawn short of it",
+		not Rules.is_promotion(pawn, ChessMove.new(Vector2i(1, 6), Vector2i(1, 5))), "")
+	_check("is_promotion is false for a non-pawn",
+		not Rules.is_promotion(pawn, ChessMove.new(Vector2i(1, 0), Vector2i(1, 6))), "")
+	_check("four promotion choices are offered, and no king",
+		Rules.PROMOTION_CHOICES.size() == 4
+			and not Rules.PROMOTION_CHOICES.has(PieceProfiles.Type.KING)
+			and not Rules.PROMOTION_CHOICES.has(PieceProfiles.Type.PAWN),
+		str(Rules.PROMOTION_CHOICES))
 	_check("a pawn short of the last rank does not promote",
 		BoardState.decode(Rules.landing_code(pawn,
 			ChessMove.new(Vector2i(1, 6), Vector2i(1, 5)))).x == PieceProfiles.Type.PAWN, "")

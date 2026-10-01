@@ -21,6 +21,20 @@ signal reset_view_requested
 signal flip_requested
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
+## Asks the player which piece a pawn becomes. Routed through the HUD because
+## the picker is presentation and Main should not have to know it exists.
+func ask_promotion(promoting_side: int) -> void:
+	if promotion_picker != null:
+		promotion_picker.open(promoting_side)
+
+
+## Closes the picker without a choice. The caller still has to finish the move:
+## dismissing the prompt does not cancel it.
+func close_promotion() -> void:
+	if promotion_picker != null:
+		promotion_picker.close()
+
+
 ## The three states the mic control can present. Requesting is separate from
 ## live on purpose: asking for voice and speaking are different things, and
 ## collapsing them would leave the player unsure whether anyone heard them.
@@ -48,6 +62,7 @@ signal voice_state_changed(state: VoiceState)
 @onready var flip_button: Button = %FlipButton
 @onready var reset_button: Button = %ResetButton
 @onready var menu_button: Button = %MenuButton
+@onready var promotion_picker: PromotionPicker = %PromotionPicker
 @onready var mic_button: Button = %MicButton
 
 ## Current presentation state of the mic control.

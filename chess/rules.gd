@@ -92,6 +92,30 @@ static func is_pseudo_legal(state: BoardState, move: ChessMove) -> bool:
 	return pseudo_legal_moves(state, move.from_square).has(move.to_square)
 
 
+## Whether this move would promote: a pawn arriving on its far rank.
+##
+## Asked separately from is_legal because a promotion is the one move the player
+## does not get to specify fully on their own, so the input layer has to ask
+## before submitting rather than after.
+static func is_promotion(state: BoardState, move: ChessMove) -> bool:
+	if state == null or move == null:
+		return false
+	var code := state.at(move.from_square.x, move.from_square.y)
+	if code == BoardState.EMPTY:
+		return false
+	var piece := BoardState.decode(code)
+	return piece.x == PieceProfiles.Type.PAWN \
+		and move.to_square.y == PROMOTION_RANK.get(piece.y, -1)
+
+
+## The pieces a pawn may promote to. No king: that is not a promotion, it is an
+## illegal move, and offering it would invite confusion.
+const PROMOTION_CHOICES := [
+	PieceProfiles.Type.QUEEN, PieceProfiles.Type.ROOK,
+	PieceProfiles.Type.BISHOP, PieceProfiles.Type.KNIGHT,
+]
+
+
 ## Whether this move is fully legal, king safety included.
 static func is_legal(state: BoardState, move: ChessMove) -> bool:
 	if not is_pseudo_legal(state, move):

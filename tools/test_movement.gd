@@ -52,6 +52,8 @@ func _init() -> void:
 
 	await _capture_and_knight_checks()
 
+	await _promotion_checks()
+
 	scene.queue_free()
 	await _side_ownership_checks()
 
@@ -121,6 +123,103 @@ func _capture_and_knight_checks() -> void:
 
 	scene.queue_free()
 	await process_frame
+
+
+## Promotion end to end: a held move, a choice, and the pawn becoming it.
+##
+## Runs on its own scene and sets the board up directly, because the promotion
+## move itself is chosen by the player rather than arrived at by tapping, so
+## there is no pair of squares to reach it from the opening.
+func _promotion_checks() -> void:
+	print("Promotion")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+
+	# A white pawn on b7, a white king somewhere harmless, black to be mated by.
+	main.game.state.squares.fill(BoardState.EMPTY)
+	main.game.state.set_square(1, 6,
+		BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+	main.game.state.set_square(4, 0,
+		BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	main.game.state.set_square(7, 7,
+		BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	main.game.state.side_to_move = BoardState.LIGHT
+
+	# The generated scene has all thirty-two pieces in it. Clearing the board
+	# state does not remove them, and they matter: the black pawn node still on
+	# b7 would swallow a tap aimed at b8, so the move would never be offered.
+	# Freed here so the scene and the state agree.
+	var keep := [Vector2i(1, 6), Vector2i(4, 0), Vector2i(7, 7)]
+	for square: Vector2i in main.pieces.keys():
+		if keep.has(square):
+			continue
+		var extra: Node = main.pieces[square]
+		main.pieces.erase(square)
+		extra.queue_free()
+	# The node on b7 is the black pawn the generator put there, so recolour it
+	# rather than building a second one.
+	(main.pieces[Vector2i(1, 6)] as PieceView).side = BoardState.LIGHT
+	# A frame before re-collecting: queue_free is deferred, so the nodes are
+	# still in the tree for now and the scan would find every one of them again.
+	await process_frame
+	main._collect_pieces()
+	await process_frame
+
+	var pawn: PieceView = main.pieces[Vector2i(1, 6)]
+	_check("the pawn on b7 is the light one", pawn.side == BoardState.LIGHT, "")
+	_check("the pawn is on the board to promote", pawn != null
+		and pawn.piece_type == PieceProfiles.Type.PAWN, "")
+
+	# Put it through the input path, so the move is held rather than applied.
+	main.selected = Vector2i(1, 6)
+	# Aimed near the far edge of b8 rather than its centre. From this camera the
+	# ray to the exact centre passes at almost precisely the height of the pawn
+	# on b7 behind it, and colliders are fitted flush to their meshes, so a
+	# graze is caught. Stepping further away lifts the ray clear.
+	main._tap(main.camera.unproject_position(
+		BoardMesh.square_position(1, 7) + Vector3(0.0, 0.0, 0.35)))
+	_check("the promotion is not applied while the choice is open",
+		main.game.state.at(1, 7) == BoardState.EMPTY
+			and main.pieces.has(Vector2i(1, 6)), "")
+	_check("the picker is shown", main.hud.promotion_picker != null
+		and main.hud.promotion_picker.visible, "")
+	_check("the picker covers the screen, so it can actually be seen",
+		main.hud.promotion_picker.size.x > 100.0
+			and main.hud.promotion_picker.size.y > 100.0,
+		"size=%s" % main.hud.promotion_picker.size)
+	_check("the picker offers one tappable option per promotion piece",
+		main.hud.promotion_picker.option_count() == Rules.PROMOTION_CHOICES.size(),
+		"options=%d" % main.hud.promotion_picker.option_count())
+
+	# Underpromote on purpose: a knight is the choice that proves the pawn
+	# actually changed rather than quietly becoming a queen.
+	main._on_promotion_chosen(PieceProfiles.Type.KNIGHT)
+	await process_frame
+	_check("the move lands once a piece is chosen",
+		main.game.state.at(1, 7) != BoardState.EMPTY, "")
+	_check("the board records the chosen piece",
+		BoardState.decode(main.game.state.at(1, 7))
+			== Vector2i(PieceProfiles.Type.KNIGHT, BoardState.LIGHT),
+		PieceProfiles.type_name(BoardState.decode(main.game.state.at(1, 7)).x))
+	var promoted: PieceView = main.pieces[Vector2i(1, 7)]
+	_check("the same node is reused and now looks like a knight",
+		promoted != null and promoted.piece_type == PieceProfiles.Type.KNIGHT
+			and promoted == pawn, "rebuilt in place=%s" % (promoted == pawn))
+	_check("the picker closes after choosing",
+		not main.hud.promotion_picker.visible, "")
+	_check("no promotion is left pending", main._pending_promotion == null, "")
+
+	scene.queue_free()
+	await process_frame
+
+
+## A world point for a square, projected to screen, for driving _tap directly.
+func _screen(main: Main, square: Vector2i) -> Vector2:
+	return main.camera.unproject_position(BoardMesh.square_position(square.x, square.y))
 
 
 ## Taps a square the way a finger would: on the piece's body when one is

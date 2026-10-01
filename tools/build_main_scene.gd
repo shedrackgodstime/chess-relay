@@ -151,6 +151,7 @@ func _hud() -> Control:
 	hud.add_child(_control_column())
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
+	hud.add_child(_promotion_picker())
 	return hud
 
 
@@ -197,6 +198,16 @@ func _control_column() -> VBoxContainer:
 
 ## The menu button sits in the top-right corner, away from the view controls
 ## so it never gets hit by accident mid-game.
+## The promote-what-to overlay. Added last so it paints over everything, and
+## starts hidden because it is only shown while a promotion is pending.
+func _promotion_picker() -> Control:
+	var picker := Control.new()
+	picker.name = "PromotionPicker"
+	picker.unique_name_in_owner = true
+	picker.set_script(load("res://ui/promotion_picker.gd"))
+	return picker
+
+
 func _menu_button() -> Button:
 	var button := _icon_button("MenuButton", Icons.menu())
 	button.set_anchors_preset(Control.PRESET_TOP_RIGHT)

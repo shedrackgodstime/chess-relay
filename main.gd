@@ -93,6 +93,8 @@ func _ready() -> void:
 	game.moved.connect(_on_game_moved)
 	_collect_pieces()
 	_connect_hud()
+	if hud.promotion_picker != null:
+		hud.promotion_picker.chosen.connect(_on_promotion_chosen)
 	hud.bind()
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Voice is a property of the mode, so it is decided once here rather than
@@ -240,8 +242,48 @@ func _tap(screen_position: Vector2) -> void:
 	if not _may_move_now():
 		_deselect()
 		return
-	if game.apply_move(ChessMove.new(selected, square)):
+	var move := ChessMove.new(selected, square)
+	# A promotion is the one move two taps cannot fully describe. Hold it until
+	# the player has said which piece, rather than applying a queen and changing
+	# it afterwards: the glide would animate the wrong piece, and the opponent's
+	# copy would have to be told about it after the fact.
+	if Rules.is_promotion(game.state, move) and move.promotion < 0 \
+			and _may_ask_for_promotion():
+		_pending_promotion = move
+		hud.ask_promotion(player_side)
 		_deselect()
+		return
+	if game.apply_move(move):
+		_deselect()
+		_maybe_ai_move()
+
+
+## The promotion waiting on the player's answer, if any.
+var _pending_promotion: ChessMove = null
+
+
+## Whether a promotion should be put to the player. Only for the side they
+## play: the AI chooses for itself, and a move arriving over the wire has
+## already been decided by whoever sent it.
+func _may_ask_for_promotion() -> bool:
+	return _pending_promotion == null
+
+
+## Finishes the held promotion with the player's choice. The move was never
+## applied, so there is nothing to roll back.
+func _on_promotion_chosen(type: int) -> void:
+	hud.close_promotion()
+	var move := _pending_promotion
+	_pending_promotion = null
+	if move == null:
+		return
+	move.promotion = type
+	# The view is updated before the move is applied, so the piece that glides
+	# across the board is already the one that was chosen rather than a pawn
+	# wearing a new mesh on arrival.
+	if pieces.has(move.from_square):
+		(pieces[move.from_square] as PieceView).piece_type = type
+	if game.apply_move(move):
 		_maybe_ai_move()
 
 
