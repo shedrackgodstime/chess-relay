@@ -71,8 +71,7 @@ func _studio_checks() -> void:
 	# Not near-black: surfaces facing away from the lamp live on ambient alone,
 	# and starving it turns the wood and the board's two square tones grey.
 	_check("ambient is bright enough to keep material colour",
-		env.ambient_light_energy >= 0.8 and env.ambient_light_energy < 1.6,
-		"energy=%.2f" % env.ambient_light_energy)
+		env.ambient_light_energy >= 1.4, "energy=%.2f" % env.ambient_light_energy)
 	_check("ambient is warm, not neutral grey",
 		env.ambient_light_color.r >= env.ambient_light_color.b,
 		"%s" % env.ambient_light_color)
@@ -81,6 +80,18 @@ func _studio_checks() -> void:
 	_check("the floor is a brown, not a hole",
 		TableMesh.FLOOR_COLOR.r > TableMesh.FLOOR_COLOR.b,
 		"%s" % TableMesh.FLOOR_COLOR)
+
+	# The trays sit at the table's edge, roughly 7 units from the lamp axis.
+	# A cone too tight to reach them leaves them black while the board looks
+	# correctly lit, which is how the trays became invisible.
+	var lamp_drop: float = StudioView.LAMP_HEIGHT + absf(TableMesh.TOP_Y)
+	var cone_at_table: float = lamp_drop * tan(deg_to_rad(StudioView.LAMP_ANGLE_DEGREES))
+	var tray_reach: float = Vector2(TrayMesh.TRAY_X, TrayMesh.LENGTH * 0.5).length()
+	_check("lamp cone reaches the far corners of both trays",
+		cone_at_table > tray_reach + 1.0,
+		"cone=%.1f trays at=%.1f" % [cone_at_table, tray_reach])
+	_check("spot falloff is flat enough not to shadow the periphery",
+		StudioView.FALLOFF_AT_TABLE < 0.5, "%.2f" % StudioView.FALLOFF_AT_TABLE)
 	_check("fog is on so the floor fades rather than ends",
 		env.fog_enabled and env.fog_density > 0.0, "density=%.3f" % env.fog_density)
 	_check("background is a flat colour behind the dome",
