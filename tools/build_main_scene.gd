@@ -97,14 +97,14 @@ func _check_highlight() -> MeshInstance3D:
 ##
 ## Two instances of the one marker rather than a bespoke two-square mesh, so
 ## every highlight on the board is the same component in a different colour:
-## gold for the selection, faint amber for the last move, red for a king in
-## check. One shape to recognise.
+## gold for the selection, blue and green for the last move's two ends, red for a
+## king in check. One shape to recognise.
 func _last_move_from() -> MeshInstance3D:
-	return _highlight_named("LastMoveFrom", SquareHighlight.LAST_MOVE)
+	return _highlight_named("LastMoveFrom", SquareHighlight.LAST_MOVE_FROM)
 
 
 func _last_move_to() -> MeshInstance3D:
-	return _highlight_named("LastMoveTo", SquareHighlight.LAST_MOVE)
+	return _highlight_named("LastMoveTo", SquareHighlight.LAST_MOVE_TO)
 
 
 func _highlight_named(node_name: String, tint: Color) -> MeshInstance3D:

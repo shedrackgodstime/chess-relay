@@ -9,19 +9,30 @@ extends MeshInstance3D
 ## _ready like every other procedural mesh here, which keeps it out of the
 ## .tscn; Main moves and toggles it.
 ##
-## Used twice: once in gold for the selected piece, and once in red for a king in
-## check. Same shape on purpose. A check is not a new visual idea, it is the
-## marker already in use saying something urgent instead, and reusing the frame
-## means the player does not have to learn a second shape for it.
+## Four colours on one marker, and that is as many as this board should carry:
+## from, to, selection, check. What keeps it readable is not the hue but the
+## brightness. The selection frame is the brightest thing on the board, the
+## check frame is strong, the arrival is middling and the departure is faint. Hue
+## only adds to that, so a player who cannot separate two colours still reads the
+## right thing from how loud each one is.
 
 const OUTER := 0.94
-const BAR := 0.11
+
+## Thickness of each side of the frame, as a fraction of the square. Thinner than
+## it was: at 0.11 the frame read as a box drawn around the square rather than a
+## highlight laid over it.
+const BAR := 0.07
 const HEIGHT := 0.014
 const LIFT := 0.008
 
-## The last move. Faint on purpose: it is reference, and it is visible on most
-## turns, so it must not compete with the board.
-const LAST_MOVE := Color(1.0, 0.76, 0.36, 0.45)
+## The last move, in two hues so the direction reads at a glance without
+## inferring which square the piece came from.
+##
+## Blue for where it left, green for where it arrived. Both deliberately far
+## from the gold of the selection frame, so holding a piece never looks like
+## the same thing as the move that just happened.
+const LAST_MOVE_FROM := Color(0.42, 0.58, 1.0, 0.40)
+const LAST_MOVE_TO := Color(0.38, 0.94, 0.54, 0.58)
 
 ## Selection: the warm gold used throughout the HUD.
 const GOLD := Color(1.0, 0.85, 0.25)

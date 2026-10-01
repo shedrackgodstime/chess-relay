@@ -217,10 +217,35 @@ func _last_move_and_side_checks() -> void:
 			main.last_move_to.marked_square()])
 	_check("both last-move frames have geometry",
 		main.last_move_from.mesh != null and main.last_move_to.mesh != null, "")
-	_check("the last move reuses the selection marker, fainter",
-		main.last_move_from.colour.is_equal_approx(SquareHighlight.LAST_MOVE)
-			and not main.last_move_from.colour.is_equal_approx(SquareHighlight.GOLD),
-		"colour=%s" % main.last_move_from.colour)
+	# Four colours in use on the board, so no two may collide.
+	var hues := [SquareHighlight.LAST_MOVE_FROM, SquareHighlight.LAST_MOVE_TO,
+		SquareHighlight.GOLD, SquareHighlight.RED]
+	var distinct := 0
+	for i in hues.size():
+		var clash := false
+		for j in range(i + 1, hues.size()):
+			if (hues[i] as Color).is_equal_approx(hues[j]):
+				clash = true
+		if not clash:
+			distinct += 1
+	_check("the four highlight colours are all different", distinct == 4,
+		"distinct=%d" % distinct)
+	_check("the last move's two ends differ from each other",
+		not SquareHighlight.LAST_MOVE_FROM.is_equal_approx(SquareHighlight.LAST_MOVE_TO)
+			and not SquareHighlight.LAST_MOVE_FROM.is_equal_approx(SquareHighlight.GOLD)
+			and not SquareHighlight.LAST_MOVE_TO.is_equal_approx(SquareHighlight.GOLD),
+		"from=%s to=%s" % [SquareHighlight.LAST_MOVE_FROM, SquareHighlight.LAST_MOVE_TO])
+	# Brightness carries the hierarchy, so hue is not the only channel.
+	_check("brightness ranks the four from loudest to quietest",
+		SquareHighlight.GOLD.get_luminance() > SquareHighlight.RED.get_luminance()
+			and SquareHighlight.LAST_MOVE_TO.get_luminance()
+				> SquareHighlight.LAST_MOVE_FROM.get_luminance(),
+		"gold=%.2f red=%.2f to=%.2f from=%.2f" % [
+			SquareHighlight.GOLD.get_luminance(), SquareHighlight.RED.get_luminance(),
+			SquareHighlight.LAST_MOVE_TO.get_luminance(),
+			SquareHighlight.LAST_MOVE_FROM.get_luminance()])
+	_check("the frame is thinner than it was",
+		SquareHighlight.BAR <= 0.08, "bar=%.2f" % SquareHighlight.BAR)
 
 	_tap_square(main, Vector2i(1, 1))
 	_tap_square(main, Vector2i(1, 3))
