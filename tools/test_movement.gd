@@ -428,8 +428,11 @@ func _legal_marker_checks() -> void:
 	await process_frame
 	var main: Main = scene
 	main.ai_opponent = false
-	_check("the hints are off by default", not Indicators.show_legal_moves(), "")
-
+	# Pinned rather than asserted from the default: this test is about what the
+	# setting does, and the default is currently a temporary development value that
+	# will change. A test that asserts it would fail when that value is corrected,
+	# for no reason connected to what it checks.
+	Indicators.set_show_legal_moves(false)
 	_tap_square(main, Vector2i(6, 1))
 	_check("selecting with the setting off marks nothing",
 		main.legal_marked.is_empty(), "")
@@ -482,6 +485,8 @@ func _legal_marker_checks() -> void:
 	_check("deselecting clears every hint", main.legal_marked.is_empty(), "")
 	_check("and leaves no frame showing", _shown_hints(main).call().is_empty(), "")
 
+	# Left off rather than restored to whatever the default is, so a test cannot
+	# quietly leave a setting on for whatever runs after it.
 	Indicators.set_show_legal_moves(false)
 	scene.queue_free()
 	await process_frame

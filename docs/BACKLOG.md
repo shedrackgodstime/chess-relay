@@ -116,6 +116,29 @@ Two possible fixes, not yet decided:
 - Make picking prefer a piece that is behind a nearer blocker. Riskier: it changes
   what every tap means, not just this one case.
 
+## Temporary: everything visible while building
+
+**These defaults are for review, not chosen. Put them back before this ships.**
+
+| What | Now | Shipping | Where |
+| --- | --- | --- | --- |
+| Legal-destination hints | **on** | **off** | `Indicators.DEV_DEFAULT`, `settings/indicators.gd` |
+| Voice control | shown | follows `ai_opponent` | `Main.DEV_SHOW_VOICE`, `main.gd` |
+
+Both are on so every feature can be watched working while the game is still being
+built, which is worth more than the intent they give away: nothing can be judged
+before it has been seen at all. The shipping values are the deliberate ones.
+
+Legal hints default to off in a real game because every marked square announces
+your intent a beat before you commit to it, which is noise for an experienced
+opponent and the single most useful teaching aid there is for a beginner. That
+tension is why it is a lobby setting and not a rule. Castling is the one place it
+costs something concrete: with the hints off there is no cue at all that a king
+moves two squares, which is worth checking in a real game before it stays off.
+
+The tests pin both settings explicitly instead of asserting the defaults, so
+correcting these values will not break anything that was testing behaviour.
+
 ## Rules not yet implemented
 
 The move generator refuses these rather than mishandling them, which is safe but
