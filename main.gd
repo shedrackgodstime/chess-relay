@@ -311,6 +311,12 @@ func _on_game_finished(result: ChessGame.Result) -> void:
 			hud.set_game_over("CHECKMATE  ·  Black wins")
 		ChessGame.Result.DRAW_BY_STALEMATE:
 			hud.set_game_over("STALEMATE  ·  draw")
+		ChessGame.Result.DRAW_BY_REPETITION:
+			hud.set_game_over("DRAW  ·  threefold repetition")
+		ChessGame.Result.DRAW_BY_FIFTY_MOVE:
+			hud.set_game_over("DRAW  ·  fifty-move rule")
+		ChessGame.Result.DRAW_BY_INSUFFICIENT_MATERIAL:
+			hud.set_game_over("DRAW  ·  insufficient material")
 		_:
 			hud.set_game_over("")
 

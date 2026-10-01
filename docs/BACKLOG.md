@@ -124,9 +124,12 @@ incomplete. `Rules` is the only place that needs to change.
   simulating only the mover's own left a shield in place and let a capture
   through that exposed the king along a rank.
 
-- **Draws.** Threefold repetition, the fifty-move rule, and insufficient material.
+- **Draws.** Done: threefold repetition, the fifty-move rule, and insufficient material.
   All three are cheap on top of a move history that already exists
-  (`ChessGame.history`), except insufficient material, which is a piece-count test.
+  (`ChessGame.position_counts`), except insufficient material, which is a piece-count test.
+- **Draw claims.** All three draws end the game automatically here. Under the real
+  rules only the fifty-move rule and threefold repetition are claims a player has to
+  make, and a fivefold repetition and a seventy-five-move draw are automatic.
 
 ## Not started
 

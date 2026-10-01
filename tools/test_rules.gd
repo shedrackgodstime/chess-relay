@@ -29,6 +29,7 @@ func _init() -> void:
 	_pin_checks()
 	_endgame_checks()
 	_game_over_checks()
+	_draw_checks()
 	if _failures == 0:
 		print("rules: all checks passed")
 	else:
@@ -81,6 +82,187 @@ func _check(label: String, ok: bool, detail: String = "") -> void:
 		_failures += 1
 		printerr("  FAIL %s  %s" % [label, detail])
 
+
+## The three draw rules, which are three different kinds of thing: a dead
+## position is about material and is automatic, while repetition and the
+## fifty-move rule are about history and are claims in the real rules that a
+## player has to make. This game treats all three as automatic.
+func _draw_checks() -> void:
+	print("Draw rules")
+
+	# --- dead positions ---
+	_check("bare kings cannot mate", _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK)}), "")
+	_check("king and knight cannot mate", _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.KNIGHT, BoardState.LIGHT)}), "")
+	_check("king and bishop cannot mate", _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.BISHOP, BoardState.LIGHT)}), "")
+	_check("two knights against a bare king cannot force mate", _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.KNIGHT, BoardState.LIGHT),
+		Vector2i(2, 1): _dp(PieceProfiles.Type.KNIGHT, BoardState.LIGHT)}), "")
+	_check("a knight on each side can be won", not _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.KNIGHT, BoardState.LIGHT),
+		Vector2i(6, 5): _dp(PieceProfiles.Type.KNIGHT, BoardState.DARK)}), "")
+	# Two bishops of the same colour are the classic dead pair. Of opposite
+	# colours they can cross-check and mate.
+	_check("bishops on the same colour of square are dead", _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.BISHOP, BoardState.LIGHT),
+		Vector2i(2, 2): _dp(PieceProfiles.Type.BISHOP, BoardState.DARK)}), "")
+	_check("bishops on opposite colours can mate", not _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.BISHOP, BoardState.LIGHT),
+		Vector2i(2, 1): _dp(PieceProfiles.Type.BISHOP, BoardState.DARK)}), "")
+	_check("a rook is enough material", not _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.ROOK, BoardState.LIGHT)}), "")
+	_check("knight and bishop together can mate", not _dead({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.KNIGHT, BoardState.LIGHT),
+		Vector2i(2, 1): _dp(PieceProfiles.Type.BISHOP, BoardState.LIGHT)}), "")
+
+	var dead_game := ChessGame.new()
+	dead_game.load_position(_position({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK)}))
+	_check("a dead position ends the game whatever else is true",
+		dead_game.result() == ChessGame.Result.DRAW_BY_INSUFFICIENT_MATERIAL,
+		"result=%d" % dead_game.result())
+
+	# --- repetition ---
+	# Shuffling both knights out and back twice brings the opening position round
+	# for a third time.
+	var game := ChessGame.new()
+	var opening := BoardState.new()
+	opening.standard_setup()
+	game.load_position(opening)
+	var key: int = game.state.repetition_key()
+	_check("the opening is counted once",
+		game.position_counts.size() == 1 and int(game.position_counts.get(key, 0)) == 1,
+		"size=%d" % game.position_counts.size())
+	# One out-and-back for both knights, which is four moves and returns the board
+	# to the opening.
+	var cycle := [
+		Vector2i(6, 0), Vector2i(5, 2), Vector2i(6, 7), Vector2i(5, 5),
+		Vector2i(5, 2), Vector2i(6, 0), Vector2i(5, 5), Vector2i(6, 7)]
+	var all_applied := _shuffle_cycle(game, cycle)
+	_check("the knight shuffle applies", all_applied, "")
+	_check("not yet a draw after the first cycle",
+		game.result() == ChessGame.Result.ONGOING, "result=%d" % game.result())
+	_check("the opening has been seen twice",
+		int(game.position_counts.get(key, 0)) == 2,
+		"seen=%d" % int(game.position_counts.get(key, 0)))
+	_shuffle_cycle(game, cycle)
+	_check("the opening has been seen three times",
+		int(game.position_counts.get(key, 0)) == 3,
+		"seen=%d" % int(game.position_counts.get(key, 0)))
+	_check("threefold repetition is a draw",
+		game.result() == ChessGame.Result.DRAW_BY_REPETITION,
+		"result=%d" % game.result())
+	_check("and nothing more may be played",
+		not game.apply_move(ChessMove.new(Vector2i(6, 0), Vector2i(5, 2))), "")
+
+	# Two positions differing only by an en passant square nothing can use are the
+	# same position and must not count as different. With an enemy pawn beside it
+	# the capture exists, and they differ.
+	var plain := _position({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(1, 1): _dp(PieceProfiles.Type.PAWN, BoardState.LIGHT),
+		Vector2i(2, 1): _dp(PieceProfiles.Type.PAWN, BoardState.DARK)})
+	var unusable := plain.duplicate() as BoardState
+	unusable.en_passant_square = Vector2i(1, 3)
+	_check("an en passant square nothing can use is ignored for repetition",
+		unusable.repetition_key() == plain.repetition_key(), "")
+	var usable := plain.duplicate() as BoardState
+	usable.set_square(2, 2, _dp(PieceProfiles.Type.PAWN, BoardState.DARK))
+	usable.en_passant_square = Vector2i(1, 3)
+	_check("one that can be used is not ignored",
+		usable.repetition_key() != plain.repetition_key(), "")
+
+	# --- fifty-move rule ---
+	var quiet := ChessGame.new()
+	quiet.load_position(_position({
+		Vector2i(0, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(0, 1): _dp(PieceProfiles.Type.ROOK, BoardState.LIGHT),
+		Vector2i(7, 6): _dp(PieceProfiles.Type.ROOK, BoardState.DARK)}))
+	_check("no draw with plenty of material on the board",
+		quiet.result() == ChessGame.Result.ONGOING, "")
+	quiet.halfmove_clock = 99
+	_check("not yet at a hundred half-moves",
+		quiet.result() == ChessGame.Result.ONGOING, "clock=%d" % quiet.halfmove_clock)
+	quiet.halfmove_clock = 100
+	_check("a hundred half-moves without progress is a draw",
+		quiet.result() == ChessGame.Result.DRAW_BY_FIFTY_MOVE,
+		"result=%d" % quiet.result())
+	# Checkmate outranks it: a mating move that also completes fifty moves is a mate.
+	var mating := ChessGame.new()
+	mating.load_position(_back_rank_mate())
+	mating.halfmove_clock = 200
+	_check("checkmate outranks the fifty-move rule",
+		mating.result() == ChessGame.Result.WHITE_WINS,
+		"result=%d" % mating.result())
+
+	var clock := ChessGame.new()
+	clock.load_position(opening)
+	_check("the clock starts at zero", clock.halfmove_clock == 0, "")
+	clock.apply_move(ChessMove.new(Vector2i(4, 1), Vector2i(4, 3)))
+	_check("a pawn move resets it", clock.halfmove_clock == 0,
+		"clock=%d" % clock.halfmove_clock)
+	clock.apply_move(ChessMove.new(Vector2i(4, 7), Vector2i(4, 5)))
+	_check("a quiet move counts one", clock.halfmove_clock == 1,
+		"clock=%d" % clock.halfmove_clock)
+	clock.apply_move(ChessMove.new(Vector2i(6, 0), Vector2i(5, 2)))
+	clock.apply_move(ChessMove.new(Vector2i(5, 7), Vector2i(6, 5)))
+	_check("and keeps counting", clock.halfmove_clock == 3,
+		"clock=%d" % clock.halfmove_clock)
+	clock.apply_move(ChessMove.new(Vector2i(4, 5), Vector2i(5, 5)))
+	_check("a capture resets it", clock.halfmove_clock == 0,
+		"clock=%d" % clock.halfmove_clock)
+
+
+## Plays a flat list of squares as from/to pairs, reporting whether they all
+## applied so one refusal does not cascade into a wall of failures.
+func _shuffle_cycle(game: ChessGame, squares: Array) -> bool:
+	var all_applied := true
+	for i in range(0, squares.size(), 2):
+		if not game.apply_move(ChessMove.new(squares[i], squares[i + 1])):
+			all_applied = false
+	return all_applied
+
+
+## Whether the position has too little material to mate.
+func _dead(setup: Dictionary) -> bool:
+	return Rules.has_insufficient_material(_position(setup))
+
+
+## One encoded piece, since the bare-board helper takes plain integers.
+func _dp(type: int, side: int) -> int:
+	return BoardState.encode(type, side)
+
+
+## White king e1 and rook a1, black king e8 and rook h8, white to move, so that
+## Ra1xa8 is mate. The same rook is the piece whose capture resets the clock.
+func _back_rank_mate() -> BoardState:
+	return _position({
+		Vector2i(4, 0): _dp(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(0, 0): _dp(PieceProfiles.Type.ROOK, BoardState.LIGHT),
+		Vector2i(4, 7): _dp(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(7, 7): _dp(PieceProfiles.Type.ROOK, BoardState.DARK)})
 
 func _perft_checks() -> void:
 	print("Perft")

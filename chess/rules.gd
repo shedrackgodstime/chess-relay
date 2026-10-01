@@ -249,6 +249,72 @@ static func _span_is_clear(state: BoardState, from: Vector2i, rook: Vector2i,
 	return state.at(destination.x, from.y) == BoardState.EMPTY
 
 
+## Whether neither side has the material to deliver mate, so the game cannot end
+## however long it is played.
+##
+## The cases are the ones the rules recognise: bare kings, and a single minor
+## piece against a bare king. Two knights against a bare king is included, since
+## although mate exists it cannot be forced, which is the same situation as far as
+## a game is concerned. Two bishops, a knight with a bishop, or anything with a
+## pawn, rook or queen is enough.
+static func has_insufficient_material(state: BoardState) -> bool:
+	if state == null:
+		return true
+	var knights := {BoardState.LIGHT: 0, BoardState.DARK: 0}
+	var bishops := {BoardState.LIGHT: 0, BoardState.DARK: 0}
+	var other := 0
+	for rank in BoardState.BOARD_SIZE:
+		for file in BoardState.BOARD_SIZE:
+			var code := state.at(file, rank)
+			if code == BoardState.EMPTY:
+				continue
+			var piece := BoardState.decode(code)
+			match piece.x:
+				PieceProfiles.Type.PAWN, PieceProfiles.Type.ROOK, PieceProfiles.Type.QUEEN:
+					other += 1
+				PieceProfiles.Type.KNIGHT:
+					knights[piece.y] += 1
+				PieceProfiles.Type.BISHOP:
+					bishops[piece.y] += 1
+	if other > 0:
+		return false
+	var total_knights: int = knights[BoardState.LIGHT] + knights[BoardState.DARK]
+	var total_bishops: int = bishops[BoardState.LIGHT] + bishops[BoardState.DARK]
+	if total_knights + total_bishops <= 1:
+		return true
+	# Two bishops only deaden the position when they cannot help each other, which
+	# means both stand on squares of the same colour.
+	if total_knights == 0 and total_bishops == 2 \
+			and bishops[BoardState.LIGHT] == 1 and bishops[BoardState.DARK] == 1:
+		return _bishops_share_colour(state)
+	# Two knights against a bare king cannot be forced to mate, though mate exists.
+	# A knight on each side is a different matter and can be won, so the test is
+	# that one side is left with nothing but its king.
+	if total_knights == 2 and total_bishops == 0 \
+			and (knights[BoardState.LIGHT] == 0 or knights[BoardState.DARK] == 0):
+		return true
+	return false
+
+
+## Whether every bishop on the board stands on the same colour of square.
+static func _bishops_share_colour(state: BoardState) -> bool:
+	var colour := -1
+	for rank in BoardState.BOARD_SIZE:
+		for file in BoardState.BOARD_SIZE:
+			var code := state.at(file, rank)
+			if code == BoardState.EMPTY:
+				continue
+			var piece := BoardState.decode(code)
+			if piece.x != PieceProfiles.Type.BISHOP:
+				continue
+			var square_colour := (file + rank) % 2
+			if colour == -1:
+				colour = square_colour
+			elif colour != square_colour:
+				return false
+	return true
+
+
 static func is_in_check(state: BoardState, side: int) -> bool:
 	var king := king_square(state, side)
 	if king.x < 0:

@@ -25,7 +25,19 @@ enum Result {
 	WHITE_WINS,
 	BLACK_WINS,
 	DRAW_BY_STALEMATE,
+	DRAW_BY_REPETITION,
+	DRAW_BY_FIFTY_MOVE,
+	DRAW_BY_INSUFFICIENT_MATERIAL,
 }
+
+## Half-moves since the last capture or pawn move. Not position state: it is
+## game history, so it is deliberately not part of the board hash and does not
+## travel in a position snapshot. Both peers derive it from the same moves.
+var halfmove_clock := 0
+
+## How many times each position has been seen, keyed by BoardState.repetition_key.
+## Seeded with the opening so the first repetition is counted against it.
+var position_counts := {}
 
 var state := BoardState.new()
 var history: Array[ChessMove] = []
@@ -45,6 +57,8 @@ var captured_by_dark: Array[int] = []
 func reset() -> void:
 	state = BoardState.new()
 	history.clear()
+	halfmove_clock = 0
+	position_counts = {state.repetition_key(): 1}
 	captured_by_light = []
 	captured_by_dark = []
 	_finished = false
@@ -142,6 +156,15 @@ func apply_move(move: ChessMove) -> bool:
 	else:
 		state.en_passant_square = Vector2i(-1, -1)
 	state.side_to_move = BoardState.DARK if state.side_to_move == BoardState.LIGHT else BoardState.LIGHT
+	# Half-moves since the last irreversible step. A capture or a pawn move resets
+	# it; anything else is a move that could have been made fifty times over.
+	if captured != BoardState.EMPTY or moving.x == PieceProfiles.Type.PAWN:
+		halfmove_clock = 0
+	else:
+		halfmove_clock += 1
+	var key := state.repetition_key()
+	position_counts[key] = int(position_counts.get(key, 0)) + 1
+
 	history.append(move)
 	moved.emit(move, captured)
 	if result() != Result.ONGOING and not _finished:
@@ -164,6 +187,19 @@ func is_legal(move: ChessMove) -> bool:
 	return Rules.is_legal(state, move)
 
 
+## Starts a game from a given position, which is how the opening, a FEN or a
+## perft root is loaded. History and the half-move clock are not inherited,
+## because none of them belong to the position; repetitions are counted from here.
+func load_position(from: BoardState) -> void:
+	state = from
+	history.clear()
+	captured_by_light = []
+	captured_by_dark = []
+	halfmove_clock = 0
+	_finished = false
+	position_counts = {state.repetition_key(): 1}
+
+
 ## Whether the game is still playable, and if not, how it ended.
 ##
 ## Decided on demand from the position rather than recorded as events, so it
@@ -171,12 +207,34 @@ func is_legal(move: ChessMove) -> bool:
 ## would. The side to move having nothing left is the end of it: in check is
 ## checkmate, not in check is stalemate.
 func result() -> Result:
-	if Rules.has_legal_move(state, state.side_to_move):
-		return Result.ONGOING
-	if not Rules.is_in_check(state, state.side_to_move):
-		return Result.DRAW_BY_STALEMATE
-	return Result.WHITE_WINS if state.side_to_move == BoardState.DARK \
-		else Result.BLACK_WINS
+	# Checkmate and stalemate first. They are the outcomes a player is watching
+	# for, and a mating move that also completed fifty full moves is a mate, not a
+	# draw.
+	if not Rules.has_legal_move(state, state.side_to_move):
+		if not Rules.is_in_check(state, state.side_to_move):
+			return Result.DRAW_BY_STALEMATE
+		return Result.WHITE_WINS if state.side_to_move == BoardState.DARK \
+			else Result.BLACK_WINS
+	# A dead position ends the game whatever else is true of it.
+	if Rules.has_insufficient_material(state):
+		return Result.DRAW_BY_INSUFFICIENT_MATERIAL
+	if position_counts.get(state.repetition_key(), 0) >= 3:
+		return Result.DRAW_BY_REPETITION
+	if halfmove_clock >= 100:
+		return Result.DRAW_BY_FIFTY_MOVE
+	return Result.ONGOING
+
+
+## The outcome for an arbitrary position, for tests and for a restored game.
+func result_for(another: BoardState) -> Result:
+	if not Rules.has_legal_move(another, another.side_to_move):
+		if not Rules.is_in_check(another, another.side_to_move):
+			return Result.DRAW_BY_STALEMATE
+		return Result.WHITE_WINS if another.side_to_move == BoardState.DARK \
+			else Result.BLACK_WINS
+	if Rules.has_insufficient_material(another):
+		return Result.DRAW_BY_INSUFFICIENT_MATERIAL
+	return Result.ONGOING
 
 
 func is_over() -> bool:
@@ -263,6 +321,8 @@ func _snapshot() -> Dictionary:
 		"rights": state.castling_rights,
 		"en_passant": state.en_passant_square,
 		"history": history.size(),
+		"halfmove": halfmove_clock,
+		"positions": position_counts.duplicate(),
 		"light": captured_by_light.size(),
 		"dark": captured_by_dark.size(),
 		"finished": _finished,
@@ -280,6 +340,8 @@ func _restore(saved: Dictionary) -> void:
 	state.castling_rights = saved["rights"]
 	state.en_passant_square = saved["en_passant"]
 	history.resize(int(saved["history"]))
+	halfmove_clock = int(saved["halfmove"])
+	position_counts = saved["positions"]
 	captured_by_light.resize(int(saved["light"]))
 	captured_by_dark.resize(int(saved["dark"]))
 	_finished = saved["finished"]

@@ -305,3 +305,44 @@ func to_fen() -> String:
 
 ## Piece letter by type, for FEN output.
 const TYPE_LETTERS := "pnbrqk"
+
+
+## Which way a side's pawns travel, in rank steps. Needed here for the repetition
+## key, which has to reason about whether an en passant capture exists.
+const PAWN_DIRECTION := {LIGHT: 1, DARK: -1}
+
+
+## The position as a key for repetition, which is the same as hash except for
+## the en passant square.
+##
+## The square only counts when a capture is actually available from it. Two
+## positions whose sole difference is a pawn that has just gone two squares and
+## cannot be taken are the same position under the rules, so counting the square
+## regardless would both miss genuine repetitions and invent false ones.
+func repetition_key() -> int:
+	var accumulator := 1469598103
+	for code in squares:
+		accumulator = (accumulator ^ code) * 16777619
+	accumulator = (accumulator ^ side_to_move) * 16777619
+	accumulator = (accumulator ^ castling_rights) * 16777619
+	var ep := en_passant_square
+	if ep.x >= 0 and not _en_passant_capture_available():
+		ep = Vector2i(-1, -1)
+	accumulator = (accumulator ^ (ep.x + 1)) * 16777619
+	return (accumulator ^ (ep.y + 1)) * 16777619
+
+
+func _en_passant_capture_available() -> bool:
+	var attacker_side := DARK if side_to_move == LIGHT else LIGHT
+	# The capturing pawn sits one row behind the target square, because it moves
+	# toward it and the target is the square the other pawn passed over.
+	var behind_rank: int = en_passant_square.y - int(PAWN_DIRECTION.get(attacker_side, 1))
+	for step in [-1, 1]:
+		var square := Vector2i(en_passant_square.x + step, behind_rank)
+		if not is_inside(square.x, square.y):
+			continue
+		var code := at(square.x, square.y)
+		if code != EMPTY and decode(code).x == PieceProfiles.Type.PAWN \
+				and decode(code).y == attacker_side:
+			return true
+	return false
