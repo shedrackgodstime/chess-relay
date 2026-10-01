@@ -260,21 +260,33 @@ func _last_move_and_side_checks() -> void:
 	await process_frame
 
 
-## The king-in-check marker: absent when nobody is in check, on the right square
-## when someone is, and cleared again once the check is answered.
+## The king-in-check highlight: the same frame the selection uses, in red.
 func _check_marker_checks() -> void:
-	print("Check marker")
+	print("Check highlight")
 	var scene := (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
 	await process_frame
 	await process_frame
 	var main: Main = scene
-	var marker: KingCheckMarker = main.check_marker
-	_check("no check marker on the opening board", not marker.is_marked(), "")
+	var check: SquareHighlight = main.check_highlight
+	var selection: SquareHighlight = main.highlight
 
-	# A real position rather than a fabricated one: the black king on e8 is
-	# checked by a rook on e1. The rook has to be on the same file, or it is not
-	# check at all and the marker correctly stays away.
+	_check("no check highlight on the opening board", not check.visible, "")
+	_check("it is red, unlike the gold selection frame",
+		check.colour.is_equal_approx(SquareHighlight.RED)
+			and selection.colour.is_equal_approx(SquareHighlight.GOLD)
+			and not check.colour.is_equal_approx(selection.colour),
+		"check=%s selection=%s" % [check.colour, selection.colour])
+	# Same shape, so there is one marker to recognise and colour is the message.
+	_check("it uses the same frame geometry as the selection",
+		check.mesh != null and check.mesh.get_aabb().size.is_equal_approx(
+			(selection.mesh as ArrayMesh).get_aabb().size),
+		"check=%s selection=%s" % [
+			check.mesh.get_aabb().size if check.mesh else Vector3.ZERO,
+			(selection.mesh as ArrayMesh).get_aabb().size if selection.mesh else Vector3.ZERO])
+
+	# A real position: the black king on e8 checked by a rook on e1. The rook has
+	# to share the file or it is not check at all.
 	main.game.state.squares.fill(BoardState.EMPTY)
 	main.game.state.set_square(4, 7,
 		BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
@@ -283,30 +295,25 @@ func _check_marker_checks() -> void:
 	main.game.state.side_to_move = BoardState.DARK
 	main._update_check_marker()
 	await process_frame
-	_check("the marker comes up when a king is in check",
-		marker.is_marked() and marker.visible, "")
-	_check("it marks the king's square, not the attacker's",
-		marker.marked_square() == Vector2i(4, 7),
-		"marked=%s" % marker.marked_square())
-	_check("the marker has both a wash and a border",
-		marker.get_node_or_null("Fill") != null
-			and marker.get_node_or_null("Border") != null, "")
-	_check("it sits on the square rather than offset from it",
-		marker.position.distance_to(BoardMesh.square_position(4, 7)) < 0.01,
-		"pos=%s" % marker.position)
+	_check("the highlight comes up when a king is in check", check.visible, "")
+	_check("it frames the king's square, not the attacker's",
+		check.marked_square() == Vector2i(4, 7),
+		"marked=%s" % check.marked_square())
+	_check("it sits at the same height as the selection frame",
+		is_equal_approx(check.position.y, SquareHighlight.LIFT),
+		"y=%.4f" % check.position.y)
 
-	# Answer the check by stepping off the file, and it must go away, or it
-	# becomes noise. e7 would still be on the rook's file and still in check.
+	# Answer the check by stepping off the file, and it goes away. e7 would still
+	# be on the rook's file and still in check.
 	main.game.state.set_square(4, 6, BoardState.EMPTY)
 	main.game.state.set_square(5, 6,
 		BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
 	main._update_check_marker()
 	await process_frame
-	_check("the marker clears once the check is answered",
-		not marker.is_marked() and not marker.visible, "")
+	_check("the highlight clears once the check is answered",
+		not check.visible and check.marked_square() == Vector2i(-1, -1), "")
 
-	# And a stalemate-adjacent position: in check but with no legal move still
-	# shows it, because the player has to be told why.
+	# Checkmate still shows it: the player has to be told why there is no move.
 	main.game.state.squares.fill(BoardState.EMPTY)
 	main.game.state.set_square(6, 6, BoardState.encode(PieceProfiles.Type.QUEEN, BoardState.LIGHT))
 	main.game.state.set_square(5, 5, BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
@@ -314,8 +321,9 @@ func _check_marker_checks() -> void:
 	main.game.state.side_to_move = BoardState.DARK
 	main._update_check_marker()
 	await process_frame
-	_check("a check with no legal reply still shows the marker",
-		marker.is_marked() and marker.marked_square() == Vector2i(7, 7), "")
+	_check("a check with no legal reply still shows it",
+		check.visible and check.marked_square() == Vector2i(7, 7),
+		"marked=%s" % check.marked_square())
 
 	scene.queue_free()
 	await process_frame

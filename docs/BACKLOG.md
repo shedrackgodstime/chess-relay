@@ -61,12 +61,15 @@ deliberately faint and separate from the selection highlight: selection says
 and the marker has to stay visible when nothing is selected, which is most of
 the time.
 
-Also done: the king-in-check marker, `board/king_check_marker.gd`. Loud on
-purpose, the opposite treatment to the last move: a wash over the square plus a
-brighter border, pulsing slowly. A border as well as a wash because the king
-stands on the square and would otherwise hide the wash entirely. Read from the
-position rather than from the move that caused it, so it is also right at the
-start of a game or after a position is restored.
+Also done, and the correction matters: the king-in-check highlight is the
+**same frame as the selection marker, in red**. A first attempt built a separate
+pulsing wash-and-border design, which was wrong. A check is not a new visual
+idea, it is the marker already in use saying something urgent instead, so
+reusing the frame means one shape to recognise and colour carrying the message.
+`SquareHighlight` now takes a colour, with gold for selection and red for check,
+and the emission follows the albedo so a red frame glows red rather than glowing
+the same gold. Read from the position, so it is right at game start, after a side
+change, and after a position is restored.
 
 ### Choosing a side
 

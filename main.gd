@@ -14,7 +14,7 @@ extends Node3D
 @onready var highlight: SquareHighlight = $World/Highlight
 @onready var hud: Hud = $UILayer/Hud
 @onready var last_move: LastMoveMarker = $World/LastMove
-@onready var check_marker: KingCheckMarker = $World/KingCheck
+@onready var check_highlight: SquareHighlight = $World/CheckHighlight
 @onready var tray_light: TrayView = $World/TrayLight
 @onready var tray_dark: TrayView = $World/TrayDark
 
@@ -454,17 +454,14 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 ## caused it, so it also comes up right after the game starts or a position is
 ## restored.
 func _update_check_marker() -> void:
-	if check_marker == null:
+	if check_highlight == null:
 		return
 	var side := game.state.side_to_move
-	if not Rules.is_in_check(game.state, side):
-		check_marker.hide_marker()
-		return
 	var king := Rules.king_square(game.state, side)
-	if king.x < 0:
-		check_marker.hide_marker()
+	if king.x < 0 or not Rules.is_in_check(game.state, side):
+		check_highlight.hide_marker()
 		return
-	check_marker.show_at(king.x, king.y)
+	check_highlight.show_at(king.x, king.y)
 
 
 ## Repaints both capture trays from the game's capture lists.

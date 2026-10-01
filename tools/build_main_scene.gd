@@ -30,7 +30,7 @@ func _init() -> void:
 	world.add_child(_board())
 	world.add_child(_highlight())
 	world.add_child(_last_move())
-	world.add_child(_check_marker())
+	world.add_child(_check_highlight())
 	world.add_child(_pieces())
 	world.add_child(_table())
 	world.add_child(_tray("TrayLight", LIGHT))
@@ -81,13 +81,15 @@ func _highlight() -> MeshInstance3D:
 	return highlight
 
 
-## The warning marker for a king in check. Above the last-move marker in the
-## draw order, since a check matters more than remembering the previous move.
-func _check_marker() -> Node3D:
-	var marker := Node3D.new()
-	marker.name = "KingCheck"
-	marker.set_script(load("res://board/king_check_marker.gd"))
-	return marker
+## The red frame for a king in check: the same marker the selection uses, in a
+## different colour. Not a separate design, so the player has one shape to
+## recognise and reads the colour for urgency.
+func _check_highlight() -> MeshInstance3D:
+	var highlight := MeshInstance3D.new()
+	highlight.name = "CheckHighlight"
+	highlight.set_script(load("res://board/square_highlight.gd"))
+	highlight.set("colour", SquareHighlight.RED)
+	return highlight
 
 
 ## The from-and-to marker for the move just played.
