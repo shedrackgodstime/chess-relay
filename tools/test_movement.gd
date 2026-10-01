@@ -295,6 +295,107 @@ func _last_move_and_side_checks() -> void:
 ## A pawn in hand plus a tap at the opponent's end of the board must not open the
 ## promotion overlay, and choosing from it must never leave a pawn that looks
 ## like a queen but still moves like a pawn.
+## The legal-destination hints, which are a lobby setting rather than part of
+## playing a game. Off by default, and when on they must agree with the rules
+## exactly, since a hint that marks an illegal square is worse than none.
+func _legal_marker_checks() -> void:
+	print("Legal markers")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+	_check("the hints are off by default", not Indicators.show_legal_moves(), "")
+
+	_tap_square(main, Vector2i(6, 1))
+	_check("selecting with the setting off marks nothing",
+		main.legal_marked.is_empty(), "")
+
+	Indicators.set_show_legal_moves(true)
+	_tap_square(main, Vector2i(1, 1))
+	# b2 is a pawn in the opening, so it reaches b3 and b4 and nothing else.
+	_check("selecting with it on marks both of a pawn's squares",
+		main.legal_marked.size() == 2, "marked=%s" % str(main.legal_marked))
+	_check("including the one it can reach",
+		main.legal_marked.has(Vector2i(1, 2)), "marked=%s" % str(main.legal_marked))
+	_check("and nothing it cannot",
+		not main.legal_marked.has(Vector2i(2, 3)), "")
+	_check("and not its own square", not main.legal_marked.has(Vector2i(1, 1)), "")
+	_check("and it agrees with the rules",
+		main.legal_marked == _destinations(main, Vector2i(1, 1)), "")
+	_check("with as many frames showing as squares marked",
+		_shown_hints(main).call().size() == main.legal_marked.size(), "")
+
+	# A knight has the same number of moves everywhere, which makes it the piece a
+	# wrong answer is easiest to see on. This one stands on the a-file, where all
+	# four of its moves are on the board, and a fresh scene so that nothing marked
+	# for the position above is still showing and counted as its own.
+	scene.queue_free()
+	await process_frame
+	scene = (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	main = scene
+	main.ai_opponent = false
+	main.game.load_position(_position_with({
+		Vector2i(4, 0): BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT),
+		Vector2i(4, 7): BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK),
+		Vector2i(0, 4): BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.LIGHT)}))
+	main.selected = Vector2i(0, 4)
+	main.highlight.show_at(0, 4)
+	main._update_legal_markers()
+	_check("a knight on the a-file is offered all four of its moves",
+		main.legal_marked.size() == 4, "marked=%s" % str(main.legal_marked))
+	for expected: Vector2i in [Vector2i(1, 6), Vector2i(2, 5),
+			Vector2i(2, 3), Vector2i(1, 2)]:
+		_check("including %s" % str(expected), main.legal_marked.has(expected), "")
+	_check("and it matches the rules there too",
+		main.legal_marked == _destinations(main, Vector2i(0, 4)), "")
+
+	# Selecting nothing must clear them, or they outlive the piece that caused
+	# them and sit on squares the next piece cannot reach.
+	main._deselect()
+	_check("deselecting clears every hint", main.legal_marked.is_empty(), "")
+	_check("and leaves no frame showing", _shown_hints(main).call().is_empty(), "")
+
+	Indicators.set_show_legal_moves(false)
+	scene.queue_free()
+	await process_frame
+
+
+## The squares the rules say a piece on this square may reach, for comparison.
+func _destinations(main: Main, from: Vector2i) -> Array:
+	var out: Array = []
+	var side := BoardState.decode(main.game.state.at(from.x, from.y)).y
+	for move in Rules.legal_moves(main.game.state, side):
+		if move.from_square == from:
+			out.append(move.to_square)
+	return out
+
+
+## The hint frames that are currently showing.
+func _shown_hints(main: Main) -> Callable:
+	return func() -> Array:
+		var out: Array = []
+		for child in main.get_node("World/LegalHighlights").get_children():
+			var hint := child as SquareHighlight
+			if hint != null and hint.visible:
+				out.append(hint)
+		return out
+
+
+## Which squares the visible hints are marking.
+## A position holding only the given pieces, and nothing else.
+func _position_with(setup: Dictionary) -> BoardState:
+	var state := BoardState.new()
+	state.squares.fill(BoardState.EMPTY)
+	for square: Vector2i in setup:
+		state.set_square(square.x, square.y, setup[square])
+	return state
+
+
 func _promotion_refusal_checks() -> void:
 	print("Promotion refused")
 	var scene := (load("res://main.tscn") as PackedScene).instantiate()
@@ -544,6 +645,7 @@ func _promotion_checks() -> void:
 	_check("no promotion is left pending", main._pending_promotion == null, "")
 
 	await _promotion_refusal_checks()
+	await _legal_marker_checks()
 	scene.queue_free()
 	await process_frame
 

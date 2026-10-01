@@ -16,6 +16,12 @@ extends Node3D
 @onready var last_move_from: SquareHighlight = $World/LastMoveFrom
 @onready var last_move_to: SquareHighlight = $World/LastMoveTo
 @onready var check_highlight: SquareHighlight = $World/CheckHighlight
+@onready var legal_pool: Node3D = $World/LegalHighlights
+
+## The squares the hints are currently marking, newest set first. Kept so the
+## pool can be reused without anything having to reverse a world position back
+## into a square.
+var legal_marked: Array[Vector2i] = []
 @onready var tray_light: TrayView = $World/TrayLight
 @onready var tray_dark: TrayView = $World/TrayDark
 
@@ -255,6 +261,7 @@ func _tap(screen_position: Vector2) -> void:
 		if _may_take(square):
 			selected = square
 			highlight.show_at(square.x, square.y)
+			_update_legal_markers()
 		return
 	if square == selected:
 		_deselect()
@@ -267,6 +274,7 @@ func _tap(screen_position: Vector2) -> void:
 		_deselect()
 		selected = square
 		highlight.show_at(square.x, square.y)
+		_update_legal_markers()
 		return
 	# A piece already in hand can only be released on a legal turn. Without
 	# this the player could move their own pieces while it was the opponent's
@@ -439,6 +447,55 @@ func _piece_owning(node: Node) -> PieceView:
 func _deselect() -> void:
 	selected = Vector2i(-1, -1)
 	highlight.hide_marker()
+	_hide_legal_markers()
+
+
+## Marks every square the held piece may legally reach, or clears the marks.
+##
+## Read from the rules rather than from what the tap handler happens to accept, so
+## the marks cannot drift from the moves. Off unless the setting is on, and
+## re-read every time rather than cached, so flipping it in the lobby takes effect
+## without the board being rebuilt.
+##
+## Castling is marked on the king's destination square only. It is a single move
+## with one square, and marking the rook as well would imply the rook can be
+## ordered there on its own.
+func _update_legal_markers() -> void:
+	_hide_legal_markers()
+	if not Indicators.show_legal_moves() or selected.x < 0:
+		return
+	var side := BoardState.decode(game.state.at(selected.x, selected.y)).y
+	var wanted := false
+	for move in Rules.legal_moves(game.state, side):
+		if move.from_square != selected:
+			continue
+		wanted = true
+		var hint := _free_legal_marker()
+		if hint == null:
+			break
+		hint.colour = SquareHighlight.LEGAL_CAPTURE \
+			if Rules.landing_code(game.state, move) != BoardState.EMPTY \
+			else SquareHighlight.LEGAL
+		hint.show_at(move.to_square.x, move.to_square.y)
+		legal_marked.append(move.to_square)
+	if not wanted:
+		_hide_legal_markers()
+
+
+## The next unused hint frame, or null when the pool is exhausted. A pool running
+## dry would drop a mark, which is far better than allocating a mesh mid-game.
+func _free_legal_marker() -> SquareHighlight:
+	for child in legal_pool.get_children():
+		var hint := child as SquareHighlight
+		if hint != null and not hint.visible:
+			return hint
+	return null
+
+
+func _hide_legal_markers() -> void:
+	for child in legal_pool.get_children():
+		(child as SquareHighlight).hide_marker()
+	legal_marked.clear()
 
 
 ## Presents a committed move: updates the node registry, captures victims,

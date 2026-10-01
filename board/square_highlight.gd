@@ -37,6 +37,17 @@ const LAST_MOVE_TO := Color(0.38, 0.94, 0.54, 0.58)
 ## Selection: the warm gold used throughout the HUD.
 const GOLD := Color(1.0, 0.85, 0.25)
 
+## Legal destinations, in two brightnesses of one hue rather than two shapes.
+##
+## The board already commits to one frame that the player learns once, so a dot
+## for an ordinary move and a ring for a capture would spend that. What
+## distinguishes a capture is urgency, and urgency has already been given to
+## brightness throughout: a square you can take is louder than a square you can
+## only step to. Deliberately cool and far from the gold of the selection, so a
+## marked destination never looks like something selected.
+const LEGAL := Color(0.52, 0.70, 0.96, 0.26)
+const LEGAL_CAPTURE := Color(0.66, 0.88, 1.0, 0.78)
+
 ## Check: same frame, red. Bright enough to read against the warm wood, which a
 ## duller red would not be.
 const RED := Color(1.0, 0.27, 0.20)

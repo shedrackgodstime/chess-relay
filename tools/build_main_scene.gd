@@ -11,6 +11,10 @@ extends SceneTree
 
 const OUTPUT := "res://main.tscn"
 
+## Frames kept for the legal-destination hints. A queen on an open board reaches
+## 27 squares, and 32 leaves room without being a number that needs justifying.
+const LEGAL_POOL_SIZE := 32
+
 ## Back-rank order lives on BoardState so the visual layout and the logical
 ## layout share one definition of the starting position.
 
@@ -32,6 +36,7 @@ func _init() -> void:
 	world.add_child(_last_move_from())
 	world.add_child(_last_move_to())
 	world.add_child(_check_highlight())
+	world.add_child(_legal_highlights())
 	world.add_child(_pieces())
 	world.add_child(_table())
 	world.add_child(_tray("TrayLight", LIGHT))
@@ -91,6 +96,25 @@ func _check_highlight() -> MeshInstance3D:
 	highlight.set_script(load("res://board/square_highlight.gd"))
 	highlight.set("colour", SquareHighlight.RED)
 	return highlight
+
+
+## A pool of frames for the legal-destination hints, hidden until a piece is held.
+##
+## Pooled rather than grown on demand because the number needed is known in
+## advance, at most the moves of one piece, and because a board that allocates
+## meshes mid-game is a board that stutters when a player selects a queen. Sized to
+## the largest possible set of destinations for a queen in the middle of an empty
+## board, which is the worst case for a slider.
+func _legal_highlights() -> Node3D:
+	var pool := Node3D.new()
+	pool.name = "LegalHighlights"
+	for i in LEGAL_POOL_SIZE:
+		var hint := MeshInstance3D.new()
+		hint.name = "Hint%d" % i
+		hint.set_script(load("res://board/square_highlight.gd"))
+		hint.set("colour", SquareHighlight.LEGAL)
+		pool.add_child(hint)
+	return pool
 
 
 ## The two faint frames marking where the last move came from and went to.

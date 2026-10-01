@@ -26,7 +26,15 @@ parts belong to the rules engine, not to the visuals.
 | Checkmate | no indicators at all; the game-over banner, already built |
 | Illegal attempt | a brief shake or flash. No indicator for it |
 
-Indicators should be toggleable in settings. Worth deciding the default, and
+Indicators are toggleable in settings, off by default, decided: marking every
+destination is a real training aid but in a game it announces your intent before
+you commit to it, so neither default suits both players and it is a lobby choice
+rather than a rule. Delivered as the same thin frame in two brightnesses rather
+than the dot and ring above, because the board already spends one frame shape
+that the player learns once and a capture is distinguished by loudness, which is
+what brightness has been carrying all along. Castling is marked on the king's
+destination square only. Still to come:
+
 whether the last-move highlight is part of the same toggle or separate, since it
 is the one players tend to want permanently.
 
@@ -146,7 +154,8 @@ incomplete. `Rules` is the only place that needs to change.
 - **New game / rematch.** There is no way back to the opening position in play.
   Note that `game.reset()` alone is not enough: capture frees the victim nodes, so
   the piece registry and the scene both have to be rebuilt.
-- **Hint the legal moves** for the selected piece. `Rules.pseudo_legal_moves` is
+- ~~**Hint the legal moves** for the selected piece.~~ Done, behind the
+  `Indicators.show_legal_moves` setting, off by default. `Rules.pseudo_legal_moves` is
   already available and it is a small addition.
 
 ## Decided, do not relitigate
