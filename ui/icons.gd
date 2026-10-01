@@ -68,6 +68,54 @@ static func clear_cache() -> void:
 
 
 ## Prefers the imported SVG, falling back to a drawn glyph when it is absent.
+## Signal bars for the connection indicator, in the colour asked for.
+##
+## Not built through _icon, because that bakes the cream-gold in and this is the
+## one glyph whose colour is the message. Nor is it cached on the count alone: two
+## states of the same shape in different colours must stay distinct textures, so the
+## cache key carries both.
+##
+## Ascending bars rather than the wifi arcs. This is a direct peer-to-peer link,
+## not a network being associated with, and nested arcs say router. Bars also
+## survive being drawn small, where arcs stop being countable.
+static func signal_bars(count: int, colour: Color) -> Texture2D:
+	var key := "signal_%d_%s" % [count, colour.to_html(false)]
+	if _cache.has(key):
+		return _cache[key]
+	var img := Image.create(CANVAS, CANVAS, false, Image.FORMAT_RGBA8)
+	img.fill(Color(0, 0, 0, 0))
+	# Lucide's geometry in its own 24-unit space, scaled up. The baseline is at
+	# y=20 and the four bars top out at 16, 12, 8 and 4.
+	var scale := CANVAS / 24.0
+	var baseline := 20.0 * scale
+	var dot_x := 2.0 * scale
+	stroke_disc(img, Vector2(dot_x, baseline), 3.0)
+	var width := 2.0 * scale
+	for i in maxi(count, 0):
+		var x := (7.0 + 5.0 * i) * scale
+		var top := (20.0 - 4.0 - 4.0 * i) * scale
+		stroke_bar_v(img, x, top, baseline, width, colour)
+	var texture := ImageTexture.create_from_image(img)
+	_cache[key] = texture
+	return texture
+
+
+## A vertical stroke, which is the only primitive Lucide's bars need and which
+## nothing else in this file draws. Plain and squared-off rather than rounded: at
+## the size this is actually seen, rounding is two pixels of guessing that cannot be
+## checked here.
+static func stroke_bar_v(
+	img: Image, x: float, top: float, bottom: float, width: float, colour: Color
+) -> void:
+	var half := width * 0.5
+	var tinted := Color(colour.r, colour.g, colour.b, 1.0)
+	for y in range(int(top), int(bottom) + 1):
+		for px in range(int(x - half), int(x + half) + 1):
+			if px < 0 or px >= CANVAS or y < 0 or y >= CANVAS:
+				continue
+			img.set_pixel(px, y, tinted)
+
+
 static func _icon(name: String, fallback: Callable) -> Texture2D:
 	if _cache.has(name):
 		return _cache[name]

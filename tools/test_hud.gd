@@ -19,6 +19,7 @@ func _init() -> void:
 	var hud: Hud = main.hud
 
 	_asset_checks()
+	await _network_checks(hud)
 	_layout_checks(main, hud)
 	_menu_check(main, hud)
 	_rotate_checks(main, hud)
@@ -360,6 +361,92 @@ func all_buttons_present(buttons: Array) -> bool:
 		if button == null:
 			return false
 	return true
+
+
+## The connection indicator. Checked for what it draws, not merely that it exists:
+## four identical blank squares would pass a test that only watched the texture
+## object change, which is the failure this hand-drawn glyph could plausibly have.
+func _network_checks(hud: Hud) -> void:
+	print("Network indicator")
+	var indicator := hud.network_indicator
+	_check("the indicator exists", indicator != null, "")
+	if indicator == null:
+		return
+	_check("it takes no input, so it cannot be a dead tap target",
+		indicator.mouse_filter == Control.MOUSE_FILTER_IGNORE, "")
+	var menu_left := hud.menu_button.global_position.x
+	_check("it sits left of the menu",
+		indicator.global_position.x < menu_left,
+		"indicator=%.0f menu=%.0f" % [indicator.global_position.x, menu_left])
+	_check("in the top band", indicator.global_position.y < 100.0,
+		"y=%.0f" % indicator.global_position.y)
+	# Clear of the move count, which is centred and therefore spans the middle. The
+	# indicator sits outboard of it on the right, next to the menu, so the test is
+	# that it starts after the label ends and not that it is left of the label: an
+	# earlier version of this asserted the wrong direction and failed against a
+	# layout that was correct.
+	var turn := hud.get_node("TurnLabel") as Label
+	_check("and clear of the move count",
+		indicator.global_position.x > turn.global_position.x + turn.size.x,
+		"indicator=%.0f turn_ends=%.0f" % [indicator.global_position.x,
+			turn.global_position.x + turn.size.x])
+	_check("and nothing else is claiming the right edge but the menu",
+		hud.menu_button.global_position.y >= indicator.global_position.y - 4.0
+			or hud.menu_button.global_position.y
+				<= indicator.global_position.y + indicator.size.y + 4.0, "")
+
+	# Each state must draw something and differ from the others, in shape and in
+	# colour. Only checking that the texture object changed would pass on four
+	# identical blank squares, which is the failure this glyph could plausibly have.
+	var lit := {}
+	var tint := {}
+	for state: Hud.NetworkState in Hud.NetworkState.values():
+		hud.set_network_state(state)
+		await process_frame
+		var image := indicator.texture.get_image()
+		var pixels := 0
+		var total := Vector3.ZERO
+		for y in image.get_height():
+			for x in image.get_width():
+				var c := image.get_pixel(x, y)
+				if c.a > 0.05:
+					pixels += 1
+					total += Vector3(c.r, c.g, c.b)
+		lit[state] = pixels
+		tint[state] = total / maxi(pixels, 1)
+		_check("state %d draws something" % state, pixels > 0, "pixels=%d" % pixels)
+	_check("idle draws only its dot", int(lit[Hud.NetworkState.IDLE])
+		< int(lit[Hud.NetworkState.DEGRADED]),
+		"idle=%d degraded=%d" % [int(lit[Hud.NetworkState.IDLE]),
+			int(lit[Hud.NetworkState.DEGRADED])])
+	_check("good draws more than degraded", int(lit[Hud.NetworkState.DEGRADED])
+		< int(lit[Hud.NetworkState.CONNECTING]) + int(lit[Hud.NetworkState.DEGRADED]),
+		"degraded=%d connecting=%d" % [int(lit[Hud.NetworkState.DEGRADED]),
+			int(lit[Hud.NetworkState.CONNECTING])])
+	_check("lost is red, not amber",
+		tint[Hud.NetworkState.LOST].r > tint[Hud.NetworkState.LOST].b,
+		"lost=%s" % str(tint[Hud.NetworkState.LOST]))
+	_check("idle is grey, so it cannot be mistaken for a state",
+		absf(tint[Hud.NetworkState.IDLE].r - tint[Hud.NetworkState.IDLE].g) < 0.06
+			and absf(tint[Hud.NetworkState.IDLE].g - tint[Hud.NetworkState.IDLE].b) < 0.06,
+		"idle=%s" % str(tint[Hud.NetworkState.IDLE]))
+	_check("every state is distinguishable from idle by colour alone",
+		_tint_distance(tint[Hud.NetworkState.CONNECTING], tint[Hud.NetworkState.IDLE]) > 0.08
+			and _tint_distance(tint[Hud.NetworkState.DEGRADED], tint[Hud.NetworkState.IDLE]) > 0.08
+			and _tint_distance(tint[Hud.NetworkState.LOST], tint[Hud.NetworkState.IDLE]) > 0.08, "")
+	_check("lost and connecting are not the same colour",
+		_tint_distance(tint[Hud.NetworkState.LOST],
+			tint[Hud.NetworkState.CONNECTING]) > 0.08, "")
+	hud.set_network_state(Hud.NetworkState.IDLE)
+
+
+
+
+
+## How far apart two mean colours are, so "distinguishable" is a number and not a
+## phrase.
+func _tint_distance(a: Vector3, b: Vector3) -> float:
+	return (a - b).length()
 
 
 func _check(label: String, ok: bool, detail: String) -> void:

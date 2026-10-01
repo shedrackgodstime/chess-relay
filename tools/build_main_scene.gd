@@ -212,6 +212,7 @@ func _hud() -> Control:
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
 	hud.add_child(_game_over_label())
+	hud.add_child(_network_indicator())
 	hud.add_child(_promotion_picker())
 	return hud
 
@@ -276,6 +277,36 @@ func _game_over_label() -> Label:
 	label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
 	label.add_theme_constant_override("outline_size", 8)
 	return label
+
+
+## The connection indicator, in the top band beside the menu.
+##
+## Where the mic used to be, but one gap closer to the menu than it was: status
+## belongs with the session controls rather than with the board, and the mic has
+## moved to the other side. Passive by construction, mouse_filter ignored, so it
+## neither looks nor behaves like something to tap.
+func _network_indicator() -> TextureRect:
+	var indicator := TextureRect.new()
+	indicator.name = "NetworkIndicator"
+	indicator.unique_name_in_owner = true
+	indicator.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	indicator.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	indicator.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	indicator.texture = Icons.signal_bars(0, Color(0.62, 0.60, 0.58, 1.0))
+	# Right-anchored, a gap left of the menu: the menu's right edge is MENU_INSET in,
+	# it is one touch target wide, and the indicator is half that again.
+	var right := Hud.MENU_INSET + Hud.TOUCH_SIZE.x + 14.0
+	var side := 30.0
+	indicator.anchor_left = 1.0
+	indicator.anchor_right = 1.0
+	indicator.anchor_top = 0.0
+	indicator.anchor_bottom = 0.0
+	indicator.offset_right = -right
+	indicator.offset_left = -right - side
+	# Vertically centred on the menu band, which starts at 16 and is TOUCH_SIZE tall.
+	indicator.offset_top = 16.0 + (Hud.TOUCH_SIZE.y - side) * 0.5
+	indicator.offset_bottom = indicator.offset_top + side
+	return indicator
 
 
 ## The promote-what-to overlay. Added last so it paints over everything, and

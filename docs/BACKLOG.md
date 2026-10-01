@@ -234,9 +234,26 @@ incomplete. `Rules` is the only place that needs to change.
   start: a frame sitting over the board must be `MOUSE_FILTER_IGNORE`. Overlaying the
   board is how the new-game button caught taps aimed at squares, and a panel the size
   of a video frame is a far bigger offender.
-- **Network status indicator.** Agreed in principle, for the corner the mic leaves.
-  Belongs with the clock work: a connection indicator and a clock that pauses on
-  disconnect are the two halves of the same requirement.
+- ~~**Network status indicator.**~~ Built, in the corner the mic left, next to the menu.
+  `Hud.NetworkState` is IDLE / CONNECTING / DEGRADED / LOST, drawn as Lucide signal
+  bars, and it currently has nothing driving it, so it sits at IDLE, which is true
+  today: there is no transport. Wiring it is one call once there is.
+  Two decisions worth keeping. **Bars, not the wifi arcs:** this is a direct
+  peer-to-peer link and nested arcs say router, they survive being drawn small less
+  well, and `wifi-off`'s diagonal slash would dominate a passive corner for something
+  that is only status. **Four states, three colours plus a neutral grey,** because
+  connecting and not-connected are not the same thing and amber cannot honestly mean
+  both; idle is grey rather than a colour because there is nothing to judge yet and
+  painting it as a status would cry wolf every time the game opened.
+  The bar count is the real channel and colour only reinforces it, because red and
+  green are not separable for everyone and this board already decided brightness and
+  shape carry the meaning. LOST shares one bar with CONNECTING and is separated by
+  red, because it is the state that must not be read as progress.
+  It is `MOUSE_FILTER_IGNORE` and takes no input: a control that looks live but does
+  nothing is worse than none, and anything over the board can catch taps aimed at
+  squares.
+  Belongs with the clock work, and is its other half: a connection indicator and a
+  clock that pauses on disconnect are the same requirement.
 - ~~**Hint the legal moves** for the selected piece.~~ Done, behind the
   `Indicators.show_legal_moves` setting, on temporarily for review.
 

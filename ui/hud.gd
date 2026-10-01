@@ -19,6 +19,19 @@ signal rotate_requested(direction: int)
 signal reset_view_requested
 ## Emitted to swap the board to the other player's point of view.
 signal flip_requested
+## Shows the state of the connection to the other player.
+##
+## Not a button and never one. It sits where the mic used to be, and a control that
+## looks live but does nothing is worse than no control at all. It takes no input, so
+## it cannot become the dead tap target that any overlay over the board otherwise
+## invites.
+func set_network_state(state: NetworkState) -> void:
+	if network_indicator == null:
+		return
+	var visual: Array = NETWORK_VISUALS[state]
+	network_indicator.texture = Icons.signal_bars(visual[0], visual[1])
+
+
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
 ## Shows the end of the game over the board, or clears it.
@@ -75,6 +88,30 @@ signal voice_state_changed(state: VoiceState)
 @onready var menu_button: Button = %MenuButton
 @onready var promotion_picker: PromotionPicker = %PromotionPicker
 @onready var game_over_label: Label = %GameOverLabel
+@onready var network_indicator: TextureRect = %NetworkIndicator
+
+## What the connection to the other player is doing.
+##
+## Four states rather than three colours, because "connecting" and "not connected"
+## are not the same thing and amber cannot honestly mean both. Idle is deliberately
+## a neutral grey rather than a fourth colour: there is nothing to judge yet, and
+## painting that as a status would cry wolf every time the game opened.
+enum NetworkState { IDLE, CONNECTING, DEGRADED, LOST }
+
+## Bar count and colour for each state. The bar count is the real channel and colour
+## is the reinforcement, not the message: red and green are not separable for
+## everyone, and this board has already decided that brightness and shape carry
+## meaning with hue only ever adding to it.
+##
+## LOST deliberately shares one bar with CONNECTING and differs only in colour and
+## hue position, because it is the state that must not be mistaken for progress. It
+## is the one the player needs to notice, so it is the one given the loudest.
+const NETWORK_VISUALS := {
+	NetworkState.IDLE: [0, Color(0.62, 0.60, 0.58, 1.0)],
+	NetworkState.CONNECTING: [1, Color(1.0, 0.85, 0.25, 1.0)],
+	NetworkState.DEGRADED: [2, Color(1.0, 0.85, 0.25, 1.0)],
+	NetworkState.LOST: [1, Color(1.0, 0.27, 0.20, 1.0)],
+}
 @onready var mic_button: Button = %MicButton
 
 ## Current presentation state of the mic control.
