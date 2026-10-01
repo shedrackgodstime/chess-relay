@@ -136,13 +136,26 @@ func _special_rules_checks() -> void:
 		ep.from_fen("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1"), "")
 	_check("en passant perft 1 is 14", kiwipete_perft(ep, 1) == 14,
 		"got=%d" % kiwipete_perft(ep, 1))
-	# Depth 2 is known to be 193 against a true 191: two moves too many. Left
-	# asserted rather than hidden, but see docs/BACKLOG.md, which records it as
-	# an open bug. Depth 1 and the direct en passant checks below do pass, so the
-	# mechanism works; something else in this position over-generates.
-	_check("en passant perft 2 is not yet exact (known: 193 vs 191)",
-		kiwipete_perft(ep, 2) == 193,
+	_check("en passant perft 2 is 191", kiwipete_perft(ep, 2) == 191,
 		"got=%d" % kiwipete_perft(ep, 2))
+	_check("en passant perft 3 is 2812", kiwipete_perft(ep, 3) == 2812,
+		"got=%d" % kiwipete_perft(ep, 3))
+
+	# The bug that position 3 exists to catch, stated on its own so the reason
+	# survives. An en passant capture moves two pieces off the board: the one
+	# being captured and the one doing the capturing. Simulating only the second
+	# left a shield in place and let the capture through.
+	var pinned := BoardState.new()
+	pinned.squares.fill(BoardState.EMPTY)
+	pinned.set_square(0, 4, BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	pinned.set_square(7, 4, BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT))
+	pinned.set_square(1, 4, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+	pinned.set_square(2, 4, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.DARK))
+	pinned.set_square(2, 3, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+	pinned.side_to_move = BoardState.DARK
+	pinned.en_passant_square = Vector2i(2, 3)
+	_check("an en passant capture that exposes the king along a rank is refused",
+		not Rules.is_legal(pinned, ChessMove.new(Vector2i(2, 4), Vector2i(2, 3))), "")
 
 	# Castling actually moving the rook, and costing the right.
 	var game := ChessGame.new()

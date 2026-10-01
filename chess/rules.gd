@@ -277,10 +277,30 @@ static func _leaves_own_king_exposed(state: BoardState, move: ChessMove) -> bool
 	squares[move.from_square.y * BoardState.BOARD_SIZE + move.from_square.x] = BoardState.EMPTY
 	var landing := landing_code(state, move)
 	squares[move.to_square.y * BoardState.BOARD_SIZE + move.to_square.x] = landing
+	# An en passant capture also vacates the square beside the mover, and that
+	# square may be the only thing shielding the king. Leaving it occupied here
+	# made a discovered check look covered, so the capture was allowed when the
+	# capturing pawn and the captured one together were the only obstacles.
+	if _is_en_passant(state, move):
+		squares[move.from_square.y * BoardState.BOARD_SIZE + move.to_square.x] = BoardState.EMPTY
 	var king := _find_king(squares, side)
 	if king.x < 0:
 		return false
 	return _is_attacked_on(squares, king, 1 - side)
+
+
+## Whether this move captures en passant: a pawn landing on the square behind a
+## pawn that has just gone two squares, which is empty by definition.
+##
+## Derived here rather than passed in, because both the legality check and the
+## board mutation need it and neither should depend on the other being right.
+static func _is_en_passant(state: BoardState, move: ChessMove) -> bool:
+	if state.at(move.to_square.x, move.to_square.y) != BoardState.EMPTY:
+		return false
+	if BoardState.decode(state.at(move.from_square.x, move.from_square.y)).x \
+			!= PieceProfiles.Type.PAWN:
+		return false
+	return move.to_square == state.en_passant_square
 
 
 ## What ends up on the destination square. A pawn reaching the far rank with no
