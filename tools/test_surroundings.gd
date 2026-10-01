@@ -7,100 +7,6 @@ extends SceneTree
 var _failures := 0
 
 
-## The lamp-lit studio. These are mostly structural checks: the look is tuned by
-## eye on a device, but the properties that make the look possible have to hold.
-func _studio_checks() -> void:
-	print("Studio")
-	var studio := StudioView.new()
-	root.add_child(studio)
-	await process_frame
-
-	var camera := OrbitCamera.new()
-	var reach: float = camera.max_distance + 2.0
-	_check("dome encloses the furthest camera position",
-		StudioView.DOME_RADIUS > reach, "dome=%.0f reach=%.0f" % [StudioView.DOME_RADIUS, reach])
-	_check("dome clears the floor's own extent",
-		StudioView.DOME_RADIUS > TableMesh.FLOOR_SIZE * 0.5,
-		"dome=%.0f floor half=%.0f" % [StudioView.DOME_RADIUS, TableMesh.FLOOR_SIZE * 0.5])
-
-	# At the lowest allowed pitch the camera is nearly level with the table, so
-	# anything past the floor's edge would be visible. The dome is what stops
-	# that reading as a hard line.
-	_check("camera can look near enough level to need a backdrop",
-		camera.min_pitch_degrees < 20.0, "min pitch=%.0f" % camera.min_pitch_degrees)
-
-	var dome := studio.get_node_or_null("Dome") as MeshInstance3D
-	_check("dome is drawn", dome != null and dome.mesh != null, "")
-	_check("dome is drawn from the inside",
-		(dome.mesh as SphereMesh).flip_faces, "")
-	var material := dome.material_override as StandardMaterial3D
-	_check("dome material exists", material != null, "")
-	_check("dome is unlit so the lamp cannot make it glow",
-		material != null and material.shading_mode == BaseMaterial3D.SHADING_MODE_UNSHADED,
-		"mode=%d" % (material.shading_mode if material else -1))
-	_check("dome is double sided",
-		material != null
-			and material.cull_mode == BaseMaterial3D.CULL_DISABLED, "")
-	_check("dome casts no shadow",
-		dome.cast_shadow == GeometryInstance3D.SHADOW_CASTING_SETTING_OFF, "")
-
-	var lamp := studio.get_node_or_null("Lamp") as SpotLight3D
-	_check("lamp exists", lamp != null, "")
-	var forward := (-lamp.basis.z).normalized()
-	var to_table := Vector3(-lamp.position).normalized()
-	_check("lamp is aimed at the table",
-		forward.dot(to_table) > 0.999, "dot=%.4f" % forward.dot(to_table))
-	_check("lamp shines downward", forward.y < -0.9, "y=%.3f" % forward.y)
-	_check("lamp sits above the table", lamp.position.y > 0.0, "y=%.2f" % lamp.position.y)
-	_check("lamp casts shadows", lamp.shadow_enabled, "")
-	# A spot on a short throw needs far more energy than a directional, so the
-	# comparison is only that the fill does not do the lamp's job.
-	var fill := studio.get_node_or_null("Fill") as DirectionalLight3D
-	_check("fill exists and stays a fill",
-		fill != null and fill.light_energy < lamp.light_energy * 0.25,
-		"fill=%.2f lamp=%.1f" % [fill.light_energy if fill else -1.0, lamp.light_energy])
-
-	var env := Environment.new()
-	StudioView.apply_to(env)
-	_check("ambient is a fixed colour, not the sky",
-		env.ambient_light_source == Environment.AMBIENT_SOURCE_COLOR,
-		"src=%d" % env.ambient_light_source)
-	_check("sky no longer contributes to ambient",
-		is_zero_approx(env.ambient_light_sky_contribution),
-		"%.2f" % env.ambient_light_sky_contribution)
-	# Not near-black: surfaces facing away from the lamp live on ambient alone,
-	# and starving it turns the wood and the board's two square tones grey.
-	_check("ambient is bright enough to keep material colour",
-		env.ambient_light_energy >= 1.4, "energy=%.2f" % env.ambient_light_energy)
-	_check("ambient is warm, not neutral grey",
-		env.ambient_light_color.r >= env.ambient_light_color.b,
-		"%s" % env.ambient_light_color)
-	_check("exposure compensates for the filmic tonemap",
-		env.tonemap_exposure > 1.0, "exposure=%.2f" % env.tonemap_exposure)
-	_check("the floor is a brown, not a hole",
-		TableMesh.FLOOR_COLOR.r > TableMesh.FLOOR_COLOR.b,
-		"%s" % TableMesh.FLOOR_COLOR)
-
-	# The trays sit at the table's edge, roughly 7 units from the lamp axis.
-	# A cone too tight to reach them leaves them black while the board looks
-	# correctly lit, which is how the trays became invisible.
-	var lamp_drop: float = StudioView.LAMP_HEIGHT + absf(TableMesh.TOP_Y)
-	var cone_at_table: float = lamp_drop * tan(deg_to_rad(StudioView.LAMP_ANGLE_DEGREES))
-	var tray_reach: float = Vector2(TrayMesh.TRAY_X, TrayMesh.LENGTH * 0.5).length()
-	_check("lamp cone reaches the far corners of both trays",
-		cone_at_table > tray_reach + 1.0,
-		"cone=%.1f trays at=%.1f" % [cone_at_table, tray_reach])
-	_check("spot falloff is flat enough not to shadow the periphery",
-		StudioView.FALLOFF_AT_TABLE < 0.5, "%.2f" % StudioView.FALLOFF_AT_TABLE)
-	_check("fog is on so the floor fades rather than ends",
-		env.fog_enabled and env.fog_density > 0.0, "density=%.3f" % env.fog_density)
-	_check("background is a flat colour behind the dome",
-		env.background_mode == Environment.BG_COLOR, "mode=%d" % env.background_mode)
-
-	studio.queue_free()
-	await process_frame
-
-
 ## The tray has to fit on the table without touching either the board frame or
 ## the rim, since it sits in the gap between them.
 func _tray_geometry_checks() -> void:
@@ -209,7 +115,6 @@ func _tray_view_checks() -> void:
 
 func _init() -> void:
 	Quality.set_preset(Quality.Preset.MEDIUM)
-	_studio_checks()
 	_tray_geometry_checks()
 	_tray_view_checks()
 	var mesh := TableMesh.build()

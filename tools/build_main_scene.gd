@@ -31,10 +31,11 @@ func _init() -> void:
 	world.add_child(_highlight())
 	world.add_child(_pieces())
 	world.add_child(_table())
-	world.add_child(_studio())
 	world.add_child(_tray("TrayLight", LIGHT))
 	world.add_child(_tray("TrayDark", DARK))
 	world.add_child(_floor())
+	world.add_child(_key_light())
+	world.add_child(_fill_light())
 	world.add_child(_environment())
 	world.add_child(_camera())
 	root.add_child(_hud_layer())
@@ -356,14 +357,6 @@ func _table() -> MeshInstance3D:
 	return table
 
 
-## The backdrop dome and the lamp above the table.
-func _studio() -> Node3D:
-	var studio := Node3D.new()
-	studio.name = "Studio"
-	studio.set_script(load("res://surroundings/studio_view.gd"))
-	return studio
-
-
 ## A capture tray lying on the table, one each side of the board.
 ##
 ## The trays hold pieces by the colour that was taken, so the tray on a given
@@ -396,13 +389,49 @@ func _floor() -> MeshInstance3D:
 	return floor_node
 
 
+func _key_light() -> DirectionalLight3D:
+	var light := DirectionalLight3D.new()
+	light.name = "KeyLight"
+	light.light_energy = 1.25
+	light.light_color = Color(1.0, 0.965, 0.910)
+	light.shadow_enabled = true
+	light.directional_shadow_max_distance = 40.0
+	light.transform = Transform3D(Basis(), Vector3.ZERO).looking_at(
+		Vector3(-0.55, -1.0, -0.35), Vector3.UP
+	)
+	return light
+
+
+func _fill_light() -> DirectionalLight3D:
+	var light := DirectionalLight3D.new()
+	light.name = "FillLight"
+	light.light_energy = 0.35
+	light.light_color = Color(0.760, 0.830, 1.0)
+	light.shadow_enabled = false
+	light.transform = Transform3D(Basis(), Vector3.ZERO).looking_at(
+		Vector3(0.65, -0.55, 0.55), Vector3.UP
+	)
+	return light
+
+
 func _environment() -> WorldEnvironment:
 	var node := WorldEnvironment.new()
 	node.name = "Environment"
 	var env := Environment.new()
-	# Lamp-lit darkness rather than an open sky: the values live on StudioView
-	# because they only make sense alongside the lamp that motivates them.
-	StudioView.apply_to(env)
+	env.background_mode = Environment.BG_SKY
+
+	var sky_material := ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = Color(0.180, 0.290, 0.470)
+	sky_material.sky_horizon_color = Color(0.640, 0.700, 0.760)
+	sky_material.ground_bottom_color = Color(0.090, 0.100, 0.115)
+	sky_material.ground_horizon_color = Color(0.480, 0.520, 0.560)
+	env.sky = Sky.new()
+	env.sky.sky_material = sky_material
+
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_sky_contribution = 1.0
+	env.ambient_light_energy = 0.85
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	node.environment = env
 	return node
 

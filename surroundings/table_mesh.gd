@@ -26,9 +26,7 @@ const FLOOR_SIZE := 80.0
 
 const WOOD_BASE := Color(0.310, 0.196, 0.122)
 const WOOD_VEIN := Color(0.170, 0.098, 0.058)
-## Dark, but a warm brown rather than near-black: the floor has to read as part
-## of a room, and a black floor takes the wood's palette down with it.
-const FLOOR_COLOR := Color(0.150, 0.108, 0.082)
+const FLOOR_COLOR := Color(0.105, 0.115, 0.135)
 
 static var _cache := {}
 
