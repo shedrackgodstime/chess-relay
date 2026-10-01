@@ -255,6 +255,68 @@ func _last_move_and_side_checks() -> void:
 		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.LIGHT)),
 		"yaw=%.1f" % main.camera.yaw_degrees)
 
+	await _check_marker_checks()
+	scene.queue_free()
+	await process_frame
+
+
+## The king-in-check marker: absent when nobody is in check, on the right square
+## when someone is, and cleared again once the check is answered.
+func _check_marker_checks() -> void:
+	print("Check marker")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	var marker: KingCheckMarker = main.check_marker
+	_check("no check marker on the opening board", not marker.is_marked(), "")
+
+	# A real position rather than a fabricated one: the black king on e8 is
+	# checked by a rook on e1. The rook has to be on the same file, or it is not
+	# check at all and the marker correctly stays away.
+	main.game.state.squares.fill(BoardState.EMPTY)
+	main.game.state.set_square(4, 7,
+		BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	main.game.state.set_square(4, 0,
+		BoardState.encode(PieceProfiles.Type.ROOK, BoardState.LIGHT))
+	main.game.state.side_to_move = BoardState.DARK
+	main._update_check_marker()
+	await process_frame
+	_check("the marker comes up when a king is in check",
+		marker.is_marked() and marker.visible, "")
+	_check("it marks the king's square, not the attacker's",
+		marker.marked_square() == Vector2i(4, 7),
+		"marked=%s" % marker.marked_square())
+	_check("the marker has both a wash and a border",
+		marker.get_node_or_null("Fill") != null
+			and marker.get_node_or_null("Border") != null, "")
+	_check("it sits on the square rather than offset from it",
+		marker.position.distance_to(BoardMesh.square_position(4, 7)) < 0.01,
+		"pos=%s" % marker.position)
+
+	# Answer the check by stepping off the file, and it must go away, or it
+	# becomes noise. e7 would still be on the rook's file and still in check.
+	main.game.state.set_square(4, 6, BoardState.EMPTY)
+	main.game.state.set_square(5, 6,
+		BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	main._update_check_marker()
+	await process_frame
+	_check("the marker clears once the check is answered",
+		not marker.is_marked() and not marker.visible, "")
+
+	# And a stalemate-adjacent position: in check but with no legal move still
+	# shows it, because the player has to be told why.
+	main.game.state.squares.fill(BoardState.EMPTY)
+	main.game.state.set_square(6, 6, BoardState.encode(PieceProfiles.Type.QUEEN, BoardState.LIGHT))
+	main.game.state.set_square(5, 5, BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	main.game.state.set_square(7, 7, BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	main.game.state.side_to_move = BoardState.DARK
+	main._update_check_marker()
+	await process_frame
+	_check("a check with no legal reply still shows the marker",
+		marker.is_marked() and marker.marked_square() == Vector2i(7, 7), "")
+
 	scene.queue_free()
 	await process_frame
 

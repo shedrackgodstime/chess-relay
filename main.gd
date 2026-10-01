@@ -14,6 +14,7 @@ extends Node3D
 @onready var highlight: SquareHighlight = $World/Highlight
 @onready var hud: Hud = $UILayer/Hud
 @onready var last_move: LastMoveMarker = $World/LastMove
+@onready var check_marker: KingCheckMarker = $World/KingCheck
 @onready var tray_light: TrayView = $World/TrayLight
 @onready var tray_dark: TrayView = $World/TrayDark
 
@@ -48,6 +49,7 @@ const AI_DELAY_SECONDS := 0.8
 			return
 		player_side = value
 		_deselect()
+		_update_check_marker()
 		# The view has to follow the side, or a Black player opens the game looking
 		# at the back of White's pieces.
 		frame_board()
@@ -106,6 +108,7 @@ func _ready() -> void:
 	if hud.promotion_picker != null:
 		hud.promotion_picker.chosen.connect(_on_promotion_chosen)
 	hud.bind()
+	_update_check_marker()
 	_on_game_finished(game.result())
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Voice is a property of the mode, so it is decided once here rather than
@@ -436,11 +439,32 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	# Both ends of the move, so an opponent's reply can be seen to land where it
 	# was expected to rather than having to be remembered.
 	last_move.show_move(move.from_square, move.to_square)
+	_update_check_marker()
 	_refresh_trays()
 	piece.glide_to(
 		BoardMesh.square_position(move.to_square.x, move.to_square.y),
 		piece.piece_type == PieceProfiles.Type.KNIGHT
 	)
+
+
+## Marks the king that is in check, or clears the marker.
+##
+## Only the side to move can be in check in a reachable position, so that is the
+## only king worth marking. Read from the position rather than from the move that
+## caused it, so it also comes up right after the game starts or a position is
+## restored.
+func _update_check_marker() -> void:
+	if check_marker == null:
+		return
+	var side := game.state.side_to_move
+	if not Rules.is_in_check(game.state, side):
+		check_marker.hide_marker()
+		return
+	var king := Rules.king_square(game.state, side)
+	if king.x < 0:
+		check_marker.hide_marker()
+		return
+	check_marker.show_at(king.x, king.y)
 
 
 ## Repaints both capture trays from the game's capture lists.

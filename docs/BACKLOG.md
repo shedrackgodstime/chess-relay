@@ -61,8 +61,12 @@ deliberately faint and separate from the selection highlight: selection says
 and the marker has to stay visible when nothing is selected, which is most of
 the time.
 
-Still owed from the same family: mark the king that is in check. That one wants
-to be loud, unlike the last move.
+Also done: the king-in-check marker, `board/king_check_marker.gd`. Loud on
+purpose, the opposite treatment to the last move: a wash over the square plus a
+brighter border, pulsing slowly. A border as well as a wash because the king
+stands on the square and would otherwise hide the wash entirely. Read from the
+position rather than from the move that caused it, so it is also right at the
+start of a game or after a position is restored.
 
 ### Choosing a side
 
