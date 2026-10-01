@@ -249,6 +249,13 @@ incomplete. `Rules` is the only place that needs to change.
   green are not separable for everyone and this board already decided brightness and
   shape carry the meaning. LOST shares one bar with CONNECTING and is separated by
   red, because it is the state that must not be read as progress.
+  The whole set of bars is always drawn, faintly, under the live ones. That frame is
+  what makes the glyph readable at all: a bare dot says nothing about what the control
+  is or what it could show, and an idle state with nothing drawn looks identical to a
+  broken one. With the frame in place idle says "a meter, at nothing". The frame is
+  white at low opacity rather than a state colour, so it reads as capacity and never
+  as a level. The test pins that the drawn frame is the same size in every state, by
+  lit-plus-unlit, since a lit bar covers the frame beneath it.
   It is `MOUSE_FILTER_IGNORE` and takes no input: a control that looks live but does
   nothing is worse than none, and anything over the board can catch taps aimed at
   squares.

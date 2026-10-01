@@ -395,52 +395,69 @@ func _network_checks(hud: Hud) -> void:
 			or hud.menu_button.global_position.y
 				<= indicator.global_position.y + indicator.size.y + 4.0, "")
 
-	# Each state must draw something and differ from the others, in shape and in
-	# colour. Only checking that the texture object changed would pass on four
-	# identical blank squares, which is the failure this glyph could plausibly have.
-	var lit := {}
+	# The frame has to be identical in every state. That is the property which makes
+	# idle legible: the unlit bars never change, only the lit ones on top of them, so
+	# a state cannot quietly shrink the meter out from under the player.
+	var ghost_counts := {}
+	var lit_counts := {}
 	var tint := {}
 	for state: Hud.NetworkState in Hud.NetworkState.values():
 		hud.set_network_state(state)
 		await process_frame
 		var image := indicator.texture.get_image()
-		var pixels := 0
+		var ghost := 0
+		var lit := 0
 		var total := Vector3.ZERO
 		for y in image.get_height():
 			for x in image.get_width():
 				var c := image.get_pixel(x, y)
-				if c.a > 0.05:
-					pixels += 1
+				if c.a <= 0.05:
+					continue
+				# The frame is translucent and the live bars are not. Separating the
+				# two by opacity is what lets a test tell capacity from level without
+				# reading hues, and it is only true because stroke_bar_v stopped
+				# forcing alpha to opaque.
+				if c.a > 0.5:
+					lit += 1
 					total += Vector3(c.r, c.g, c.b)
-		lit[state] = pixels
-		tint[state] = total / maxi(pixels, 1)
-		_check("state %d draws something" % state, pixels > 0, "pixels=%d" % pixels)
-	_check("idle draws only its dot", int(lit[Hud.NetworkState.IDLE])
-		< int(lit[Hud.NetworkState.DEGRADED]),
-		"idle=%d degraded=%d" % [int(lit[Hud.NetworkState.IDLE]),
-			int(lit[Hud.NetworkState.DEGRADED])])
-	_check("good draws more than degraded", int(lit[Hud.NetworkState.DEGRADED])
-		< int(lit[Hud.NetworkState.CONNECTING]) + int(lit[Hud.NetworkState.DEGRADED]),
-		"degraded=%d connecting=%d" % [int(lit[Hud.NetworkState.DEGRADED]),
-			int(lit[Hud.NetworkState.CONNECTING])])
+				else:
+					ghost += 1
+		ghost_counts[state] = ghost
+		lit_counts[state] = lit
+		tint[state] = total / maxi(lit, 1)
+		_check("state %d draws its frame even with nothing lit" % state, ghost > 0,
+			"ghost=%d lit=%d" % [ghost, lit])
+	# The frame is the same shape in every state, so the number of drawn pixels must
+	# not change. Ghost pixels on their own do fall as a state lights more bars,
+	# because a lit bar covers the frame beneath it, which is why the invariant is the
+	# sum. An earlier version asserted the ghost count alone and failed against
+	# behaviour that was correct.
+	var totals: Array = []
+	for state: Hud.NetworkState in Hud.NetworkState.values():
+		totals.append(int(ghost_counts[state]) + int(lit_counts[state]))
+	_check("the frame is the same size in every state",
+		totals.all(func(t: int) -> bool: return t == totals[0]),
+		"totals=%s" % str(totals))
+	_check("idle lights nothing at all", int(lit_counts[Hud.NetworkState.IDLE]) == 0,
+		"lit=%d" % int(lit_counts[Hud.NetworkState.IDLE]))
+	_check("degraded lights more than connecting",
+		int(lit_counts[Hud.NetworkState.DEGRADED])
+			> int(lit_counts[Hud.NetworkState.CONNECTING]),
+		"connecting=%d degraded=%d" % [int(lit_counts[Hud.NetworkState.CONNECTING]),
+			int(lit_counts[Hud.NetworkState.DEGRADED])])
+	_check("lost and connecting light the same bars, so only colour tells them apart",
+		int(lit_counts[Hud.NetworkState.LOST]) == int(lit_counts[Hud.NetworkState.CONNECTING]),
+		"lost=%d connecting=%d" % [int(lit_counts[Hud.NetworkState.LOST]),
+			int(lit_counts[Hud.NetworkState.CONNECTING])])
 	_check("lost is red, not amber",
-		tint[Hud.NetworkState.LOST].r > tint[Hud.NetworkState.LOST].b,
+		tint[Hud.NetworkState.LOST].r > tint[Hud.NetworkState.LOST].b + 0.1,
 		"lost=%s" % str(tint[Hud.NetworkState.LOST]))
-	_check("idle is grey, so it cannot be mistaken for a state",
-		absf(tint[Hud.NetworkState.IDLE].r - tint[Hud.NetworkState.IDLE].g) < 0.06
-			and absf(tint[Hud.NetworkState.IDLE].g - tint[Hud.NetworkState.IDLE].b) < 0.06,
-		"idle=%s" % str(tint[Hud.NetworkState.IDLE]))
-	_check("every state is distinguishable from idle by colour alone",
-		_tint_distance(tint[Hud.NetworkState.CONNECTING], tint[Hud.NetworkState.IDLE]) > 0.08
-			and _tint_distance(tint[Hud.NetworkState.DEGRADED], tint[Hud.NetworkState.IDLE]) > 0.08
-			and _tint_distance(tint[Hud.NetworkState.LOST], tint[Hud.NetworkState.IDLE]) > 0.08, "")
-	_check("lost and connecting are not the same colour",
-		_tint_distance(tint[Hud.NetworkState.LOST],
-			tint[Hud.NetworkState.CONNECTING]) > 0.08, "")
+	_check("and connecting is amber",
+		tint[Hud.NetworkState.CONNECTING].r > 0.8
+			and tint[Hud.NetworkState.CONNECTING].g > 0.7
+			and tint[Hud.NetworkState.CONNECTING].b < 0.6,
+		"connecting=%s" % str(tint[Hud.NetworkState.CONNECTING]))
 	hud.set_network_state(Hud.NetworkState.IDLE)
-
-
-
 
 
 ## How far apart two mean colours are, so "distinguishable" is a number and not a

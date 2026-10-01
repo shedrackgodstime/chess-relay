@@ -78,23 +78,37 @@ static func clear_cache() -> void:
 ## Ascending bars rather than the wifi arcs. This is a direct peer-to-peer link,
 ## not a network being associated with, and nested arcs say router. Bars also
 ## survive being drawn small, where arcs stop being countable.
+##
+## How many bars the meter has, and so how tall the unlit frame is.
+const SIGNAL_BARS := 4
+
+## The unlit frame. White at low opacity rather than a state colour, so it reads as
+## capacity and can never be mistaken for a level.
+const SIGNAL_GHOST := Color(1.0, 1.0, 1.0, 0.22)
+
 static func signal_bars(count: int, colour: Color) -> Texture2D:
 	var key := "signal_%d_%s" % [count, colour.to_html(false)]
 	if _cache.has(key):
 		return _cache[key]
 	var img := Image.create(CANVAS, CANVAS, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
-	# Lucide's geometry in its own 24-unit space, scaled up. The baseline is at
-	# y=20 and the four bars top out at 16, 12, 8 and 4.
+	# Lucide's geometry in its own 24-unit space, scaled up: baseline at y=20, and the
+	# four bars topping out at 16, 12, 8 and 4.
 	var scale := CANVAS / 24.0
 	var baseline := 20.0 * scale
-	var dot_x := 2.0 * scale
-	stroke_disc(img, Vector2(dot_x, baseline), 3.0)
 	var width := 2.0 * scale
-	for i in maxi(count, 0):
-		var x := (7.0 + 5.0 * i) * scale
-		var top := (20.0 - 4.0 - 4.0 * i) * scale
-		stroke_bar_v(img, x, top, baseline, width, colour)
+	# The baseline dot belongs to the frame, not to any state.
+	stroke_disc_tinted(img, Vector2(2.0 * scale, baseline), 3.0, SIGNAL_GHOST)
+	# The whole frame first, faintly, then the live bars on top of it. The frame is
+	# the reason this reads at all: a bare dot says nothing about what the control is
+	# or what it could show, and an idle state with nothing drawn is
+	# indistinguishable from a broken one. With it, idle says "a meter, at nothing".
+	for i in maxi(SIGNAL_BARS, 0):
+		stroke_bar_v(img, (7.0 + 5.0 * i) * scale,
+			(20.0 - 4.0 - 4.0 * i) * scale, baseline, width, SIGNAL_GHOST)
+	for i in clampi(count, 0, SIGNAL_BARS):
+		stroke_bar_v(img, (7.0 + 5.0 * i) * scale,
+			(20.0 - 4.0 - 4.0 * i) * scale, baseline, width, colour)
 	var texture := ImageTexture.create_from_image(img)
 	_cache[key] = texture
 	return texture
@@ -108,12 +122,15 @@ static func stroke_bar_v(
 	img: Image, x: float, top: float, bottom: float, width: float, colour: Color
 ) -> void:
 	var half := width * 0.5
-	var tinted := Color(colour.r, colour.g, colour.b, 1.0)
+	# The colour is used as given, alpha included. Forcing the alpha to opaque here is
+	# what made the signal meter's unlit frame indistinguishable from its live bars:
+	# the frame drew fully solid, so every state painted the same four bars and only
+	# the hue differed.
 	for y in range(int(top), int(bottom) + 1):
 		for px in range(int(x - half), int(x + half) + 1):
 			if px < 0 or px >= CANVAS or y < 0 or y >= CANVAS:
 				continue
-			img.set_pixel(px, y, tinted)
+			img.set_pixel(px, y, colour)
 
 
 static func _icon(name: String, fallback: Callable) -> Texture2D:
@@ -344,6 +361,18 @@ static func _inside_triangle(point: Vector2, a: Vector2, b: Vector2, c: Vector2)
 
 static func _sign(p1: Vector2, p2: Vector2, p3: Vector2) -> float:
 	return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
+
+
+## A disc in a given colour, for the signal meter's baseline dot, which belongs to
+## the unlit frame rather than to any state.
+static func stroke_disc_tinted(
+	img: Image, centre: Vector2, radius: float, colour: Color
+) -> void:
+	for y in CANVAS:
+		for x in CANVAS:
+			if Vector2(x + 0.5, y + 0.5).distance_squared_to(centre) <= radius * radius:
+				if x >= 0 and x < CANVAS and y >= 0 and y < CANVAS:
+					img.set_pixel(x, y, colour)
 
 
 static func stroke_disc(img: Image, centre: Vector2, radius: float) -> void:
