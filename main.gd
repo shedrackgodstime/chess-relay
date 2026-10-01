@@ -93,15 +93,27 @@ var _press_moved := false
 ## raw pitch and distance, take the ratio length as
 ## distance / (half-extent + frame margin) and split it by the pitch angle.
 ##
-## Currently pitch 45, distance 10.81. Note that the e2 pawn is still untappable
-## below pitch 50: the king on e1 stands in front of it from this camera. That is
-## a separate problem from the framing and is recorded in docs/BACKLOG.md.
-@export_range(0.5, 4.0) var framing_height := 1.745165:
+## Currently pitch 50, distance 10.81.
+##
+## TEMPORARY, for looking at. Both ratios were moved together to raise the angle
+## from 45 to 50 while leaving the reach identical, so the board stays exactly as
+## large on screen and the angle is the only thing that differs; otherwise the view
+## would change in two ways at once and neither could be judged.
+##
+## This was raised on the belief that the e2 pawn was untappable at 45 because the
+## king on e1 stands in front of it, and that 50 was the angle at which it cleared.
+## Measured, that is only half right and the half that is wrong matters: a tap on
+## the pawn reaches it at both angles, and a tap on the bare centre of the e2 square
+## reaches the king at both. So 50 fixes nothing here and is purely a view to be
+## judged by eye. What is left is the centre of a square sitting behind a piece,
+## which picking by ray alone cannot resolve; it is recorded in docs/BACKLOG.md
+## rather than solved here. See _e2_reachability_checks in tools/test_movement.gd.
+@export_range(0.5, 4.0) var framing_height := 1.89063:
 	set(value):
 		framing_height = value
 		frame_board()
 
-@export_range(0.5, 4.0) var framing_distance := 1.745165:
+@export_range(0.5, 4.0) var framing_distance := 1.58642:
 	set(value):
 		framing_distance = value
 		frame_board()

@@ -106,10 +106,22 @@ refuses once it is over, and the HUD shows a banner.
 
 ### The e-file cannot be tapped at the default pitch
 
-The camera sits behind the player's own back rank, so the king on e1 hides the
-e2 pawn completely: every point on the pawn resolves to the king. Only the e-file
-is affected, the other seven files are fine. It clears at pitch 50 and above; the
-default is 41.9, chosen deliberately.
+**Corrected by measurement.** This was believed on a device and never tested, and
+the test says something different. Measured with
+`_e2_reachability_checks` in `tools/test_movement.gd`:
+
+- A tap on the **pawn's own body** reaches the pawn, at pitch 45 and at 50. This
+  is the tap a player actually makes, so the pawn is not unreachable.
+- A tap on the **bare centre of the e2 square** reaches the **king**, at 45 and at
+  50 alike. Raising the pitch does not help, because both pieces are centred on
+  their own squares and the ray still passes through the king's body.
+
+So the pitch is not the cause and 50 is not a fix; it is only a different view to
+be judged by eye, and it is currently set to 50 for exactly that. The real problem
+is narrower than this note claimed: the centre of a square can sit behind a piece
+that stands in front of it, which picking by ray alone cannot resolve. That is
+what needs deciding, and it applies to any piece standing in front of any square,
+not specially to the e-file or to pawns.
 
 Two possible fixes, not yet decided:
 - Raise the default pitch to 50.
@@ -123,6 +135,7 @@ Two possible fixes, not yet decided:
 | What | Now | Shipping | Where |
 | --- | --- | --- | --- |
 | Legal-destination hints | **on** | **off** | `Indicators.DEV_DEFAULT`, `settings/indicators.gd` |
+| Camera pitch | **50°** | 45° or keep 50 | `framing_height` / `framing_distance`, `main.gd` |
 | Voice control | shown | follows `ai_opponent` | `Main.DEV_SHOW_VOICE`, `main.gd` |
 
 Both are on so every feature can be watched working while the game is still being

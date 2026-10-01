@@ -205,8 +205,9 @@ func _last_move_and_side_checks() -> void:
 
 	_check("no marker before anything has been played",
 		_last_move_shown(main) == 0, "shown=%d" % _last_move_shown(main))
-	# The a-file, not the e-file: at this pitch the king on e1 swallows taps on
-	# e2, which is a separate problem with its own test.
+	# The a-file, not the e-file. The e-file is measured separately by
+	# _e2_reachability_checks, since it depends on the camera angle rather than on
+	# anything to do with markers.
 	_tap_square(main, Vector2i(0, 1))
 	_tap_square(main, Vector2i(0, 3))
 	_check("the move marks both ends",
@@ -418,6 +419,58 @@ func _views_match_state(main: Main) -> bool:
 				or view.piece_type != BoardState.decode(want[square]).x:
 			return false
 	return true
+
+
+## Whether the pawn on e2 can be picked at the default camera.
+##
+## Measured rather than assumed, because this was believed on a device and never
+## tested, and the test says something different from the belief.
+##
+## Two targets. A tap on the pawn's own body reaches the pawn at both 45 and 50,
+## which is the tap a player actually makes. A tap on the bare centre of the e2
+## square reaches the king at both angles: the king stands between the camera and
+## the centre, and raising the pitch does not change that, because both pieces are
+## centred on their own squares and the ray still passes through the king's body.
+##
+## So the e2 difficulty is the square centre being behind a piece, which picking by
+## ray alone cannot fix. It is not fixed here, and the framing was moved to 50 to
+## be looked at rather than because it was ever going to solve this.
+func _e2_reachability_checks() -> void:
+	print("e2 reachability")
+	for pitch: float in [45.0, 50.0]:
+		var scene := (load("res://main.tscn") as PackedScene).instantiate()
+		root.add_child(scene)
+		await process_frame
+		await process_frame
+		var main: Main = scene
+		main.ai_opponent = false
+		# Both the derived default and the framing that produces this angle, so the
+		# comparison cannot be between a pitch and something else.
+		main.framing_height = tan(deg_to_rad(pitch)) * main.framing_distance
+		await process_frame
+		_check("the camera is at %d degrees" % pitch,
+			is_equal_approx(main.camera.pitch_degrees, pitch),
+			"pitch=%.2f" % main.camera.pitch_degrees)
+		_tap_square(main, Vector2i(4, 1))
+		_check("at %d a tap on the pawn itself picks it up" % pitch,
+			main.selected == Vector2i(4, 1),
+			"tapping the e2 pawn selected %s" % str(main.selected))
+		main._deselect()
+		await process_frame
+		# The bare square centre, which is the harder target: the king stands
+		# between the camera and it, so this is where occlusion would show up. A tap
+		# that lands here while the pawn is there has at least not been swallowed
+		# by the piece in front of it.
+		var centre: Vector3 = BoardMesh.square_position(4, 1)
+		var picked := main._pick_square(main.camera.unproject_position(centre))
+		# The king wins, at both angles. Recorded rather than asserted as a
+		# requirement, because the note this framing was built on claimed the pawn
+		# cleared at 50 and it does not. What matters to a player is the tap on the
+		# pawn itself, which works at both.
+		_check("at %d the king still covers the bare e2 centre" % pitch,
+			picked == Vector2i(4, 0), "centre of e2 picked %s" % str(picked))
+		scene.queue_free()
+		await process_frame
 
 
 func _legal_marker_checks() -> void:
@@ -773,6 +826,7 @@ func _promotion_checks() -> void:
 
 	await _promotion_refusal_checks()
 	await _legal_marker_checks()
+	await _e2_reachability_checks()
 	await _castling_view_checks()
 	scene.queue_free()
 	await process_frame
