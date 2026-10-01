@@ -15,11 +15,77 @@ func _init() -> void:
 	_setup_checks()
 	_move_data_checks()
 	_funnel_checks()
+	_capture_checks()
 	if _failures == 0:
 		print("chess: all checks passed")
 	else:
 		printerr("chess: %d check(s) failed" % _failures)
 	quit(1 if _failures > 0 else 0)
+
+
+## Captures are tracked as data derived from the move sequence, so both P2P
+## peers build identical trays without extra replication.
+func _capture_checks() -> void:
+	print("Capture tracking")
+	var game := ChessGame.new()
+	_check("a fresh game has no captures",
+		game.captures_by(BoardState.LIGHT).is_empty()
+			and game.captures_by(BoardState.DARK).is_empty(), "")
+
+	# White pawn on e4 takes the dark knight sitting on d5.
+	var knight := BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK)
+	game.state.set_square(3, 4, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+	game.state.set_square(3, 3, knight)
+	game.state.side_to_move = BoardState.LIGHT
+	game.apply_move(ChessMove.new(Vector2i(3, 4), Vector2i(3, 3)))
+
+	_check("a capture is recorded for the capturing side",
+		game.captures_by(BoardState.LIGHT) == [knight],
+		str(game.captures_by(BoardState.LIGHT)))
+	_check("the victim is not credited to the losing side",
+		game.captures_by(BoardState.DARK).is_empty(), "")
+
+	# Black recaptures: a pawn beside the white pawn that just landed, taking it.
+	var pawn := BoardState.encode(PieceProfiles.Type.PAWN, BoardState.DARK)
+	game.state.set_square(4, 3, pawn)
+	game.apply_move(ChessMove.new(Vector2i(4, 3), Vector2i(3, 3)))
+	_check("recapture lands on the other side's tray",
+		game.captures_by(BoardState.DARK).size() == 1,
+		str(game.captures_by(BoardState.DARK)))
+	_check("both trays fill independently",
+		game.captures_by(BoardState.LIGHT).size() == 1
+			and game.captures_by(BoardState.DARK).size() == 1, "")
+
+	# Material: a knight counts 3, a pawn 1.
+	_check("material sums knights as 3 and pawns as 1",
+		game.material_captured_by(BoardState.LIGHT) == 3
+			and game.material_captured_by(BoardState.DARK) == 1,
+		"light=%d dark=%d" % [game.material_captured_by(BoardState.LIGHT),
+			game.material_captured_by(BoardState.DARK)])
+
+	# A non-capturing move must not add anything.
+	var before := game.captures_by(BoardState.LIGHT).size()
+	game.state.set_square(4, 4, BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.LIGHT))
+	game.apply_move(ChessMove.new(Vector2i(4, 4), Vector2i(5, 5)))
+	_check("a quiet move adds no capture",
+		game.captures_by(BoardState.LIGHT).size() == before, "")
+
+	game.reset()
+	_check("reset clears both trays",
+		game.captures_by(BoardState.LIGHT).is_empty()
+			and game.captures_by(BoardState.DARK).is_empty()
+			and game.material_captured_by(BoardState.LIGHT) == 0, "")
+
+	# Two independent games from the same moves must agree, or peers drift.
+	var a := ChessGame.new()
+	var b := ChessGame.new()
+	for peer in [a, b]:
+		peer.state.set_square(3, 4, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+		peer.state.set_square(3, 3, knight)
+		peer.state.side_to_move = BoardState.LIGHT
+		peer.apply_move(ChessMove.new(Vector2i(3, 4), Vector2i(3, 3)))
+	_check("peers build identical trays from the same moves",
+		a.captures_by(BoardState.LIGHT) == b.captures_by(BoardState.LIGHT), "")
 
 
 func _encoding_checks() -> void:

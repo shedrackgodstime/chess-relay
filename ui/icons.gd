@@ -97,7 +97,7 @@ static func _fallback_rotate_left() -> Image:
 ## Circular arrow, clockwise. The left-facing one is this mirrored, which
 ## guarantees the pair is exactly symmetric instead of nearly so.
 static func _circular_arrow() -> Image:
-	var img := _blank()
+	var img := blank_canvas()
 	var centre := Vector2(CANVAS * 0.5, CANVAS * 0.5)
 	var radius := CANVAS * 0.30
 	var width := CANVAS * 0.068
@@ -105,7 +105,7 @@ static func _circular_arrow() -> Image:
 	# on screen because +Y points down.
 	var start := -50.0
 	var end := 240.0
-	_arc(img, centre, radius, width, start, end, 1.0)
+	stroke_arc(img, centre, radius, width, start, end, 1.0)
 	var end_angle := deg_to_rad(end)
 	var tip := centre + Vector2(cos(end_angle), sin(end_angle)) * radius
 	# Tangent in the direction of travel at the arc's end.
@@ -120,16 +120,16 @@ static func _fallback_flip() -> Image:
 
 ## Two arrows pointing opposite ways: the universal "swap sides" glyph.
 static func _swap_arrows() -> Image:
-	var img := _blank()
+	var img := blank_canvas()
 	var half := CANVAS * 0.30
 	var width := CANVAS * 0.070
 	var head := CANVAS * 0.13
 	var top := CANVAS * 0.35
 	var bottom := CANVAS * 0.65
 	# Upper arrow points right, lower points left.
-	_bar(img, Vector2(-half, top), Vector2(half - head * 0.7, top), width)
+	stroke_bar(img, Vector2(-half, top), Vector2(half - head * 0.7, top), width)
 	_arrow_head(img, Vector2(half - head * 0.7, top), Vector2.RIGHT, head, width * 1.15)
-	_bar(img, Vector2(half, bottom), Vector2(-half + head * 0.7, bottom), width)
+	stroke_bar(img, Vector2(half, bottom), Vector2(-half + head * 0.7, bottom), width)
 	_arrow_head(img, Vector2(-half + head * 0.7, bottom), Vector2.LEFT, head, width * 1.15)
 	return img
 
@@ -140,13 +140,13 @@ static func _fallback_reset() -> Image:
 
 ## A crosshair: recentre the view.
 static func _crosshair() -> Image:
-	var img := _blank()
+	var img := blank_canvas()
 	var centre := Vector2(CANVAS * 0.5, CANVAS * 0.5)
-	_arc(img, centre, CANVAS * 0.20, CANVAS * 0.055, 0.0, 360.0, 1.0)
-	_disc(img, centre, CANVAS * 0.05)
+	stroke_arc(img, centre, CANVAS * 0.20, CANVAS * 0.055, 0.0, 360.0, 1.0)
+	stroke_disc(img, centre, CANVAS * 0.05)
 	for i in 4:
 		var direction := Vector2.RIGHT.rotated(deg_to_rad(90.0 * i))
-		_bar(img, centre + direction * CANVAS * 0.28, centre + direction * CANVAS * 0.40, CANVAS * 0.05)
+		stroke_bar(img, centre + direction * CANVAS * 0.28, centre + direction * CANVAS * 0.40, CANVAS * 0.05)
 	return img
 
 
@@ -160,29 +160,29 @@ static func _fallback_mic_signal() -> Image:
 	var img := _fallback_mic()
 	# Two radiating arcs either side, signalling a request going out.
 	var y := CANVAS * 0.40
-	_arc(img, Vector2(CANVAS * 0.24, y), CANVAS * 0.22, CANVAS * 0.05, 250.0, 290.0, 1.0)
-	_arc(img, Vector2(CANVAS * 0.76, y), CANVAS * 0.22, CANVAS * 0.05, 250.0, 290.0, -1.0)
+	stroke_arc(img, Vector2(CANVAS * 0.24, y), CANVAS * 0.22, CANVAS * 0.05, 250.0, 290.0, 1.0)
+	stroke_arc(img, Vector2(CANVAS * 0.76, y), CANVAS * 0.22, CANVAS * 0.05, 250.0, 290.0, -1.0)
 	return img
 
 
 static func _fallback_mic() -> Image:
-	var img := _blank()
+	var img := blank_canvas()
 	var width := CANVAS * 0.17
 	# Capsule: a bar with a disc capping each end, so no polygon fill needed.
-	_bar(img, Vector2(CANVAS * 0.5, CANVAS * 0.20), Vector2(CANVAS * 0.5, CANVAS * 0.48), width)
-	_disc(img, Vector2(CANVAS * 0.5, CANVAS * 0.20), width * 0.5)
-	_disc(img, Vector2(CANVAS * 0.5, CANVAS * 0.48), width * 0.5)
+	stroke_bar(img, Vector2(CANVAS * 0.5, CANVAS * 0.20), Vector2(CANVAS * 0.5, CANVAS * 0.48), width)
+	stroke_disc(img, Vector2(CANVAS * 0.5, CANVAS * 0.20), width * 0.5)
+	stroke_disc(img, Vector2(CANVAS * 0.5, CANVAS * 0.48), width * 0.5)
 	# Cradle, stem and base.
-	_arc(img, Vector2(CANVAS * 0.5, CANVAS * 0.42), CANVAS * 0.21, CANVAS * 0.05, 0.0, 180.0, 1.0)
-	_bar(img, Vector2(CANVAS * 0.5, CANVAS * 0.63), Vector2(CANVAS * 0.5, CANVAS * 0.80), CANVAS * 0.05)
-	_bar(img, Vector2(CANVAS * 0.37, CANVAS * 0.83), Vector2(CANVAS * 0.63, CANVAS * 0.83), CANVAS * 0.05)
+	stroke_arc(img, Vector2(CANVAS * 0.5, CANVAS * 0.42), CANVAS * 0.21, CANVAS * 0.05, 0.0, 180.0, 1.0)
+	stroke_bar(img, Vector2(CANVAS * 0.5, CANVAS * 0.63), Vector2(CANVAS * 0.5, CANVAS * 0.80), CANVAS * 0.05)
+	stroke_bar(img, Vector2(CANVAS * 0.37, CANVAS * 0.83), Vector2(CANVAS * 0.63, CANVAS * 0.83), CANVAS * 0.05)
 	return img
 
 
 static func _three_dots() -> Image:
-	var img := _blank()
+	var img := blank_canvas()
 	for i in 3:
-		_disc(img, Vector2(CANVAS * 0.5, CANVAS * (0.30 + 0.20 * i)), CANVAS * 0.075)
+		stroke_disc(img, Vector2(CANVAS * 0.5, CANVAS * (0.30 + 0.20 * i)), CANVAS * 0.075)
 	return img
 
 
@@ -211,7 +211,9 @@ static func _mirror_x(image: Image) -> Image:
 
 # --- raster primitives -------------------------------------------------------
 
-static func _blank() -> Image:
+## Shared drawing primitives. Public because the captured-tray glyphs fall back
+## to the same rasteriser rather than keeping a second copy of it.
+static func blank_canvas() -> Image:
 	var img := Image.create(CANVAS, CANVAS, false, Image.FORMAT_RGBA8)
 	img.fill(Color(0, 0, 0, 0))
 	return img
@@ -222,7 +224,7 @@ static func _plot(img: Image, x: int, y: int) -> void:
 		img.set_pixel(x, y, COLOUR)
 
 
-static func _arc(
+static func stroke_arc(
 	img: Image, centre: Vector2, radius: float, width: float,
 	start_deg: float, end_deg: float, direction: float
 ) -> void:
@@ -266,12 +268,21 @@ static func _triangle(img: Image, a: Vector2, b: Vector2, c: Vector2) -> void:
 
 
 ## A straight stroke: one quad as two triangles, plus a round-ish cap.
-static func _bar(img: Image, from: Vector2, to: Vector2, width: float) -> void:
-	var up := Vector2(0.0, -width * 0.5)
-	var down := Vector2(0.0, width * 0.5)
-	_triangle(img, from + up, to + up, from + down)
-	_triangle(img, to + up, to + down, from + down)
-	_disc(img, from, width * 0.5)
+## A stroke of constant width between two points, with rounded caps.
+static func stroke_bar(img: Image, from: Vector2, to: Vector2, width: float) -> void:
+	var axis := to - from
+	# Offsets must be perpendicular to the line, not always vertical: a fixed
+	# vertical offset makes the two triangles collapse to zero area on a
+	# vertical bar, so the stroke silently vanishes.
+	if axis.length_squared() < 0.0001:
+		stroke_disc(img, from, width * 0.5)
+		return
+	var normal := axis.orthogonal().normalized() * (width * 0.5)
+	_triangle(img, from + normal, to + normal, from - normal)
+	_triangle(img, to + normal, to - normal, from - normal)
+	# Both ends, so bars meeting at an angle join without a notch.
+	stroke_disc(img, from, width * 0.5)
+	stroke_disc(img, to, width * 0.5)
 
 
 static func _inside_triangle(point: Vector2, a: Vector2, b: Vector2, c: Vector2) -> bool:
@@ -287,7 +298,7 @@ static func _sign(p1: Vector2, p2: Vector2, p3: Vector2) -> float:
 	return (p1.x - p3.x) * (p2.y - p3.y) - (p2.x - p3.x) * (p1.y - p3.y)
 
 
-static func _disc(img: Image, centre: Vector2, radius: float) -> void:
+static func stroke_disc(img: Image, centre: Vector2, radius: float) -> void:
 	for y in CANVAS:
 		for x in CANVAS:
 			if Vector2(x + 0.5, y + 0.5).distance_squared_to(centre) <= radius * radius:

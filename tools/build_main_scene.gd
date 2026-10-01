@@ -149,6 +149,8 @@ func _hud() -> Control:
 	hud.add_child(_control_column())
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
+	hud.add_child(_capture_tray("CapturedLight"))
+	hud.add_child(_capture_tray("CapturedDark"))
 	return hud
 
 
@@ -254,6 +256,33 @@ func _voice_row() -> Control:
 	row.add_child(dot)
 
 	return row
+
+
+## One capture tray, anchored to a bottom corner.
+##
+## The two trays sit at opposite bottom corners so they cannot crowd each other
+## once both sides have taken pieces, and neither collides with the control
+## column, which owns the middle of the right edge. A flow container rather
+## than a row so sixteen pieces wrap instead of running off a narrow screen.
+func _capture_tray(node_name: String) -> HFlowContainer:
+	var tray := HFlowContainer.new()
+	tray.name = node_name
+	tray.unique_name_in_owner = true
+	tray.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	tray.alignment = FlowContainer.ALIGNMENT_BEGIN
+	tray.add_theme_constant_override("h_separation", 2)
+	tray.add_theme_constant_override("v_separation", 2)
+	tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tray.offset_top = -88.0
+	tray.offset_bottom = -14.0
+	if node_name == "CapturedLight":
+		tray.offset_left = 14.0
+		tray.offset_right = -320.0
+	else:
+		tray.alignment = FlowContainer.ALIGNMENT_END
+		tray.offset_left = 320.0
+		tray.offset_right = -14.0
+	return tray
 
 
 ## A hairline outline that appears only while the mic is live. Carries the same

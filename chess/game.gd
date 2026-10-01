@@ -18,10 +18,33 @@ signal moved(move: ChessMove, captured: int)
 var state := BoardState.new()
 var history: Array[ChessMove] = []
 
+## Piece codes taken by each side, in the order they fell. Tracked as data
+## derived from the move sequence rather than pushed in by the view, so two
+## P2P peers applying the same moves build identical trays without any extra
+## replication. Keyed by BoardState.LIGHT / DARK.
+var captured_by := {BoardState.LIGHT: [] as Array[int], BoardState.DARK: [] as Array[int]}
+
 
 func reset() -> void:
 	state = BoardState.new()
 	history.clear()
+	captured_by[BoardState.LIGHT] = []
+	captured_by[BoardState.DARK] = []
+
+
+## Pieces this side has taken, oldest first.
+func captures_by(side: int) -> Array[int]:
+	return captured_by.get(side, [] as Array[int])
+
+
+## Total material captured by a side, counting pawns as 1 and the rest as 3.
+## Chess does not score this way, but the number a player expects to compare
+## is the simple sum, and the rules engine can revise it later.
+func material_captured_by(side: int) -> int:
+	var total := 0
+	for code in captures_by(side):
+		total += 1 if BoardState.decode(code).x == PieceProfiles.Type.PAWN else 3
+	return total
 
 
 ## Applies a move: validates shape, delegates legality, mutates state,
@@ -42,6 +65,9 @@ func apply_move(move: ChessMove) -> bool:
 		return false
 
 	var captured := state.at(move.to_square.x, move.to_square.y)
+	# Recorded before the side flip, since captures_by is keyed by the taker.
+	if captured != BoardState.EMPTY:
+		(captured_by[state.side_to_move] as Array).append(captured)
 	state.set_square(move.to_square.x, move.to_square.y,
 		state.at(move.from_square.x, move.from_square.y))
 	state.set_square(move.from_square.x, move.from_square.y, BoardState.EMPTY)

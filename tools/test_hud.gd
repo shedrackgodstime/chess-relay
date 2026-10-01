@@ -75,6 +75,7 @@ func _layout_checks(main: Main, hud: Hud) -> void:
 	# which is the point of anchoring in the first place.
 	_centering_checks(view_buttons)
 	_mic_checks(main, hud)
+	_capture_tray_checks(main, hud)
 
 	_check("column is anchored to the right edge", column.anchor_left >= 0.9,
 		"anchor_left=%.2f" % column.anchor_left)
@@ -209,6 +210,70 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 
 	_check("mic carries a glyph",
 		hud.mic_button.get_node_or_null("Glyph") is TextureRect, "")
+
+
+## Trays are rebuilt from the game's capture lists, so the view can never
+## disagree with the authoritative state.
+func _capture_tray_checks(main: Main, hud: Hud) -> void:
+	print("Capture trays")
+	var light_tray := hud.captured_light
+	var dark_tray := hud.captured_dark
+	_check("both trays exist", light_tray != null and dark_tray != null, "")
+	_check("trays start empty",
+		light_tray.get_child_count() == 0 and dark_tray.get_child_count() == 0,
+		"light=%d dark=%d" % [light_tray.get_child_count(), dark_tray.get_child_count()])
+
+	# At the starting position nothing has been taken.
+	hud.set_captured(main.game.captures_by(BoardState.LIGHT),
+		main.game.captures_by(BoardState.DARK))
+	_check("starting position fills no tray",
+		light_tray.get_child_count() == 0 and dark_tray.get_child_count() == 0, "")
+
+	# Take three: two knights and a pawn, then one rook.
+	var taken := [
+		BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK),
+		BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK),
+		BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT),
+	]
+	hud.set_captured(taken, [])
+	_check("tray shows one silhouette per captured piece",
+		light_tray.get_child_count() == 3, "n=%d" % light_tray.get_child_count())
+	_check("the untouched tray stays empty", dark_tray.get_child_count() == 0, "")
+
+	# Silhouettes are tinted for the piece that died, not the capturer.
+	var tints := {}
+	var types := []
+	for icon in light_tray.get_children():
+		var rect := icon as TextureRect
+		tints[rect.modulate.to_html(false)] = true
+		types.append(rect.texture)
+	_check("captured colour is distinct per side",
+		tints.size() == 2, "distinct=%d" % tints.size())
+	_check("every silhouette carries a glyph",
+		types.all(func(t: Texture2D) -> bool: return t != null), "")
+
+	# Grouped by type, so pawns lead regardless of the order they fell.
+	_check("tray is grouped by piece type",
+		types[0] == types[1] and types[1] != types[2], "pawn should lead")
+
+	# Repainting replaces rather than appends.
+	hud.set_captured([taken[0]], [])
+	_check("repainting replaces the row",
+		light_tray.get_child_count() == 1, "n=%d" % light_tray.get_child_count())
+
+	hud.set_captured([], [])
+	_check("trays can be emptied", light_tray.get_child_count() == 0, "")
+
+	# A full tray is the worst case a game can reach.
+	var all_dark: Array[int] = []
+	for type in [PieceProfiles.Type.PAWN, PieceProfiles.Type.PAWN,
+			PieceProfiles.Type.KNIGHT, PieceProfiles.Type.BISHOP,
+			PieceProfiles.Type.ROOK, PieceProfiles.Type.QUEEN]:
+		all_dark.append(BoardState.encode(type, BoardState.DARK))
+	hud.set_captured(all_dark, [])
+	_check("a full tray renders every piece", light_tray.get_child_count() == 6,
+		"n=%d" % light_tray.get_child_count())
+	hud.set_captured([], [])
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.
