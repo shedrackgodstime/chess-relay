@@ -137,8 +137,9 @@ Two possible fixes, not yet decided:
 | --- | --- | --- | --- |
 | Legal-destination hints | **on** | **off** | `Indicators.DEV_DEFAULT`, `settings/indicators.gd` |
 | Voice control | shown | follows `ai_opponent` | `Main.DEV_SHOW_VOICE`, `main.gd` |
+| Network indicator | shown as **GOOD** | **IDLE** | `_network_indicator`, `tools/build_main_scene.gd` |
 
-Both are on so every feature can be watched working while the game is still being
+These are on so every feature can be watched working while the game is still being
 built, which is worth more than the intent they give away: nothing can be judged
 before it has been seen at all. The shipping values are the deliberate ones.
 
@@ -258,14 +259,26 @@ incomplete. `Rules` is the only place that needs to change.
   test counted the pixels, confirmed they were drawn and correctly separated from the
   live bars, and the control still read as nothing but a stray dot, which is worse than
   no frame because it looks broken. Drawn is not visible, and a headless pixel count
-  cannot tell the difference. It was then judged **too strong** at 0.42, competing with
-  the live bars, and is now 0.32 with strokes wider than Lucide's 2. Both values were
-  judged by eye on a real screen and both were wrong: the first in the invisible
-  direction, the correction in the prominent one. A number chosen without looking at
-  the result is wrong in both directions at once, and a value found between two
-  known-bad ones is a probe, not a measurement. The test now bounds the frame between
-  0.28 and 0.38, which only keeps it out of the range already known to fail rather
-  than claiming to know where inside it belongs.
+  cannot tell the difference. It was then judged **too strong** at 0.42 and **still too
+  strong** at 0.32, and is now 0.26 with strokes wider than Lucide's 2. Every value
+  was judged by eye on a real screen and the first three were wrong: 0.22 in the
+  invisible direction, the next two in the prominent one. Alpha is not perceived
+  linearly and the low end is far harder to see than the high end, which is why
+  stepping up from the bottom overshot twice while the arithmetic midpoint did not
+  land. The strokes were widened and the control enlarged after the first reading, so
+  0.26 now is not the same quantity 0.22 was, and treating them as comparable would
+  be the wrong conclusion.
+  The test bounds the frame between 0.22 and 0.30. That is deliberately a weak claim:
+  it keeps the number out of the range already known to fail and does not pretend to
+  know where inside it belongs, since three separate guesses were wrong.
+  **It is shown as GOOD rather than IDLE, temporarily.** IDLE is the truthful state
+  with no transport, but IDLE is four faint bars and no live ones, so it could not
+  show whether the frame is faint enough to sit behind the bars it frames, and there
+  was nothing to compare it against. GOOD also turned out to be a genuinely missing
+  state rather than a display convenience: it is where a player spends the entire game
+  and there was no way at all to say "connected and fine". Three bars, not four,
+  because a peer link has no meaningful good/excellent distinction and a fifth bar
+  would imply one. Returning to IDLE costs one line.
   The test pins that the drawn frame is the same size in every state, by
   lit-plus-unlit, since a lit bar covers the frame beneath it.
   It is `MOUSE_FILTER_IGNORE` and takes no input: a control that looks live but does
