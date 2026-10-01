@@ -264,25 +264,48 @@ func _voice_row() -> Control:
 ## once both sides have taken pieces, and neither collides with the control
 ## column, which owns the middle of the right edge. A flow container rather
 ## than a row so sixteen pieces wrap instead of running off a narrow screen.
-func _capture_tray(node_name: String) -> HFlowContainer:
+func _capture_tray(node_name: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = node_name + "Panel"
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_theme_stylebox_override("panel", _tray_box())
+	panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	panel.offset_top = -104.0
+	panel.offset_bottom = -12.0
+	panel.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	if node_name == "CapturedLight":
+		panel.offset_left = 10.0
+		panel.offset_right = -330.0
+	else:
+		panel.offset_left = 330.0
+		panel.offset_right = -10.0
+
+	# A flow container inside, so sixteen pieces wrap to a second row rather
+	# than running off the side of a narrow screen.
 	var tray := HFlowContainer.new()
 	tray.name = node_name
 	tray.unique_name_in_owner = true
-	tray.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	tray.alignment = FlowContainer.ALIGNMENT_BEGIN
-	tray.add_theme_constant_override("h_separation", 2)
-	tray.add_theme_constant_override("v_separation", 2)
 	tray.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	tray.offset_top = -88.0
-	tray.offset_bottom = -14.0
-	if node_name == "CapturedLight":
-		tray.offset_left = 14.0
-		tray.offset_right = -320.0
-	else:
-		tray.alignment = FlowContainer.ALIGNMENT_END
-		tray.offset_left = 320.0
-		tray.offset_right = -14.0
-	return tray
+	tray.add_theme_constant_override("h_separation", 3)
+	tray.add_theme_constant_override("v_separation", 3)
+	panel.add_child(tray)
+	return panel
+
+
+## The tray surface. Without it an empty tray is literally nothing on screen,
+## so there is no way to tell the feature exists until the first capture lands.
+func _tray_box() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.09, 0.08, 0.07, 0.55)
+	box.set_corner_radius_all(10)
+	box.set_border_width_all(1)
+	box.border_color = Color(1.0, 0.88, 0.62, 0.16)
+	box.content_margin_left = 10.0
+	box.content_margin_right = 10.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 6.0
+	return box
 
 
 ## A hairline outline that appears only while the mic is live. Carries the same

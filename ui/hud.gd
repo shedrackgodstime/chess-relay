@@ -176,7 +176,7 @@ func set_voice_visible(shown: bool) -> void:
 
 
 ## Size of one captured-piece silhouette in a tray.
-const CAPTURED_SIZE := Vector2(26.0, 26.0)
+const CAPTURED_SIZE := Vector2(32.0, 32.0)
 
 ## Repaints both capture trays from scratch.
 ##

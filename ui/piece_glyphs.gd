@@ -45,13 +45,17 @@ static func clear_cache() -> void:
 	_cache.clear()
 
 
-## The tint for a side's pieces in the trays. Light pieces take the warm cream
-## used elsewhere in the HUD; dark pieces are near-black rather than pure, so
-## they stay readable against the dark board instead of vanishing into it.
+## The tint for a side's pieces in the trays.
+##
+## Dark pieces are deliberately a mid warm grey rather than near-black. The
+## board and table are already dark, so a true black silhouette disappeared
+## into them entirely and a captured piece read as missing rather than taken.
+## Mid grey stays unmistakably darker than the cream light pieces while still
+## being visible against the background, so the two sides remain tellable apart.
 static func tint_for(side: int) -> Color:
 	if side == BoardState.LIGHT:
 		return Color(0.98, 0.94, 0.86)
-	return Color(0.16, 0.14, 0.13)
+	return Color(0.58, 0.50, 0.45)
 
 
 ## Rough stand-ins, only reached when the SVGs have not been imported. Enough to
