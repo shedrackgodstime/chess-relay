@@ -292,6 +292,81 @@ func _last_move_and_side_checks() -> void:
 
 
 ## The king-in-check highlight: the same frame the selection uses, in red.
+## A pawn in hand plus a tap at the opponent's end of the board must not open the
+## promotion overlay, and choosing from it must never leave a pawn that looks
+## like a queen but still moves like a pawn.
+func _promotion_refusal_checks() -> void:
+	print("Promotion refused")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+
+	main.game.state.squares.fill(BoardState.EMPTY)
+	main.game.state.set_square(4, 1,
+		BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+	# Rank index 7 is the promotion rank. The piece on it is not a pawn, so a
+	# pawn cannot push onto it and cannot capture straight ahead either: the move
+	# is impossible, which is exactly the case that used to open the overlay.
+	main.game.state.set_square(4, 7,
+		BoardState.encode(PieceProfiles.Type.ROOK, BoardState.DARK))
+	main.game.state.set_square(0, 0,
+		BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	main.game.state.set_square(7, 7,
+		BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
+	main.game.state.side_to_move = BoardState.LIGHT
+
+	# The generated scene has all thirty-two pieces in it; they are not on the
+	# board any more and would swallow taps.
+	var keep := [Vector2i(4, 1), Vector2i(4, 7), Vector2i(0, 0), Vector2i(7, 7)]
+	for square: Vector2i in main.pieces.keys():
+		if keep.has(square):
+			continue
+		var extra: Node = main.pieces[square]
+		main.pieces.erase(square)
+		extra.queue_free()
+	(main.pieces[Vector2i(4, 1)] as PieceView).side = BoardState.LIGHT
+	(main.pieces[Vector2i(4, 7)] as PieceView).side = BoardState.DARK
+	await process_frame
+	main._collect_pieces()
+	await process_frame
+
+	# A move no pawn could make, which still points at the promotion rank.
+	var impossible := ChessMove.new(Vector2i(4, 1), Vector2i(4, 7))
+	_check("a pawn move onto the far rank is a promotion by rank but not by law",
+		Rules.is_promotion(main.game.state, impossible)
+			and not main.game.is_legal(impossible), "")
+
+	main.selected = Vector2i(4, 1)
+	main._tap(main.camera.unproject_position(
+		BoardMesh.square_position(4, 7)))
+	_check("no overlay for an impossible pawn move",
+		main._pending_promotion == null and not main.hud.promotion_picker.visible,
+		"pending=%s" % main._pending_promotion)
+	_check("and nothing moved", main.pieces.has(Vector2i(4, 1)), "")
+
+	# Choosing anyway, if something else ever opens it, must leave the view
+	# agreeing with the board.
+	main._pending_promotion = ChessMove.new(Vector2i(4, 1), Vector2i(4, 7))
+	var pawn: PieceView = main.pieces[Vector2i(4, 1)]
+	main._on_promotion_chosen(PieceProfiles.Type.QUEEN)
+	await process_frame
+	_check("a refused promotion leaves the piece a pawn",
+		pawn.piece_type == PieceProfiles.Type.PAWN,
+		"piece=%s" % PieceProfiles.type_name(pawn.piece_type))
+	_check("the board still holds the pawn",
+		BoardState.decode(main.game.state.at(4, 1))
+			== Vector2i(PieceProfiles.Type.PAWN, BoardState.LIGHT), "")
+	_check("the rook is still on the square it stood on",
+		BoardState.decode(main.game.state.at(4, 7))
+			== Vector2i(PieceProfiles.Type.ROOK, BoardState.DARK), "")
+
+	scene.queue_free()
+	await process_frame
+
+
 func _check_marker_checks() -> void:
 	print("Check highlight")
 	var scene := (load("res://main.tscn") as PackedScene).instantiate()
@@ -468,6 +543,7 @@ func _promotion_checks() -> void:
 		not main.hud.promotion_picker.visible, "")
 	_check("no promotion is left pending", main._pending_promotion == null, "")
 
+	await _promotion_refusal_checks()
 	scene.queue_free()
 	await process_frame
 

@@ -279,8 +279,14 @@ func _tap(screen_position: Vector2) -> void:
 	# the player has said which piece, rather than applying a queen and changing
 	# it afterwards: the glide would animate the wrong piece, and the opponent's
 	# copy would have to be told about it after the fact.
-	if Rules.is_promotion(game.state, move) and move.promotion < 0 \
-			and _may_ask_for_promotion():
+	#
+	# Legality first, without exception. is_promotion only asks whether a pawn is
+	# heading for the far rank, so on its own it fires for any pawn move in that
+	# direction, including one sideways or onto an occupied square. Holding a pawn
+	# and tapping the opponent's end of the board used to open this overlay for a
+	# move that was never going to be accepted.
+	if move.promotion < 0 and Rules.is_promotion(game.state, move) \
+			and game.is_legal(move) and _may_ask_for_promotion():
 		_pending_promotion = move
 		hud.ask_promotion(player_side)
 		_deselect()
@@ -329,13 +335,17 @@ func _on_promotion_chosen(type: int) -> void:
 	if move == null:
 		return
 	move.promotion = type
-	# The view is updated before the move is applied, so the piece that glides
-	# across the board is already the one that was chosen rather than a pawn
-	# wearing a new mesh on arrival.
-	if pieces.has(move.from_square):
-		(pieces[move.from_square] as PieceView).piece_type = type
-	if game.apply_move(move):
-		_maybe_ai_move()
+	if not game.apply_move(move):
+		# Refused, so nothing changed on the board. The view is left alone too:
+		# changing the piece type first left a pawn that had turned into a queen
+		# but still moved like a pawn, because the state and the mesh disagreed.
+		_deselect()
+		return
+	# Only now that the move is on the board does the piece become the chosen
+	# one, and it is the same node rebuilt in place rather than replaced.
+	if pieces.has(move.to_square):
+		(pieces[move.to_square] as PieceView).piece_type = type
+	_maybe_ai_move()
 
 
 ## The side the opponent plays: always the one the player is not.
