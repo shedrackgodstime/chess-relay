@@ -124,7 +124,8 @@ what needs deciding, and it applies to any piece standing in front of any square
 not specially to the e-file or to pawns.
 
 Two possible fixes, not yet decided:
-- Raise the default pitch to 50.
+- ~~Raise the default pitch to 50.~~ Tried, measured, and put back: it fixed nothing,
+  because the pitch was never the cause. See the correction above.
 - Make picking prefer a piece that is behind a nearer blocker. Riskier: it changes
   what every tap means, not just this one case.
 
@@ -135,7 +136,6 @@ Two possible fixes, not yet decided:
 | What | Now | Shipping | Where |
 | --- | --- | --- | --- |
 | Legal-destination hints | **on** | **off** | `Indicators.DEV_DEFAULT`, `settings/indicators.gd` |
-| Camera pitch | **50°** | 45° or keep 50 | `framing_height` / `framing_distance`, `main.gd` |
 | Voice control | shown | follows `ai_opponent` | `Main.DEV_SHOW_VOICE`, `main.gd` |
 
 Both are on so every feature can be watched working while the game is still being
@@ -191,8 +191,7 @@ incomplete. `Rules` is the only place that needs to change.
   Note that `game.reset()` alone is not enough: capture frees the victim nodes, so
   the piece registry and the scene both have to be rebuilt.
 - ~~**Hint the legal moves** for the selected piece.~~ Done, behind the
-  `Indicators.show_legal_moves` setting, off by default. `Rules.pseudo_legal_moves` is
-  already available and it is a small addition.
+  `Indicators.show_legal_moves` setting, on temporarily for review.
 
 ## Decided, do not relitigate
 
