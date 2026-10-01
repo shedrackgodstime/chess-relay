@@ -55,12 +55,23 @@ already selected, not on some mode flag.
 
 ### Mark the last move
 
-The move just played should be marked at both ends, from and to, so a player can
-see what happened last without remembering it. Squares are already highlightable
-(`board/square_highlight.gd`), so this is presentation over existing state.
+Done. `board/last_move_marker.gd` marks both ends of the move just played,
+deliberately faint and separate from the selection highlight: selection says
+"this is what you are holding", the marker says "this is what just happened",
+and the marker has to stay visible when nothing is selected, which is most of
+the time.
 
-Related and probably wanted in the same pass: mark the piece that is check, and
-the last piece that moved. The turn label already says whose move it is.
+Still owed from the same family: mark the king that is in check. That one wants
+to be loud, unlike the last move.
+
+### Choosing a side
+
+Done. `ui/side_picker.gd` asks before the first move, and the camera turns to
+face the chosen side, since a Black player otherwise opens the game looking at
+the back of White's pieces. The choice is closed once a move is played.
+
+Still owed: the choice is not currently reachable again from the menu button, so
+a player who wants to change side has to restart. Fine for now, but it is a gap.
 
 ### Promotion
 

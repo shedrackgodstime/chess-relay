@@ -54,6 +54,7 @@ func _init() -> void:
 
 	await _promotion_checks()
 	await _selection_checks()
+	await _last_move_and_side_checks()
 
 	scene.queue_free()
 	await _side_ownership_checks()
@@ -172,6 +173,84 @@ func _selection_checks() -> void:
 	_tap_square(main, Vector2i(1, 2))
 	_check("a held piece still moves to an empty square with another held first",
 		main.pieces.has(Vector2i(1, 2)), "selected=%s" % main.selected)
+
+	scene.queue_free()
+	await process_frame
+
+
+## The last-move marker and choosing a side.
+##
+## Both matter beyond their own feature: a Black player opening on White's side
+## of the board is the whole point of the choice, so the camera has to follow it.
+func _last_move_and_side_checks() -> void:
+	print("Last move and side choice")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+
+	# The side chooser first, while the game is still unstarted. Playing a move
+	# closes it, correctly, so checking it afterwards proves nothing.
+	var picker: SidePicker = main.hud.side_picker
+	_check("the side chooser is offered at the start", picker != null and picker.visible, "")
+	_check("it offers both sides", picker.card_count() == 2, "cards=%d" % picker.card_count())
+	_check("the board starts facing White",
+		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.LIGHT)),
+		"yaw=%.1f" % main.camera.yaw_degrees)
+
+	main._on_side_chosen(BoardState.DARK)
+	await process_frame
+	_check("choosing Black takes the dark side",
+		main.player_side == BoardState.DARK, "side=%d" % main.player_side)
+	_check("the opponent is then the light side",
+		main.opponent_side() == BoardState.LIGHT, "")
+	_check("the board turns to face the new side",
+		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.DARK)),
+		"yaw=%.1f" % main.camera.yaw_degrees)
+	_check("the chooser closes once a side is taken", not picker.visible, "")
+
+	# The marker, on the a-file rather than the e-file: at this pitch the king on
+	# e1 swallows taps on e2, which is a separate problem and its own test.
+	_check("no marker before anything has been played", not main.last_move.is_marked(), "")
+	_tap_square(main, Vector2i(0, 1))
+	_tap_square(main, Vector2i(0, 3))
+	_check("the move marks both ends",
+		main.last_move.is_marked()
+			and main.last_move.marked_from() == Vector2i(0, 1)
+			and main.last_move.marked_to() == Vector2i(0, 3),
+		"from=%s to=%s" % [main.last_move.marked_from(), main.last_move.marked_to()])
+	_check("the marker has geometry",
+		main.last_move.mesh != null
+			and main.last_move.mesh.get_surface_count() >= 1, "")
+	_check("the side chooser is not offered again once play starts",
+		not main.hud.side_picker.visible, "")
+
+	_tap_square(main, Vector2i(1, 1))
+	_tap_square(main, Vector2i(1, 3))
+	_check("the marker follows the newest move",
+		main.last_move.marked_from() == Vector2i(1, 1)
+			and main.last_move.marked_to() == Vector2i(1, 3),
+		"from=%s to=%s" % [main.last_move.marked_from(), main.last_move.marked_to()])
+	_check("the side chooser knows the game has started",
+		not picker.should_offer(main.game), "")
+
+	# Ownership follows the chosen side. With an opponent on, a Black player must
+	# be able to pick up black pieces and must not be able to pick up white ones.
+	main.ai_opponent = true
+	# Black to move. After the two moves above it is White's turn, and a Black
+	# player may not touch anything then, which is a different rule and is
+	# already covered by the side-ownership checks.
+	main.game.state.side_to_move = BoardState.DARK
+	main._deselect()
+	_tap_square(main, Vector2i(0, 6))
+	_check("a Black player picks up their own pieces",
+		main.selected == Vector2i(0, 6), "selected=%s" % main.selected)
+	main._deselect()
+	_tap_square(main, Vector2i(1, 0))
+	_check("a Black player cannot pick up a white piece",
+		main.selected == Vector2i(-1, -1), "selected=%s" % main.selected)
 
 	scene.queue_free()
 	await process_frame

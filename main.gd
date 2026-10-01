@@ -13,6 +13,7 @@ extends Node3D
 @onready var camera: OrbitCamera = $World/Camera
 @onready var highlight: SquareHighlight = $World/Highlight
 @onready var hud: Hud = $UILayer/Hud
+@onready var last_move: LastMoveMarker = $World/LastMove
 @onready var tray_light: TrayView = $World/TrayLight
 @onready var tray_dark: TrayView = $World/TrayDark
 
@@ -42,8 +43,14 @@ const AI_DELAY_SECONDS := 0.8
 ## pieces.
 @export_enum("Light", "Dark") var player_side: int = BoardState.LIGHT:
 	set(value):
-		player_side = clampi(value, 0, 1)
+		value = clampi(value, 0, 1)
+		if value == player_side:
+			return
+		player_side = value
 		_deselect()
+		# The view has to follow the side, or a Black player opens the game looking
+		# at the back of White's pieces.
+		frame_board()
 
 ## Dev only. The voice controls stay up in every mode so the affordance can be
 ## exercised without a second device on the network. Flip this to false once the
@@ -60,9 +67,10 @@ const TAP_MAX_SECONDS := 0.6
 ## is 8.76 across, so this comfortably covers it from any allowed zoom.
 const PICK_RAY_LENGTH := 40.0
 
-## Yaw the reset view sits at: looking in from the player's own side, so their
-## pieces are at the bottom of the screen and the opponent's at the top.
-const DEFAULT_YAW := 180.0
+## Yaw that looks in from a given side, so that side's pieces are at the bottom
+## of the screen. White is on the low ranks and so on the -Z side.
+static func yaw_for_side(side: int) -> float:
+	return 180.0 if side == BoardState.LIGHT else 0.0
 
 var _press_position := Vector2.ZERO
 var _press_time := 0.0
@@ -97,8 +105,11 @@ func _ready() -> void:
 		game.finished.connect(_on_game_finished)
 	if hud.promotion_picker != null:
 		hud.promotion_picker.chosen.connect(_on_promotion_chosen)
+	if hud.side_picker != null:
+		hud.side_picker.side_chosen.connect(_on_side_chosen)
 	hud.bind()
 	_on_game_finished(game.result())
+	hud.offer_side_choice(player_side)
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Voice is a property of the mode, so it is decided once here rather than
 	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
@@ -133,7 +144,12 @@ func _on_menu_requested() -> void:
 func _on_flip_requested() -> void:
 	if camera == null:
 		return
-	var target := 180.0 if fmod(camera.yaw_degrees, 360.0) < 90.0 else 0.0
+	# Flips to the other side's view. Derived from the player's side rather than
+	# from the current yaw, so it still alternates correctly after the player has
+	# changed sides.
+	var target := yaw_for_side(opponent_side()) \
+		if is_equal_approx(fmod(camera.yaw_degrees, 360.0), yaw_for_side(player_side)) \
+		else yaw_for_side(player_side)
 	camera.reset_view(Vector3.ZERO, target, _framing_pitch(), _framing_distance())
 
 
@@ -169,7 +185,7 @@ func _register_subtree(node: Node) -> void:
 func frame_board() -> void:
 	if camera == null:
 		return
-	camera.reset_view(Vector3.ZERO, DEFAULT_YAW, _framing_pitch(), _framing_distance())
+	camera.reset_view(Vector3.ZERO, yaw_for_side(player_side), _framing_pitch(), _framing_distance())
 
 
 ## Pitch and distance that frame the board, derived from the exported ratios
@@ -267,7 +283,20 @@ func _tap(screen_position: Vector2) -> void:
 		return
 	if game.apply_move(move):
 		_deselect()
+		# The choice was made at the first tap; from here on it is not offered.
+		hud.close_side_choice()
 		_maybe_ai_move()
+
+
+## Takes the side the player chose.
+##
+## Only legal before anything has moved: handing over a position that is already
+## in progress would mean the player adopting pieces they did not move, and the
+## AI carrying the side they were about to pick up.
+func _on_side_chosen(side: int) -> void:
+	if game.history.is_empty():
+		player_side = side
+	hud.close_side_choice()
 
 
 ## Announces the end, and stops the game being played on.
@@ -419,6 +448,9 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	pieces[move.to_square] = piece
 	piece.home_square = move.to_square
 	hud.set_turn(game.state.side_to_move, game.history.size())
+	# Both ends of the move, so an opponent's reply can be seen to land where it
+	# was expected to rather than having to be remembered.
+	last_move.show_move(move.from_square, move.to_square)
 	_refresh_trays()
 	piece.glide_to(
 		BoardMesh.square_position(move.to_square.x, move.to_square.y),

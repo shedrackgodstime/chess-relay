@@ -277,7 +277,7 @@ func _reset_checks(main: Main) -> void:
 	# The default view looks in from the player's own side, so their pieces are
 	# at the bottom of the screen and the opponent's at the top.
 	_check("reset looks in from the player's side",
-		is_equal_approx(camera.yaw_degrees, Main.DEFAULT_YAW),
+		is_equal_approx(camera.yaw_degrees, Main.yaw_for_side(main.player_side)),
 		"yaw=%.1f" % camera.yaw_degrees)
 	_check("reset restores a usable distance", camera.distance < 15.0,
 		"dist=%.1f" % camera.distance)

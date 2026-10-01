@@ -29,6 +29,7 @@ func _init() -> void:
 
 	world.add_child(_board())
 	world.add_child(_highlight())
+	world.add_child(_last_move())
 	world.add_child(_pieces())
 	world.add_child(_table())
 	world.add_child(_tray("TrayLight", LIGHT))
@@ -77,6 +78,14 @@ func _highlight() -> MeshInstance3D:
 	highlight.name = "Highlight"
 	highlight.set_script(load("res://board/square_highlight.gd"))
 	return highlight
+
+
+## The from-and-to marker for the move just played.
+func _last_move() -> MeshInstance3D:
+	var marker := MeshInstance3D.new()
+	marker.name = "LastMove"
+	marker.set_script(load("res://board/last_move_marker.gd"))
+	return marker
 
 
 func _pieces() -> Node3D:
@@ -152,6 +161,7 @@ func _hud() -> Control:
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
 	hud.add_child(_game_over_label())
+	hud.add_child(_side_picker())
 	hud.add_child(_promotion_picker())
 	return hud
 
@@ -199,6 +209,15 @@ func _control_column() -> VBoxContainer:
 
 ## The menu button sits in the top-right corner, away from the view controls
 ## so it never gets hit by accident mid-game.
+## Choose a side before the game starts. Above the banner: it comes first.
+func _side_picker() -> Control:
+	var picker := Control.new()
+	picker.name = "SidePicker"
+	picker.unique_name_in_owner = true
+	picker.set_script(load("res://ui/side_picker.gd"))
+	return picker
+
+
 ## The end-of-game banner. Above the board, below the promotion overlay, and
 ## hidden until there is something to say.
 func _game_over_label() -> Label:
