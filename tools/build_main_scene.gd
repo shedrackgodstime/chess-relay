@@ -345,13 +345,29 @@ func _menu_panel() -> Control:
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.add_child(backdrop)
 
+	# Centred, and sized by what is inside it rather than by numbers. A card that hugs
+	# its contents cannot end up with a row hanging outside it when the rows change,
+	# which a fixed 380x300 only avoids until someone edits the list.
+	var centre := CenterContainer.new()
+	centre.name = "Centre"
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(centre)
+
+	# Opaque. The dimmed backdrop behind it is what says "the game is paused"; the
+	# card itself is what the words are legible on, and a translucent one put the text
+	# directly over the board.
+	var card := PanelContainer.new()
+	card.name = "Card"
+	card.unique_name_in_owner = true
+	card.custom_minimum_size = Vector2(340.0, 0.0)
+	card.add_theme_stylebox_override("panel", _card_box())
+	centre.add_child(card)
+
 	var column := VBoxContainer.new()
 	column.name = "Column"
-	column.set_anchors_preset(Control.PRESET_CENTER)
-	column.position = Vector2(-190.0, -150.0)
-	column.size = Vector2(380.0, 300.0)
 	column.add_theme_constant_override("separation", 10)
-	panel.add_child(column)
+	card.add_child(column)
 
 	var rows := VBoxContainer.new()
 	rows.name = "MenuRows"
@@ -397,6 +413,21 @@ func _menu_panel() -> Control:
 	cancel.visible = false
 	column.add_child(cancel)
 	return panel
+
+
+## The card the menu rows sit in: opaque, rounded to match the buttons, with margins
+## wide enough that nothing touches its edge.
+##
+## Its own stylebox rather than the buttons', because the margins are content margins
+## and a shared resource would push every button on the board out by eighteen pixels.
+func _card_box() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.11, 0.09, 0.08, 1.0)
+	box.border_color = Color(0.30, 0.24, 0.18, 1.0)
+	box.set_border_width_all(2)
+	box.set_corner_radius_all(14)
+	box.set_content_margin_all(18.0)
+	return box
 
 
 ## One full-width row of the menu. Text rather than an icon, because these are the

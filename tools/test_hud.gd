@@ -494,6 +494,30 @@ func _menu_checks(main: Main, hud: Hud) -> void:
 		(hud.menu_panel.get_node("Backdrop") as Control).mouse_filter
 			== Control.MOUSE_FILTER_STOP, "")
 
+	# The rows must sit inside an opaque card that hugs them, so nothing is left
+	# hanging over the dimmed board and no text sits on translucent fill.
+	var card := hud.menu_panel.get_node("Centre/Card") as PanelContainer
+	_check("the rows sit in a card", card != null, "")
+	if card != null:
+		var box := card.get_theme_stylebox("panel") as StyleBoxFlat
+		_check("and the card is opaque", box != null and box.bg_color.a >= 1.0,
+			"alpha=%.2f" % (box.bg_color.a if box != null else -1.0))
+		var rows_box := card.get_child(0) as Control
+		_check("the card is no wider than it needs",
+			card.size.x - (box.get_content_margin(SIDE_LEFT)
+				+ box.get_content_margin(SIDE_RIGHT))
+				<= maxf(rows_box.get_combined_minimum_size().x, 340.0) + 1.0,
+			"card=%.0f content=%.0f" % [card.size.x,
+				rows_box.get_combined_minimum_size().x])
+		_check("and no taller",
+			card.size.y - (box.get_content_margin(SIDE_TOP)
+				+ box.get_content_margin(SIDE_BOTTOM))
+				<= rows_box.get_combined_minimum_size().y + 1.0,
+			"card=%.0f content=%.0f" % [card.size.y,
+				rows_box.get_combined_minimum_size().y])
+		_check("and the confirmation shares the same card, so it does not jump",
+			card.get_child_count() == 1, "")
+
 	var got := {"new_game": 0, "resign": 0, "exit": 0}
 	hud.new_game_requested.connect(func() -> void: got["new_game"] += 1)
 	hud.resign_requested.connect(func() -> void: got["resign"] += 1)

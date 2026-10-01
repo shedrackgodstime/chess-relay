@@ -188,6 +188,11 @@ incomplete. `Rules` is the only place that needs to change.
 - **Voice.** The button cycles off, requesting, live and emits
   `voice_state_changed`, which has no listener. Needs capture, an encode path,
   transport, and `RECORD_AUDIO` on Android.
+- **The menu rows sit in an opaque card that hugs them.** A dimmed backdrop says the
+  game is paused; the card is what the words are legible on. Sized by its contents
+  rather than by fixed numbers, so a row cannot end up hanging outside it when the list
+  changes. It has its own stylebox because the margins are content margins and sharing
+  the buttons' would push every button on the board out by eighteen pixels.
 - **The in-game menu exists.** Menu button, hidden-while-playing panel: New game
   (confirmed), Resign (confirmed), a legal-hints toggle, a graphics-quality option, and
   Exit (confirmed). Nothing destructive fires on the first tap; the confirmation
