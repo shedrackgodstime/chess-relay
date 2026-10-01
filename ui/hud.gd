@@ -21,33 +21,7 @@ signal reset_view_requested
 signal flip_requested
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
-## Shows the live camera framing so it can be read off the screen and copied.
-##
-## The default framing is derived from two ratios in Main rather than from the
-## camera itself, so a value the player likes has to be read out and fed back in
-## by hand. This is the seam that makes that possible without guessing.
-func set_camera_readout(yaw: float, pitch: float, distance: float) -> void:
-	if camera_readout == null:
-		return
-	camera_readout.text = camera_framing_text(yaw, pitch, distance)
-
-
-## The framing as one line, in a form that can be pasted straight into a change.
-static func camera_framing_text(yaw: float, pitch: float, distance: float) -> String:
-	return "yaw %.1f  pitch %.1f  distance %.2f" % [yaw, pitch, distance]
-
-
-## Puts the current framing on the clipboard, so it can be pasted elsewhere
-## without having to read six digits off a phone screen by eye.
-func copy_camera_framing() -> void:
-	if camera_readout == null:
-		return
-	var text := camera_readout.text
-	DisplayServer.clipboard_set(text)
-	camera_readout.text = "copied: " + text
-
-
-## Size of one captured-piece silhouette in a tray. Requesting is separate from
+## The three states the mic control can present. Requesting is separate from
 ## live on purpose: asking for voice and speaking are different things, and
 ## collapsing them would leave the player unsure whether anyone heard them.
 enum VoiceState {
@@ -74,7 +48,6 @@ signal voice_state_changed(state: VoiceState)
 @onready var flip_button: Button = %FlipButton
 @onready var reset_button: Button = %ResetButton
 @onready var menu_button: Button = %MenuButton
-@onready var camera_readout: Label = %CameraReadout
 @onready var mic_button: Button = %MicButton
 
 ## Current presentation state of the mic control.

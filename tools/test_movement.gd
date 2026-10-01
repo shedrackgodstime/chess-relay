@@ -1,6 +1,6 @@
 extends SceneTree
 
-## Headless checks for piece movement and captures.
+## Headless checks for piece movement, captures and side ownership.
 ##
 ## No legality is asserted — there is none yet, by design. What is asserted is
 ## the machinery: the registry tracks every piece, taps move the selection,
@@ -80,6 +80,8 @@ func _init() -> void:
 	_check("knight registry follows", knight.home_square == Vector2i(2, 2), "")
 
 	scene.queue_free()
+	await _side_ownership_checks()
+
 	if _failures == 0:
 		print("movement: all checks passed")
 	else:
@@ -115,3 +117,67 @@ func _check(label: String, ok: bool, detail: String) -> void:
 	else:
 		_failures += 1
 		printerr("  FAIL %s  %s" % [label, detail])
+
+
+## The opponent is always the other side. Flipping the board is a camera move and
+## must never change who you control, and neither side's pieces may be picked up
+## on the other's turn.
+##
+## Runs on its own scene: it turns the AI on, which starts replying, and that
+## would fight with the shared scene's state.
+func _side_ownership_checks() -> void:
+	print("Side ownership")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = true
+	main.player_side = BoardState.LIGHT
+
+	_check("player starts on the light side", main.player_side == BoardState.LIGHT, "")
+	_check("opponent is the other side", main.opponent_side() == BoardState.DARK,
+		"opponent=%d" % main.opponent_side())
+
+	# Flipping is a camera move and must not reassign sides. Checked while it is
+	# still the player's turn, since that is the only time a piece is pickable.
+	main.camera.reset_view(Vector3.ZERO, 180.0, 41.9, 10.81)
+	_check("flipping does not change your side",
+		main.player_side == BoardState.LIGHT
+			and main.opponent_side() == BoardState.DARK,
+		"player=%d opponent=%d" % [main.player_side, main.opponent_side()])
+	_tap_square(main, Vector2i(1, 1))
+	_check("you still play the same pieces when the board is flipped",
+		main.selected == Vector2i(1, 1), "selected=%s" % main.selected)
+	main._deselect()
+
+	# The opponent's pieces are not yours to touch, even on your own turn.
+	_tap_square(main, Vector2i(0, 6))
+	_check("opponent piece cannot be picked up",
+		main.selected == Vector2i(-1, -1), "selected=%s" % main.selected)
+
+	# Yours are.
+	_tap_square(main, Vector2i(0, 1))
+	_check("own piece picks up", main.selected == Vector2i(0, 1),
+		"selected=%s" % main.selected)
+	_tap_square(main, Vector2i(0, 3))
+	_check("own piece moves",
+		main.selected == Vector2i(-1, -1)
+			and main.game.state.side_to_move == BoardState.DARK,
+		"to move=%d" % main.game.state.side_to_move)
+
+	# Now it is the opponent's turn, so your pieces are inert until it replies.
+	_tap_square(main, Vector2i(1, 1))
+	_check("own piece is inert on the opponent's turn",
+		main.selected == Vector2i(-1, -1), "selected=%s" % main.selected)
+
+	# Without an opponent both sides are playable, so the rules engine can be
+	# driven from one device.
+	main.ai_opponent = false
+	main._deselect()
+	_tap_square(main, Vector2i(1, 6))
+	_check("with no opponent either side can be played",
+		main.selected == Vector2i(1, 6), "selected=%s" % main.selected)
+
+	scene.queue_free()
+	await process_frame

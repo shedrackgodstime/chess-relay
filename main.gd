@@ -33,9 +33,17 @@ var game := ChessGame.new()
 
 ## The AI plays Dark a short beat after every move that leaves it to move.
 ## Off in tests, on for the demo; the funnel does not care who submits.
-const AI_SIDE := BoardState.DARK
+
 const AI_DELAY_SECONDS := 0.8
 @export var ai_opponent := true
+
+## The side the human plays. The opponent is always the other one, so flipping
+## the board is purely cosmetic and can never hand the player the other side's
+## pieces.
+@export_enum("Light", "Dark") var player_side: int = BoardState.LIGHT:
+	set(value):
+		player_side = clampi(value, 0, 1)
+		_deselect()
 
 ## Dev only. The voice controls stay up in every mode so the affordance can be
 ## exercised without a second device on the network. Flip this to false once the
@@ -57,8 +65,13 @@ var _press_time := 0.0
 var _press_active := false
 var _press_moved := false
 
-## Camera placement as multiples of the board's half-extent, so the default
-## view survives a change to BoardMesh's dimensions.
+## Camera placement as multiples of the board's half-extent, so the default view
+## survives a change to BoardMesh's dimensions.
+##
+## The current pair was set from an on-screen readout: yaw 0.2, pitch 41.9,
+## distance 10.81. These two encode that angle and reach rather than being them,
+## so to go back to a raw pitch and distance, take the ratio length as
+## distance / (half-extent + frame margin) and split it by the pitch angle.
 @export_range(0.5, 4.0) var framing_height := 1.648235:
 	set(value):
 		framing_height = value
@@ -202,16 +215,47 @@ func _tap(screen_position: Vector2) -> void:
 		_deselect()
 		return
 	if selected.x < 0:
-		if pieces.has(square):
+		if _may_take(square):
 			selected = square
 			highlight.show_at(square.x, square.y)
 		return
 	if square == selected:
 		_deselect()
 		return
+	# A piece already in hand can only be released on a legal turn. Without
+	# this the player could move their own pieces while it was the opponent's
+	# move, which puts two sides in the same game.
+	if not _may_move_now():
+		_deselect()
+		return
 	if game.apply_move(ChessMove.new(selected, square)):
 		_deselect()
 		_maybe_ai_move()
+
+
+## The side the opponent plays: always the one the player is not.
+func opponent_side() -> int:
+	return 1 - player_side
+
+
+## Whether this square may be picked up right now.
+##
+## With an AI opponent the player only ever touches their own side, and only on
+## their own turn. Without one, both sides are playable so the rules engine can
+## be driven from a single device.
+func _may_take(square: Vector2i) -> bool:
+	if not pieces.has(square):
+		return false
+	if not ai_opponent:
+		return true
+	var piece: PieceView = pieces[square]
+	return piece.side == player_side and game.state.side_to_move == player_side
+
+
+func _may_move_now() -> bool:
+	if not ai_opponent:
+		return true
+	return game.state.side_to_move == player_side
 
 
 ## Which board square a screen point refers to, preferring an actual piece
@@ -283,16 +327,6 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	)
 
 
-## Keeps the on-screen camera readout live, so a framing that looks right can be
-## read off the screen and fed back in instead of guessed at.
-func _process(_delta: float) -> void:
-	if hud == null or hud.camera_readout == null:
-		return
-	hud.set_camera_readout(
-		camera.yaw_degrees, camera.pitch_degrees, camera.distance
-	)
-
-
 ## Repaints both capture trays from the game's capture lists.
 ##
 ## Read from the game rather than pushed to the trays as moves happen, so a tray
@@ -309,14 +343,14 @@ func _refresh_trays() -> void:
 func _maybe_ai_move() -> void:
 	if not ai_opponent or _ai_thinking:
 		return
-	if game.state.side_to_move != AI_SIDE:
+	if game.state.side_to_move != opponent_side():
 		return
 	_ai_thinking = true
 	await get_tree().create_timer(AI_DELAY_SECONDS).timeout
 	_ai_thinking = false
-	if game.state.side_to_move != AI_SIDE:
+	if game.state.side_to_move != opponent_side():
 		return
-	var move := AiPlayer.choose_move(game, AI_SIDE)
+	var move := AiPlayer.choose_move(game, opponent_side())
 	if move != null:
 		game.apply_move(move)
 
