@@ -188,11 +188,26 @@ incomplete. `Rules` is the only place that needs to change.
 - **Voice.** The button cycles off, requesting, live and emits
   `voice_state_changed`, which has no listener. Needs capture, an encode path,
   transport, and `RECORD_AUDIO` on Android.
-- **The menu rows sit in an opaque card that hugs them.** A dimmed backdrop says the
-  game is paused; the card is what the words are legible on. Sized by its contents
-  rather than by fixed numbers, so a row cannot end up hanging outside it when the list
-  changes. It has its own stylebox because the margins are content margins and sharing
-  the buttons' would push every button on the board out by eighteen pixels.
+- **The menu is two rows: New game, Exit, and Close.** Resign, the hints toggle and
+  the quality dropdown are all gone from it. Two reasons, and the second is the one
+  that matters. They could not be understood from their own labels, which is a
+  sentence about how the menu was built rather than about the player. And settings
+  chosen before a game are settings chosen once: a pause menu is the wrong place for
+  them, because nobody reconfigures a board in the middle of a game they are trying to
+  win. **They belong in the lobby**, where there is time to explain what "Medium"
+  means and where choosing a side will happen too. Nothing is lost by moving them.
+- **Leaving the menu was impossible at first, and that was the worst bug in it.** The
+  backdrop swallowed every tap outside the card, there was no close button, and Cancel
+  was only reachable while a confirmation was up, so the panel could not be left
+  without choosing something. A menu you cannot back out of is a trap. Three ways out
+  now: tap outside the card, the back gesture or Escape, and a Close row that is
+  always there. While a confirmation is up, a tap outside dismisses the question rather
+  than dropping it silently.
+- **`ChessGame.resign()` exists and works but has no entry point.** It was reachable
+  from the menu for one commit and removed with the row. Keep the method: it is
+  correct, tested, and a resign row will want it back. Do not keep a menu row for it
+  yet.
+
 - **The in-game menu exists.** Menu button, hidden-while-playing panel: New game
   (confirmed), Resign (confirmed), a legal-hints toggle, a graphics-quality option, and
   Exit (confirmed). Nothing destructive fires on the first tap; the confirmation

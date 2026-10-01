@@ -518,6 +518,39 @@ func _menu_checks(main: Main, hud: Hud) -> void:
 		_check("and the confirmation shares the same card, so it does not jump",
 			card.get_child_count() == 1, "")
 
+	# Two rows only. Settings and Resign came out: neither could be understood from
+	# its own label, and settings chosen before a game are settings chosen once.
+	var labels: Array = []
+	for row in hud.menu_rows.get_children():
+		if row is Button:
+			labels.append((row as Button).text)
+	_check("the menu offers only new game, exit and a way out",
+		labels == ["New game", "Exit", "Close"], "%s" % str(labels))
+
+	# Leaving without choosing anything, which the first version made impossible.
+	hud.toggle_menu()
+	hud._on_backdrop_input(_tap())
+	await process_frame
+	_check("tapping outside closes it", not hud.menu_panel.visible, "")
+	hud.toggle_menu()
+	_check("and the back gesture closes it", hud.handle_cancel()
+		and not hud.menu_panel.visible, "")
+	_check("and says it consumed it", hud.handle_cancel(), "")
+	# A tap in the middle of the board while the panel is up.
+	main._tap(main.camera.unproject_position(Vector3.ZERO))
+	_check("a tap while it is open does not reach the board",
+		main.selected.x < 0, "selected=%s" % str(main.selected))
+
+	# While a confirmation is up, a stray tap outside dismisses the question rather
+	# than silently dropping it.
+	hud.toggle_menu()
+	hud.menu_new_game_button.pressed.emit()
+	await process_frame
+	hud._on_backdrop_input(_tap())
+	await process_frame
+	_check("a tap outside dismisses a question without answering it",
+		hud.menu_rows.visible and hud.menu_panel.visible, "")
+
 	var got := {"new_game": 0, "resign": 0, "exit": 0}
 	hud.new_game_requested.connect(func() -> void: got["new_game"] += 1)
 	hud.resign_requested.connect(func() -> void: got["resign"] += 1)
@@ -544,36 +577,29 @@ func _menu_checks(main: Main, hud: Hud) -> void:
 
 	# Change of mind must be free and must not leave the menu stuck on a question.
 	hud.toggle_menu()
-	hud.menu_resign_button.pressed.emit()
-	await process_frame
-	_check("resign asks first too", hud.menu_confirm_label.visible, "")
 	hud.menu_cancel_button.pressed.emit()
 	await process_frame
-	_check("cancelling does not resign", int(got["resign"]) == 0, "")
-	_check("and puts the rows back", hud.menu_rows.visible
-		and not hud.menu_confirm_label.visible, "")
+	_check("never mind does nothing", int(got["new_game"]) == 0, "")
 	hud.toggle_menu()
 
 	hud.toggle_menu()
 	hud.menu_exit_button.pressed.emit()
 	await process_frame
 	_check("exit asks first as well", hud.menu_confirm_label.visible, "")
-	_check("cancelling exit closes the menu instead, since there is nowhere to go",
-		_press(hud.menu_cancel_button) or not hud.menu_panel.visible, "")
+	hud.menu_cancel_button.pressed.emit()
+	await process_frame
+	_check("and can be declined", not hud.menu_panel.visible, "")
 
-	# The settings rows must report what is already set, so the menu never offers to
-	# change something to the value it already holds.
-	hud.refresh_menu_settings()
-	_check("the hints toggle reflects the setting",
-		hud.menu_hints_toggle.button_pressed == Indicators.show_legal_moves(), "")
-	hud.menu_hints_toggle.button_pressed = not Indicators.show_legal_moves()
-	hud.menu_hints_toggle.toggled.emit(hud.menu_hints_toggle.button_pressed)
-	_check("moving it writes the setting",
-		hud.menu_hints_toggle.button_pressed == Indicators.show_legal_moves(), "")
-	_check("and the quality option reflects the tier",
-		hud.menu_quality_option.selected == Quality.preset(), "")
 	hud.toggle_menu()
-	Indicators.set_show_legal_moves(false)
+
+
+
+## A tap event, as the backdrop would receive from a finger.
+func _tap() -> InputEventMouseButton:
+	var event := InputEventMouseButton.new()
+	event.button_index = MOUSE_BUTTON_LEFT
+	event.pressed = true
+	return event
 
 
 ## Presses a button the way a finger would and reports whether it was pressed.

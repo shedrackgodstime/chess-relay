@@ -296,6 +296,12 @@ func _framing_distance() -> float:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Escape and the Android back gesture close the menu and nothing else, so a
+	# player is never left inside it with no way out.
+	if event.is_action_pressed("ui_cancel"):
+		if hud.handle_cancel():
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseButton:
 		_tap_button((event as InputEventMouseButton).pressed,
 			(event as InputEventMouseButton).position,
