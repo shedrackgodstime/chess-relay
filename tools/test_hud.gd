@@ -431,8 +431,13 @@ func _network_checks(hud: Hud) -> void:
 		# only counted pixels passed while the control was invisible on a real
 		# screen: drawn is not visible, and a headless pixel count cannot tell the
 		# difference. This at least holds the number somewhere a person can see.
+		# The floor, not the answer. 0.22 was invisible and 0.42 too strong, so the
+		# bound only has to keep the number out of the range already known to fail;
+		# where inside that range it belongs is judged by eye.
 		_check("state %d draws its frame opaquely enough to see" % state,
-			Icons.SIGNAL_GHOST.a >= 0.35, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
+			Icons.SIGNAL_GHOST.a >= 0.28, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
+		_check("and the frame stays behind the live bars",
+			Icons.SIGNAL_GHOST.a <= 0.38, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
 		_check("and the live bars stay clearly brighter than the frame",
 			Icons.NETWORK_LIT_ALPHA - Icons.SIGNAL_GHOST.a > 0.4,
 			"ghost=%.2f lit=%.2f" % [Icons.SIGNAL_GHOST.a, Icons.NETWORK_LIT_ALPHA])

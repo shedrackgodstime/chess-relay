@@ -258,8 +258,15 @@ incomplete. `Rules` is the only place that needs to change.
   test counted the pixels, confirmed they were drawn and correctly separated from the
   live bars, and the control still read as nothing but a stray dot, which is worse than
   no frame because it looks broken. Drawn is not visible, and a headless pixel count
-  cannot tell the difference. It is at 0.42 with strokes wider than Lucide's 2, and
-  the test now holds the frame opaque enough to read rather than merely present. The test pins that the drawn frame is the same size in every state, by
+  cannot tell the difference. It was then judged **too strong** at 0.42, competing with
+  the live bars, and is now 0.32 with strokes wider than Lucide's 2. Both values were
+  judged by eye on a real screen and both were wrong: the first in the invisible
+  direction, the correction in the prominent one. A number chosen without looking at
+  the result is wrong in both directions at once, and a value found between two
+  known-bad ones is a probe, not a measurement. The test now bounds the frame between
+  0.28 and 0.38, which only keeps it out of the range already known to fail rather
+  than claiming to know where inside it belongs.
+  The test pins that the drawn frame is the same size in every state, by
   lit-plus-unlit, since a lit bar covers the frame beneath it.
   It is `MOUSE_FILTER_IGNORE` and takes no input: a control that looks live but does
   nothing is worse than none, and anything over the board can catch taps aimed at
