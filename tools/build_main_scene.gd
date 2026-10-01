@@ -151,6 +151,7 @@ func _hud() -> Control:
 	hud.add_child(_control_column())
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
+	hud.add_child(_camera_readout(hud))
 	return hud
 
 
@@ -375,6 +376,53 @@ func _tray(node_name: String, capturer: int) -> Node3D:
 		# Mirrored so the row of wells faces the board from both sides.
 		tray.scale = Vector3(-1.0, 1.0, 1.0)
 	return tray
+
+
+## Live camera framing, top-left where nothing else sits, with a copy button.
+##
+## Deliberately plain and always visible for now: it exists to be read off the
+## screen and pasted back in, and a control for hiding a debug panel would be
+## more surface than the panel is worth.
+func _camera_readout(hud: Hud) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = "CameraPanel"
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	panel.position = Vector2(12.0, 12.0)
+	panel.add_theme_stylebox_override("panel", _readout_box())
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	panel.add_child(row)
+
+	var label := Label.new()
+	label.name = "CameraReadout"
+	label.unique_name_in_owner = true
+	label.text = Hud.camera_framing_text(0.0, 0.0, 0.0)
+	label.add_theme_font_size_override("font_size", 15)
+	label.add_theme_color_override("font_color", Color(1.0, 0.94, 0.82))
+	row.add_child(label)
+
+	var copy := Button.new()
+	copy.name = "CopyCamera"
+	copy.text = "copy"
+	copy.focus_mode = Control.FOCUS_NONE
+	copy.pressed.connect(func() -> void: hud.copy_camera_framing())
+	row.add_child(copy)
+	return panel
+
+
+func _readout_box() -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = Color(0.06, 0.05, 0.05, 0.72)
+	box.set_corner_radius_all(8)
+	box.set_border_width_all(1)
+	box.border_color = Color(1.0, 0.88, 0.62, 0.22)
+	box.content_margin_left = 10.0
+	box.content_margin_right = 10.0
+	box.content_margin_top = 6.0
+	box.content_margin_bottom = 6.0
+	return box
 
 
 ## The round room enclosing the table.

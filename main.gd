@@ -283,6 +283,16 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	)
 
 
+## Keeps the on-screen camera readout live, so a framing that looks right can be
+## read off the screen and fed back in instead of guessed at.
+func _process(_delta: float) -> void:
+	if hud == null or hud.camera_readout == null:
+		return
+	hud.set_camera_readout(
+		camera.yaw_degrees, camera.pitch_degrees, camera.distance
+	)
+
+
 ## Repaints both capture trays from the game's capture lists.
 ##
 ## Read from the game rather than pushed to the trays as moves happen, so a tray

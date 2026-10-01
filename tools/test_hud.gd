@@ -21,6 +21,7 @@ func _init() -> void:
 	_asset_checks()
 	_layout_checks(main, hud)
 	_menu_check(main, hud)
+	_camera_readout_checks(main, hud)
 	_rotate_checks(main, hud)
 	_flip_checks(main)
 	_reset_checks(main)
@@ -209,6 +210,48 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 
 	_check("mic carries a glyph",
 		hud.mic_button.get_node_or_null("Glyph") is TextureRect, "")
+
+
+## The readout exists to be read and pasted, so it must show the live camera and
+## land the numbers on the clipboard.
+func _camera_readout_checks(main: Main, hud: Hud) -> void:
+	print("Camera readout")
+	_check("readout exists", hud.camera_readout != null, "")
+
+	var expected := Hud.camera_framing_text(12.5, 27.0, 9.75)
+	hud.set_camera_readout(12.5, 27.0, 9.75)
+	_check("readout shows the framing it is given",
+		hud.camera_readout.text == expected, "got=%s" % hud.camera_readout.text)
+
+	# One decimal on angles and two on distance, so a pasted value is precise
+	# enough to set and short enough to read.
+	_check("readout is copyable as a single line",
+		expected.count("\n") == 0 and expected.begins_with("yaw "),
+		"text=%s" % expected)
+
+	DisplayServer.clipboard_set("probe")
+	var clipboard_works := DisplayServer.clipboard_get() == "probe"
+	hud.copy_camera_framing()
+	# The headless display server has no clipboard, so the composed string is
+	# asserted directly and the read-back only where one exists.
+	_check("copy confirms the framing it copied",
+		hud.camera_readout.text == "copied: " + expected,
+		"text=%s" % hud.camera_readout.text)
+	if clipboard_works:
+		_check("copy puts the framing on the clipboard",
+			DisplayServer.clipboard_get() == expected,
+			"clip=%s" % DisplayServer.clipboard_get())
+
+	# The live path: the readout must track the camera it is reporting.
+	hud.set_camera_readout(
+		main.camera.yaw_degrees, main.camera.pitch_degrees, main.camera.distance
+	)
+	var live := hud.camera_readout.text
+	_check("readout matches the live camera",
+		live == Hud.camera_framing_text(
+			main.camera.yaw_degrees, main.camera.pitch_degrees, main.camera.distance),
+		"got=%s" % live)
+	hud.set_camera_readout(0.0, 0.0, 0.0)
 
 
 ## The menu button exists and announces itself; its screen is Phase 4.
