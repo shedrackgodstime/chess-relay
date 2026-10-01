@@ -15,6 +15,11 @@ const EMPTY := 0
 const LIGHT := 0
 const DARK := 1
 
+## Squares per side. The single source of truth for board size: the rules, the
+## state encoding and the scene geometry all read this rather than repeating 8,
+## so the logic and the visuals cannot drift apart.
+const BOARD_SIZE := 8
+
 ## Back-rank order from White's left, shared with the scene generator so the
 ## visual layout and the logical layout can never disagree on setup.
 const BACK_RANK := [

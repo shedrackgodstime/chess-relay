@@ -11,7 +11,8 @@ extends RefCounted
 ## board is one MeshInstance3D with three surfaces: light squares, dark squares
 ## and frame. That keeps the draw-call count and the node count low.
 
-const SQUARES := 8
+## Read from the state so the geometry and the rules cannot disagree on size.
+const SQUARES := BoardState.BOARD_SIZE
 const SQUARE_SIZE := 1.0
 ## Gap between squares, in world units, so each square reads as its own tile.
 const SQUARE_GAP := 0.035

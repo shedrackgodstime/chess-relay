@@ -50,19 +50,59 @@ func _init() -> void:
 		pawn.position.distance_to(BoardMesh.square_position(0, 3)) < 0.01,
 		"pos=%s" % pawn.position)
 
-	# Pawn takes pawn: white A4 x black A7-pawn standing on A6... use the black
-	# pawn's real square instead of inventing one.
+	await _capture_and_knight_checks()
+
+	scene.queue_free()
+	await _side_ownership_checks()
+
+	if _failures == 0:
+		print("movement: all checks passed")
+	else:
+		printerr("movement: %d check(s) failed" % _failures)
+	quit(1 if _failures > 0 else 0)
+
+
+## Capture and the knight, on their own scene.
+##
+## Separate because picking resolves to whatever is actually under the finger,
+## and the pawn left standing on a4 from the slide test sits in front of the
+## empty squares this needs. Sharing a board meant the e-pawn tried to move onto
+## a4 and was correctly refused.
+func _capture_and_knight_checks() -> void:
+	print("Capture and knight")
+	var scene := (load("res://main.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	await process_frame
+	await process_frame
+	var main: Main = scene
+	main.ai_opponent = false
+
+	# A capture the opening allows: a2-a4, b7-b5, then axb5. The black pawn has
+	# to step into reach first, because a pawn captures diagonally.
+	#
+	# The a- and b-files, not the e-file: from the default camera the player's
+	# own back rank is nearest, so the king on e1 stands in front of the e2 pawn
+	# and swallows the tap entirely. The e-file is unusable at this pitch.
+	_tap_square(main, Vector2i(0, 1))
 	_tap_square(main, Vector2i(0, 3))
-	var victim: PieceView = main.pieces[Vector2i(0, 6)]
-	_tap_square(main, Vector2i(0, 6))
-	_check("capture clears the victim square",
-		main.pieces.has(Vector2i(0, 6))
-			and (main.pieces[Vector2i(0, 6)] as PieceView).home_square == Vector2i(0, 6),
+	_tap_square(main, Vector2i(1, 6))
+	_tap_square(main, Vector2i(1, 4))
+	_check("the opening reaches a capture position",
+		main.pieces.has(Vector2i(0, 3)) and main.pieces.has(Vector2i(1, 4)),
+		"a4=%s b5=%s" % [main.pieces.has(Vector2i(0, 3)),
+			main.pieces.has(Vector2i(1, 4))])
+	var taker: PieceView = main.pieces[Vector2i(0, 3)]
+	var victim: PieceView = main.pieces[Vector2i(1, 4)]
+	_tap_square(main, Vector2i(0, 3))
+	_tap_square(main, Vector2i(1, 4))
+	_check("capture leaves the taker on the victim square",
+		main.pieces.has(Vector2i(1, 4))
+			and (main.pieces[Vector2i(1, 4)] as PieceView).home_square == Vector2i(1, 4),
 		"")
-	await _settle(pawn, BoardMesh.square_position(0, 6))
+	await _settle(taker, BoardMesh.square_position(1, 4))
 	_check("attacker lands on the victim square",
-		pawn.position.distance_to(BoardMesh.square_position(0, 6)) < 0.01,
-		"pos=%s" % pawn.position)
+		taker.position.distance_to(BoardMesh.square_position(1, 4)) < 0.01,
+		"pos=%s" % taker.position)
 	for i in 30:
 		await process_frame
 		if not is_instance_valid(victim):
@@ -80,13 +120,7 @@ func _init() -> void:
 	_check("knight registry follows", knight.home_square == Vector2i(2, 2), "")
 
 	scene.queue_free()
-	await _side_ownership_checks()
-
-	if _failures == 0:
-		print("movement: all checks passed")
-	else:
-		printerr("movement: %d check(s) failed" % _failures)
-	quit(1 if _failures > 0 else 0)
+	await process_frame
 
 
 ## Taps a square the way a finger would: on the piece's body when one is

@@ -104,9 +104,14 @@ func _convergence_checks() -> void:
 
 	var moves := [
 		ChessMove.new(Vector2i(4, 1), Vector2i(4, 3)),
-		ChessMove.new(Vector2i(3, 7), Vector2i(3, 5)),
+		# The d-pawn double step, from rank index 6. Index 7 is Black's queen on
+		# d7, and asking her to jump two squares is not a move.
+		ChessMove.new(Vector2i(3, 6), Vector2i(3, 4)),
 		ChessMove.new(Vector2i(5, 0), Vector2i(3, 2)),
-		ChessMove.new(Vector2i(0, 0), Vector2i(2, 2)),
+		# b1 to c3: the knight's hop. File 1 on rank index 0, which is where the
+		# white knight stands. Rank indices are 0-based, so index 1 is rank 2 and
+		# holds a pawn.
+		ChessMove.new(Vector2i(1, 0), Vector2i(2, 2)),
 		ChessMove.new(Vector2i(4, 3), Vector2i(4, 4)),
 	]
 	var seq := 0

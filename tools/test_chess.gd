@@ -32,12 +32,20 @@ func _capture_checks() -> void:
 		game.captures_by(BoardState.LIGHT).is_empty()
 			and game.captures_by(BoardState.DARK).is_empty(), "")
 
-	# White pawn on e4 takes the dark knight sitting on d5.
+	# A white pawn on d4 takes the dark knight on e5: a capture is diagonal,
+	# so the pawn cannot be standing directly behind its target.
+	#
+	# The board is cleared first. ChessGame.new() is a full opening position,
+	# so leaving it in place puts a black pawn on f6 and a white rook on a1, and
+	# every piece below fights with the ones already there.
+	game.state.squares.fill(BoardState.EMPTY)
 	var knight := BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.DARK)
-	game.state.set_square(3, 4, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
-	game.state.set_square(3, 3, knight)
+	game.state.set_square(3, 3, BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT))
+	game.state.set_square(4, 4, knight)
+	game.state.set_square(0, 0, BoardState.encode(PieceProfiles.Type.KING, BoardState.LIGHT))
+	game.state.set_square(7, 7, BoardState.encode(PieceProfiles.Type.KING, BoardState.DARK))
 	game.state.side_to_move = BoardState.LIGHT
-	game.apply_move(ChessMove.new(Vector2i(3, 4), Vector2i(3, 3)))
+	game.apply_move(ChessMove.new(Vector2i(3, 3), Vector2i(4, 4)))
 
 	_check("a capture is recorded for the capturing side",
 		game.captures_by(BoardState.LIGHT) == [knight],
@@ -45,12 +53,15 @@ func _capture_checks() -> void:
 	_check("the victim is not credited to the losing side",
 		game.captures_by(BoardState.DARK).is_empty(), "")
 
-	# Black recaptures: a pawn beside the white pawn that just landed, taking it.
+	# Black recaptures with the pawn on f6, taking the pawn that just landed on
+	# e5. Diagonally above its target, as a capturing pawn must be.
 	var pawn := BoardState.encode(PieceProfiles.Type.PAWN, BoardState.DARK)
-	game.state.set_square(4, 3, pawn)
-	game.apply_move(ChessMove.new(Vector2i(4, 3), Vector2i(3, 3)))
+	game.state.set_square(5, 5, pawn)
+	game.apply_move(ChessMove.new(Vector2i(5, 5), Vector2i(4, 4)))
+	# Black took the white pawn, so it is the light piece code that lands here.
 	_check("recapture lands on the other side's tray",
-		game.captures_by(BoardState.DARK).size() == 1,
+		game.captures_by(BoardState.DARK)
+			== [BoardState.encode(PieceProfiles.Type.PAWN, BoardState.LIGHT)],
 		str(game.captures_by(BoardState.DARK)))
 	_check("both trays fill independently",
 		game.captures_by(BoardState.LIGHT).size() == 1
@@ -63,10 +74,10 @@ func _capture_checks() -> void:
 		"light=%d dark=%d" % [game.material_captured_by(BoardState.LIGHT),
 			game.material_captured_by(BoardState.DARK)])
 
-	# A non-capturing move must not add anything.
+	# A non-capturing move must not add anything. The knight hops two ranks.
 	var before := game.captures_by(BoardState.LIGHT).size()
 	game.state.set_square(4, 4, BoardState.encode(PieceProfiles.Type.KNIGHT, BoardState.LIGHT))
-	game.apply_move(ChessMove.new(Vector2i(4, 4), Vector2i(5, 5)))
+	game.apply_move(ChessMove.new(Vector2i(4, 4), Vector2i(5, 6)))
 	_check("a quiet move adds no capture",
 		game.captures_by(BoardState.LIGHT).size() == before, "")
 
@@ -159,19 +170,24 @@ func _funnel_checks() -> void:
 		and int(emitted[0][1]) == BoardState.EMPTY,
 		"emitted=%d" % emitted.size())
 
-	# Queen takes the pawn that just advanced to e4.
-	game.apply_move(ChessMove.new(Vector2i(3, 7), Vector2i(4, 3)))
+	# 1... d5 2. exd5. A real capture: the black d-pawn comes down two and the
+	# white pawn on e4 takes it. The queen on d8 cannot reach e4 on any line,
+	# which with legality in place would have failed the whole funnel test.
+	_check("d7-d5 applies", game.apply_move(ChessMove.new(Vector2i(3, 6), Vector2i(3, 4))),
+		"")
+	_check("the capture applies", game.apply_move(ChessMove.new(Vector2i(4, 3), Vector2i(3, 4))),
+		"")
 	_check("capture reports the victim code",
-		int(emitted[1][1]) == BoardState.encode(PieceProfiles.Type.PAWN, 0),
-		"captured=%d" % int(emitted[1][1]))
-	_check("queen stands on the victim square",
-		BoardState.decode(game.state.at(4, 3)) == Vector2i(PieceProfiles.Type.QUEEN, 1),
+		int(emitted[2][1]) == BoardState.encode(PieceProfiles.Type.PAWN, 1),
+		"captured=%d" % int(emitted[2][1]))
+	_check("the taker stands on the victim square",
+		BoardState.decode(game.state.at(3, 4)) == Vector2i(PieceProfiles.Type.PAWN, 0),
 		"")
 
 	# Refusals change nothing and emit nothing.
 	var before := emitted.size()
 	_check("empty origin refused", not game.apply_move(ChessMove.new(Vector2i(3, 3), Vector2i(3, 4))),
-		"(d4 is vacant after the queen left d8 for e4)")
+		"(d4 is vacant in the opening position)")
 	_check("same square refused", not game.apply_move(ChessMove.new(Vector2i(3, 3), Vector2i(3, 3))),
 		"")
 	_check("off-board refused", not game.apply_move(ChessMove.new(Vector2i(0, 0), Vector2i(-1, 0))),

@@ -77,16 +77,30 @@ func apply_move(move: ChessMove) -> bool:
 			captured_by_light.append(captured)
 		else:
 			captured_by_dark.append(captured)
-	state.set_square(move.to_square.x, move.to_square.y,
-		state.at(move.from_square.x, move.from_square.y))
+	# Through the rules rather than copied across, so a pawn reaching the far
+	# rank actually promotes instead of arriving as a pawn that can never move
+	# again.
+	var landing := Rules.landing_code(state, move)
 	state.set_square(move.from_square.x, move.from_square.y, BoardState.EMPTY)
+	state.set_square(move.to_square.x, move.to_square.y, landing)
 	state.side_to_move = BoardState.DARK if state.side_to_move == BoardState.LIGHT else BoardState.LIGHT
 	history.append(move)
 	moved.emit(move, captured)
 	return true
 
 
-## Legality hook for the rules engine. True until then, so the visual
-## prototype keeps moving freely; callers already go through it.
-func is_legal(_move: ChessMove) -> bool:
-	return true
+## Legality, delegated to the rules engine.
+##
+## This stayed a stub returning true until now so the visual prototype could
+## move pieces freely while the view was being built. Everything that needs to
+## know whether a move is allowed — apply_move, the AI's choice, and later a
+## network peer's validation — comes through here, so there is one place that
+## decides.
+func is_legal(move: ChessMove) -> bool:
+	return Rules.is_legal(state, move)
+
+
+## Every legal move for the side to move. The AI chooses from this rather than
+## inventing squares and hoping one is accepted.
+func legal_moves() -> Array[ChessMove]:
+	return Rules.legal_moves(state, state.side_to_move)
