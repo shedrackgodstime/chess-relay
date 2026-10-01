@@ -253,6 +253,29 @@ func _camera_readout_checks(main: Main, hud: Hud) -> void:
 		"got=%s" % live)
 	hud.set_camera_readout(0.0, 0.0, 0.0)
 
+	# Reset must land on the framing that was chosen on screen. Asserted against
+	# the raw angle and distance rather than the ratios, because the ratios are
+	# derived from the board's half-extent and would silently shift if the board
+	# were ever resized.
+	main.frame_board()
+	_check("reset lands on the chosen framing",
+		absf(main.camera.pitch_degrees - 41.9) < 0.05
+			and absf(main.camera.distance - 10.81) < 0.01,
+		"pitch=%.2f distance=%.2f" % [main.camera.pitch_degrees, main.camera.distance])
+	_check("chosen framing fits inside the camera limits",
+		main.camera.pitch_degrees <= main.camera.max_pitch_degrees
+			and main.camera.distance <= main.camera.max_distance, "")
+
+	# Flip shares the pitch and distance and only turns the view, so it must not
+	# change the reach.
+	main.camera.reset_view(Vector3.ZERO, 180.0,
+		main._framing_pitch(), main._framing_distance())
+	_check("flipping keeps the chosen reach",
+		absf(main.camera.pitch_degrees - 41.9) < 0.05
+			and absf(main.camera.distance - 10.81) < 0.01,
+		"pitch=%.2f distance=%.2f" % [main.camera.pitch_degrees, main.camera.distance])
+	main.frame_board()
+
 
 ## The menu button exists and announces itself; its screen is Phase 4.
 func _menu_check(main: Main, hud: Hud) -> void:

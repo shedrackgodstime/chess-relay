@@ -59,12 +59,12 @@ var _press_moved := false
 
 ## Camera placement as multiples of the board's half-extent, so the default
 ## view survives a change to BoardMesh's dimensions.
-@export_range(0.5, 4.0) var framing_height := 1.50:
+@export_range(0.5, 4.0) var framing_height := 1.648235:
 	set(value):
 		framing_height = value
 		frame_board()
 
-@export_range(0.5, 4.0) var framing_distance := 2.20:
+@export_range(0.5, 4.0) var framing_distance := 1.836988:
 	set(value):
 		framing_distance = value
 		frame_board()
