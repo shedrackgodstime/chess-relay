@@ -13,7 +13,8 @@ extends Node3D
 @onready var camera: OrbitCamera = $World/Camera
 @onready var highlight: SquareHighlight = $World/Highlight
 @onready var hud: Hud = $UILayer/Hud
-@onready var last_move: LastMoveMarker = $World/LastMove
+@onready var last_move_from: SquareHighlight = $World/LastMoveFrom
+@onready var last_move_to: SquareHighlight = $World/LastMoveTo
 @onready var check_highlight: SquareHighlight = $World/CheckHighlight
 @onready var tray_light: TrayView = $World/TrayLight
 @onready var tray_dark: TrayView = $World/TrayDark
@@ -82,16 +83,19 @@ var _press_moved := false
 ## Camera placement as multiples of the board's half-extent, so the default view
 ## survives a change to BoardMesh's dimensions.
 ##
-## The current pair was set from an on-screen readout: yaw 0.2, pitch 41.9,
-## distance 10.81. These two encode that angle and reach rather than being them,
-## so to go back to a raw pitch and distance, take the ratio length as
+## These two encode an angle and a reach rather than being them. To go back to a
+## raw pitch and distance, take the ratio length as
 ## distance / (half-extent + frame margin) and split it by the pitch angle.
-@export_range(0.5, 4.0) var framing_height := 1.648235:
+##
+## Currently pitch 45, distance 10.81. Note that the e2 pawn is still untappable
+## below pitch 50: the king on e1 stands in front of it from this camera. That is
+## a separate problem from the framing and is recorded in docs/BACKLOG.md.
+@export_range(0.5, 4.0) var framing_height := 1.745165:
 	set(value):
 		framing_height = value
 		frame_board()
 
-@export_range(0.5, 4.0) var framing_distance := 1.836988:
+@export_range(0.5, 4.0) var framing_distance := 1.745165:
 	set(value):
 		framing_distance = value
 		frame_board()
@@ -438,7 +442,8 @@ func _on_game_moved(move: ChessMove, _captured: int) -> void:
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Both ends of the move, so an opponent's reply can be seen to land where it
 	# was expected to rather than having to be remembered.
-	last_move.show_move(move.from_square, move.to_square)
+	last_move_from.show_at(move.from_square.x, move.from_square.y)
+	last_move_to.show_at(move.to_square.x, move.to_square.y)
 	_update_check_marker()
 	_refresh_trays()
 	piece.glide_to(

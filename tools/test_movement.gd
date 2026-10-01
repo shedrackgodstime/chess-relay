@@ -203,26 +203,32 @@ func _last_move_and_side_checks() -> void:
 		main.selected == Vector2i(0, 1), "selected=%s" % main.selected)
 	main._deselect()
 
-	_check("no marker before anything has been played", not main.last_move.is_marked(), "")
+	_check("no marker before anything has been played",
+		_last_move_shown(main) == 0, "shown=%d" % _last_move_shown(main))
 	# The a-file, not the e-file: at this pitch the king on e1 swallows taps on
 	# e2, which is a separate problem with its own test.
 	_tap_square(main, Vector2i(0, 1))
 	_tap_square(main, Vector2i(0, 3))
 	_check("the move marks both ends",
-		main.last_move.is_marked()
-			and main.last_move.marked_from() == Vector2i(0, 1)
-			and main.last_move.marked_to() == Vector2i(0, 3),
-		"from=%s to=%s" % [main.last_move.marked_from(), main.last_move.marked_to()])
-	_check("the marker has geometry",
-		main.last_move.mesh != null
-			and main.last_move.mesh.get_surface_count() >= 1, "")
+		_last_move_shown(main) > 0
+			and main.last_move_from.marked_square() == Vector2i(0, 1)
+			and main.last_move_to.marked_square() == Vector2i(0, 3),
+		"from=%s to=%s" % [main.last_move_from.marked_square(),
+			main.last_move_to.marked_square()])
+	_check("both last-move frames have geometry",
+		main.last_move_from.mesh != null and main.last_move_to.mesh != null, "")
+	_check("the last move reuses the selection marker, fainter",
+		main.last_move_from.colour.is_equal_approx(SquareHighlight.LAST_MOVE)
+			and not main.last_move_from.colour.is_equal_approx(SquareHighlight.GOLD),
+		"colour=%s" % main.last_move_from.colour)
 
 	_tap_square(main, Vector2i(1, 1))
 	_tap_square(main, Vector2i(1, 3))
-	_check("the marker follows the newest move",
-		main.last_move.marked_from() == Vector2i(1, 1)
-			and main.last_move.marked_to() == Vector2i(1, 3),
-		"from=%s to=%s" % [main.last_move.marked_from(), main.last_move.marked_to()])
+	_check("the frames follow the newest move",
+		main.last_move_from.marked_square() == Vector2i(1, 1)
+			and main.last_move_to.marked_square() == Vector2i(1, 3),
+		"from=%s to=%s" % [main.last_move_from.marked_square(),
+			main.last_move_to.marked_square()])
 
 	# Ownership follows the chosen side. player_side is set by the lobby later;
 	# it already has to work, so it is exercised here.
@@ -327,6 +333,15 @@ func _check_marker_checks() -> void:
 
 	scene.queue_free()
 	await process_frame
+
+
+## How many last-move frames are showing.
+func _last_move_shown(main: Main) -> int:
+	var shown := 0
+	for frame in [main.last_move_from, main.last_move_to]:
+		if frame != null and frame.visible:
+			shown += 1
+	return shown
 
 
 ## Any visible full-screen child of the HUD that would swallow taps.

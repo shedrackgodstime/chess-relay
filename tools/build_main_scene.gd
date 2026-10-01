@@ -29,7 +29,8 @@ func _init() -> void:
 
 	world.add_child(_board())
 	world.add_child(_highlight())
-	world.add_child(_last_move())
+	world.add_child(_last_move_from())
+	world.add_child(_last_move_to())
 	world.add_child(_check_highlight())
 	world.add_child(_pieces())
 	world.add_child(_table())
@@ -92,12 +93,26 @@ func _check_highlight() -> MeshInstance3D:
 	return highlight
 
 
-## The from-and-to marker for the move just played.
-func _last_move() -> MeshInstance3D:
-	var marker := MeshInstance3D.new()
-	marker.name = "LastMove"
-	marker.set_script(load("res://board/last_move_marker.gd"))
-	return marker
+## The two faint frames marking where the last move came from and went to.
+##
+## Two instances of the one marker rather than a bespoke two-square mesh, so
+## every highlight on the board is the same component in a different colour:
+## gold for the selection, faint amber for the last move, red for a king in
+## check. One shape to recognise.
+func _last_move_from() -> MeshInstance3D:
+	return _highlight_named("LastMoveFrom", SquareHighlight.LAST_MOVE)
+
+
+func _last_move_to() -> MeshInstance3D:
+	return _highlight_named("LastMoveTo", SquareHighlight.LAST_MOVE)
+
+
+func _highlight_named(node_name: String, tint: Color) -> MeshInstance3D:
+	var highlight := MeshInstance3D.new()
+	highlight.name = node_name
+	highlight.set_script(load("res://board/square_highlight.gd"))
+	highlight.set("colour", tint)
+	return highlight
 
 
 func _pieces() -> Node3D:

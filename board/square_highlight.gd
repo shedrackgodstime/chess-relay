@@ -19,6 +19,10 @@ const BAR := 0.11
 const HEIGHT := 0.014
 const LIFT := 0.008
 
+## The last move. Faint on purpose: it is reference, and it is visible on most
+## turns, so it must not compete with the board.
+const LAST_MOVE := Color(1.0, 0.76, 0.36, 0.45)
+
 ## Selection: the warm gold used throughout the HUD.
 const GOLD := Color(1.0, 0.85, 0.25)
 
