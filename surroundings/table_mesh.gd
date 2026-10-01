@@ -26,7 +26,9 @@ const FLOOR_SIZE := 80.0
 
 const WOOD_BASE := Color(0.310, 0.196, 0.122)
 const WOOD_VEIN := Color(0.170, 0.098, 0.058)
-const FLOOR_COLOR := Color(0.105, 0.115, 0.135)
+## Near-black. Under the studio lamp the floor should read as the room falling
+## away, not as a surface competing with the table for attention.
+const FLOOR_COLOR := Color(0.030, 0.027, 0.026)
 
 static var _cache := {}
 
