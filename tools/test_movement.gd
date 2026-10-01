@@ -182,8 +182,9 @@ func _selection_checks() -> void:
 ##
 ## Both matter beyond their own feature: a Black player opening on White's side
 ## of the board is the whole point of the choice, so the camera has to follow it.
+## The last-move marker, and that choosing a side is the lobby's job.
 func _last_move_and_side_checks() -> void:
-	print("Last move and side choice")
+	print("Last move and side")
 	var scene := (load("res://main.tscn") as PackedScene).instantiate()
 	root.add_child(scene)
 	await process_frame
@@ -191,29 +192,20 @@ func _last_move_and_side_checks() -> void:
 	var main: Main = scene
 	main.ai_opponent = false
 
-	# The side chooser first, while the game is still unstarted. Playing a move
-	# closes it, correctly, so checking it afterwards proves nothing.
-	var picker: SidePicker = main.hud.side_picker
-	_check("the side chooser is offered at the start", picker != null and picker.visible, "")
-	_check("it offers both sides", picker.card_count() == 2, "cards=%d" % picker.card_count())
-	_check("the board starts facing White",
-		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.LIGHT)),
-		"yaw=%.1f" % main.camera.yaw_degrees)
+	# Nothing may sit over the board at start. A full-screen overlay that stops
+	# mouse input makes the game unplayable while it is up, and an earlier version
+	# of this did exactly that by asking for a side in the wrong place.
+	_check("nothing blocks the board at start", not _has_blocking_overlay(main.hud), "")
 
-	main._on_side_chosen(BoardState.DARK)
-	await process_frame
-	_check("choosing Black takes the dark side",
-		main.player_side == BoardState.DARK, "side=%d" % main.player_side)
-	_check("the opponent is then the light side",
-		main.opponent_side() == BoardState.LIGHT, "")
-	_check("the board turns to face the new side",
-		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.DARK)),
-		"yaw=%.1f" % main.camera.yaw_degrees)
-	_check("the chooser closes once a side is taken", not picker.visible, "")
+	# And a tap has to actually select.
+	_tap_square(main, Vector2i(0, 1))
+	_check("a piece can be selected on the opening board",
+		main.selected == Vector2i(0, 1), "selected=%s" % main.selected)
+	main._deselect()
 
-	# The marker, on the a-file rather than the e-file: at this pitch the king on
-	# e1 swallows taps on e2, which is a separate problem and its own test.
 	_check("no marker before anything has been played", not main.last_move.is_marked(), "")
+	# The a-file, not the e-file: at this pitch the king on e1 swallows taps on
+	# e2, which is a separate problem with its own test.
 	_tap_square(main, Vector2i(0, 1))
 	_tap_square(main, Vector2i(0, 3))
 	_check("the move marks both ends",
@@ -224,8 +216,6 @@ func _last_move_and_side_checks() -> void:
 	_check("the marker has geometry",
 		main.last_move.mesh != null
 			and main.last_move.mesh.get_surface_count() >= 1, "")
-	_check("the side chooser is not offered again once play starts",
-		not main.hud.side_picker.visible, "")
 
 	_tap_square(main, Vector2i(1, 1))
 	_tap_square(main, Vector2i(1, 3))
@@ -233,15 +223,20 @@ func _last_move_and_side_checks() -> void:
 		main.last_move.marked_from() == Vector2i(1, 1)
 			and main.last_move.marked_to() == Vector2i(1, 3),
 		"from=%s to=%s" % [main.last_move.marked_from(), main.last_move.marked_to()])
-	_check("the side chooser knows the game has started",
-		not picker.should_offer(main.game), "")
 
-	# Ownership follows the chosen side. With an opponent on, a Black player must
-	# be able to pick up black pieces and must not be able to pick up white ones.
+	# Ownership follows the chosen side. player_side is set by the lobby later;
+	# it already has to work, so it is exercised here.
+	main.player_side = BoardState.DARK
+	await process_frame
+	_check("the board turns to face the side the player took",
+		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.DARK)),
+		"yaw=%.1f" % main.camera.yaw_degrees)
+	_check("the opponent is then the light side",
+		main.opponent_side() == BoardState.LIGHT, "")
+
 	main.ai_opponent = true
-	# Black to move. After the two moves above it is White's turn, and a Black
-	# player may not touch anything then, which is a different rule and is
-	# already covered by the side-ownership checks.
+	# Black to move. It is White's turn after the moves above, and a Black player
+	# may not touch anything then, which the side-ownership checks already cover.
 	main.game.state.side_to_move = BoardState.DARK
 	main._deselect()
 	_tap_square(main, Vector2i(0, 6))
@@ -252,11 +247,30 @@ func _last_move_and_side_checks() -> void:
 	_check("a Black player cannot pick up a white piece",
 		main.selected == Vector2i(-1, -1), "selected=%s" % main.selected)
 
+	# Flip must still alternate correctly after a side change.
+	main.camera.reset_view(Vector3.ZERO, Main.yaw_for_side(BoardState.DARK), 41.9, 10.81)
+	main._on_flip_requested()
+	await process_frame
+	_check("flip turns to the other side from a changed side",
+		is_equal_approx(main.camera.yaw_degrees, Main.yaw_for_side(BoardState.LIGHT)),
+		"yaw=%.1f" % main.camera.yaw_degrees)
+
 	scene.queue_free()
 	await process_frame
 
 
-## Promotion end to end: a held move, a choice, and the pawn becoming it.
+## Any visible full-screen child of the HUD that would swallow taps.
+func _has_blocking_overlay(hud: Hud) -> bool:
+	for child in hud.get_children():
+		var control := child as Control
+		if control != null and control.visible \
+				and control.mouse_filter == Control.MOUSE_FILTER_STOP \
+				and control.size.x > 100.0 and control.size.y > 100.0:
+			return true
+	return false
+
+
+## Promotion end to end## Promotion end to end: a held move, a choice, and the pawn becoming it.
 ##
 ## Runs on its own scene and sets the board up directly, because the promotion
 ## move itself is chosen by the player rather than arrived at by tapping, so

@@ -161,7 +161,6 @@ func _hud() -> Control:
 	hud.add_child(_voice_row())
 	hud.add_child(_menu_button())
 	hud.add_child(_game_over_label())
-	hud.add_child(_side_picker())
 	hud.add_child(_promotion_picker())
 	return hud
 
@@ -209,15 +208,6 @@ func _control_column() -> VBoxContainer:
 
 ## The menu button sits in the top-right corner, away from the view controls
 ## so it never gets hit by accident mid-game.
-## Choose a side before the game starts. Above the banner: it comes first.
-func _side_picker() -> Control:
-	var picker := Control.new()
-	picker.name = "SidePicker"
-	picker.unique_name_in_owner = true
-	picker.set_script(load("res://ui/side_picker.gd"))
-	return picker
-
-
 ## The end-of-game banner. Above the board, below the promotion overlay, and
 ## hidden until there is something to say.
 func _game_over_label() -> Label:

@@ -105,11 +105,8 @@ func _ready() -> void:
 		game.finished.connect(_on_game_finished)
 	if hud.promotion_picker != null:
 		hud.promotion_picker.chosen.connect(_on_promotion_chosen)
-	if hud.side_picker != null:
-		hud.side_picker.side_chosen.connect(_on_side_chosen)
 	hud.bind()
 	_on_game_finished(game.result())
-	hud.offer_side_choice(player_side)
 	hud.set_turn(game.state.side_to_move, game.history.size())
 	# Voice is a property of the mode, so it is decided once here rather than
 	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
@@ -284,19 +281,7 @@ func _tap(screen_position: Vector2) -> void:
 	if game.apply_move(move):
 		_deselect()
 		# The choice was made at the first tap; from here on it is not offered.
-		hud.close_side_choice()
 		_maybe_ai_move()
-
-
-## Takes the side the player chose.
-##
-## Only legal before anything has moved: handing over a position that is already
-## in progress would mean the player adopting pieces they did not move, and the
-## AI carrying the side they were about to pick up.
-func _on_side_chosen(side: int) -> void:
-	if game.history.is_empty():
-		player_side = side
-	hud.close_side_choice()
 
 
 ## Announces the end, and stops the game being played on.

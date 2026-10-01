@@ -1,87 +1,94 @@
 [gd_scene format=3]
 
-[ext_resource type="Script" path="res://main.gd" id="1_074og"]
-[ext_resource type="Script" path="res://board/board_view.gd" id="2_cegan"]
-[ext_resource type="Script" path="res://board/square_highlight.gd" id="3_82xsv"]
-[ext_resource type="Script" path="res://board/last_move_marker.gd" id="4_getpj"]
-[ext_resource type="Script" path="res://pieces/piece_view.gd" id="5_ryguw"]
-[ext_resource type="Script" path="res://surroundings/table_view.gd" id="6_d13ii"]
-[ext_resource type="Script" path="res://surroundings/tray_view.gd" id="7_1u8w0"]
-[ext_resource type="Script" path="res://surroundings/room_view.gd" id="8_0odxb"]
-[ext_resource type="Script" path="res://camera/orbit_camera.gd" id="9_lswn8"]
-[ext_resource type="Script" path="res://ui/hud.gd" id="10_a6jrf"]
-[ext_resource type="Texture2D" path="res://ui/icons/rotate_left.svg" id="11_xuqvo"]
-[ext_resource type="Texture2D" path="res://ui/icons/rotate_right.svg" id="12_qsp4k"]
-[ext_resource type="Texture2D" path="res://ui/icons/flip.svg" id="13_kq58d"]
-[ext_resource type="Texture2D" path="res://ui/icons/reset.svg" id="14_seu75"]
-[ext_resource type="Texture2D" path="res://ui/icons/mic_off.svg" id="15_htxhm"]
-[ext_resource type="Texture2D" path="res://ui/icons/menu.svg" id="16_jq2sk"]
-[ext_resource type="Script" path="res://ui/side_picker.gd" id="17_4k2k6"]
-[ext_resource type="Script" path="res://ui/promotion_picker.gd" id="18_0rl1p"]
+[ext_resource type="Script" path="res://main.gd" id="1_yaehf"]
+[ext_resource type="Script" path="res://board/board_view.gd" id="2_074og"]
+[ext_resource type="Script" path="res://board/square_highlight.gd" id="3_cegan"]
+[ext_resource type="Script" path="res://board/last_move_marker.gd" id="4_82xsv"]
+[ext_resource type="Script" path="res://pieces/piece_view.gd" id="5_getpj"]
+[ext_resource type="Script" path="res://surroundings/table_view.gd" id="6_ryguw"]
+[ext_resource type="Script" path="res://surroundings/tray_view.gd" id="7_d13ii"]
+[ext_resource type="Script" path="res://surroundings/room_view.gd" id="8_1u8w0"]
+[ext_resource type="Script" path="res://camera/orbit_camera.gd" id="9_0odxb"]
+[ext_resource type="Script" path="res://ui/hud.gd" id="10_lswn8"]
+[ext_resource type="Texture2D" path="res://ui/icons/rotate_left.svg" id="11_a6jrf"]
+[ext_resource type="Texture2D" path="res://ui/icons/rotate_right.svg" id="12_xuqvo"]
+[ext_resource type="Texture2D" path="res://ui/icons/flip.svg" id="13_qsp4k"]
+[ext_resource type="Texture2D" path="res://ui/icons/reset.svg" id="14_kq58d"]
+[ext_resource type="Texture2D" path="res://ui/icons/mic_off.svg" id="15_seu75"]
+[ext_resource type="Texture2D" path="res://ui/icons/menu.svg" id="16_htxhm"]
+[ext_resource type="Script" path="res://ui/promotion_picker.gd" id="17_jq2sk"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_4k2k6"]
+height = 0.64
+radius = 0.27
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_0rl1p"]
+height = 0.80592
+radius = 0.32
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_ok6jj"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_facbu"]
-height = 0.80592
-radius = 0.32
+height = 0.7500508
+radius = 0.3988782
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_b1qrp"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_come4"]
-height = 0.7500508
-radius = 0.3988782
+height = 0.87
+radius = 0.31
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_h8e4i"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_4lmeg"]
-height = 0.87
-radius = 0.31
+height = 0.9999999
+radius = 0.33
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_0cp0l"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_d2t1y"]
-height = 0.9999999
-radius = 0.33
+height = 1.29005
+radius = 0.34
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_gngh3"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_0n3wm"]
-height = 1.29005
-radius = 0.34
+height = 0.87
+radius = 0.31
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_qnost"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_wnkbs"]
-height = 0.87
-radius = 0.31
+height = 0.7500508
+radius = 0.3988782
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_f6a44"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_0cbny"]
-height = 0.7500508
-radius = 0.3988782
+height = 0.80592
+radius = 0.32
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_hrvbo"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_uypp3"]
-height = 0.80592
-radius = 0.32
+height = 0.64
+radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_blkrb"]
 height = 0.64
@@ -144,72 +151,72 @@ height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_rqtf5"]
-height = 0.64
-radius = 0.27
+height = 0.80592
+radius = 0.32
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_1vm84"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_wu3dr"]
-height = 0.80592
-radius = 0.32
+height = 0.7500508
+radius = 0.3988782
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_cyx1q"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_0dhbp"]
-height = 0.7500508
-radius = 0.3988782
+height = 0.87
+radius = 0.31
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_jx0wj"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_kkkcx"]
-height = 0.87
-radius = 0.31
+height = 0.9999999
+radius = 0.33
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_34ol3"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_c2n8d"]
-height = 0.9999999
-radius = 0.33
+height = 1.29005
+radius = 0.34
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_wy5fy"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_gx4rg"]
-height = 1.29005
-radius = 0.34
+height = 0.87
+radius = 0.31
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_5dllo"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_phcyf"]
-height = 0.87
-radius = 0.31
+height = 0.7500508
+radius = 0.3988782
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_birbe"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_f1p13"]
-height = 0.7500508
-radius = 0.3988782
+height = 0.80592
+radius = 0.32
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_4obbf"]
 height = 0.64
 radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_ovcoh"]
-height = 0.80592
-radius = 0.32
+height = 0.64
+radius = 0.27
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_ppx11"]
 height = 0.64
@@ -267,32 +274,48 @@ radius = 0.27
 height = 0.64
 radius = 0.27
 
-[sub_resource type="CylinderShape3D" id="CylinderShape3D_yvsr8"]
-height = 0.64
-radius = 0.27
-
-[sub_resource type="CylinderShape3D" id="CylinderShape3D_vieuh"]
-height = 0.64
-radius = 0.27
-
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_yjja3"]
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_yvsr8"]
 sky_top_color = Color(0.18, 0.29, 0.47, 1)
 sky_horizon_color = Color(0.64, 0.7, 0.76, 1)
 ground_bottom_color = Color(0.09, 0.1, 0.115, 1)
 ground_horizon_color = Color(0.48, 0.52, 0.56, 1)
 
-[sub_resource type="Sky" id="Sky_l0gw7"]
-sky_material = SubResource("ProceduralSkyMaterial_yjja3")
+[sub_resource type="Sky" id="Sky_vieuh"]
+sky_material = SubResource("ProceduralSkyMaterial_yvsr8")
 
-[sub_resource type="Environment" id="Environment_inymm"]
+[sub_resource type="Environment" id="Environment_yjja3"]
 background_mode = 2
-sky = SubResource("Sky_l0gw7")
+sky = SubResource("Sky_vieuh")
 ambient_light_source = 3
 ambient_light_energy = 0.85
 tonemap_mode = 2
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jcxqu"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_l0gw7"]
 bg_color = Color(0.09, 0.08, 0.07, 0.72)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.45, 0.34, 0.24, 0.55)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_inymm"]
+bg_color = Color(0.26, 0.2, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.45, 0.34, 0.24, 0.55)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jcxqu"]
+bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -304,7 +327,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0arob"]
-bg_color = Color(0.26, 0.2, 0.15, 1)
+bg_color = Color(0.09, 0.08, 0.07, 0.72)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -316,7 +339,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_dij0e"]
-bg_color = Color(0.16, 0.13, 0.11, 1)
+bg_color = Color(0.26, 0.2, 0.15, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -328,7 +351,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k1udn"]
-bg_color = Color(0.09, 0.08, 0.07, 0.72)
+bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -340,7 +363,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_wat4s"]
-bg_color = Color(0.26, 0.2, 0.15, 1)
+bg_color = Color(0.09, 0.08, 0.07, 0.72)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -352,7 +375,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ywjan"]
-bg_color = Color(0.16, 0.13, 0.11, 1)
+bg_color = Color(0.26, 0.2, 0.15, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -364,7 +387,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_m74q3"]
-bg_color = Color(0.09, 0.08, 0.07, 0.72)
+bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -376,7 +399,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_tko6h"]
-bg_color = Color(0.26, 0.2, 0.15, 1)
+bg_color = Color(0.09, 0.08, 0.07, 0.72)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -388,7 +411,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_am8a1"]
-bg_color = Color(0.16, 0.13, 0.11, 1)
+bg_color = Color(0.26, 0.2, 0.15, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -400,7 +423,7 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_8dc3g"]
-bg_color = Color(0.09, 0.08, 0.07, 0.72)
+bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -412,30 +435,6 @@ corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_htgcl"]
-bg_color = Color(0.26, 0.2, 0.15, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.45, 0.34, 0.24, 0.55)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_smeu8"]
-bg_color = Color(0.16, 0.13, 0.11, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.45, 0.34, 0.24, 0.55)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_f3y11"]
 bg_color = Color(0, 0, 0, 0)
 border_width_left = 2
 border_width_top = 2
@@ -447,7 +446,7 @@ corner_radius_top_right = 32
 corner_radius_bottom_right = 32
 corner_radius_bottom_left = 32
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cpm2s"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_smeu8"]
 bg_color = Color(0.55, 0.92, 0.62, 0.92)
 border_width_left = 1
 border_width_top = 1
@@ -459,7 +458,7 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_u81y6"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_f3y11"]
 bg_color = Color(0.09, 0.08, 0.07, 0.72)
 border_width_left = 1
 border_width_top = 1
@@ -471,7 +470,7 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rt5wr"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cpm2s"]
 bg_color = Color(0.26, 0.2, 0.15, 1)
 border_width_left = 1
 border_width_top = 1
@@ -483,7 +482,7 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_mnw77"]
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_u81y6"]
 bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 1
 border_width_top = 1
@@ -495,597 +494,597 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
-[node name="Main" type="Node3D" unique_id=1338630349]
-script = ExtResource("1_074og")
+[node name="Main" type="Node3D" unique_id=1851756506]
+script = ExtResource("1_yaehf")
 
-[node name="World" type="Node3D" parent="." unique_id=1212984809]
+[node name="World" type="Node3D" parent="." unique_id=976306221]
 
-[node name="Board" type="MeshInstance3D" parent="World" unique_id=805805897]
-script = ExtResource("2_cegan")
+[node name="Board" type="MeshInstance3D" parent="World" unique_id=1685508125]
+script = ExtResource("2_074og")
 
-[node name="Highlight" type="MeshInstance3D" parent="World" unique_id=600264285]
-script = ExtResource("3_82xsv")
+[node name="Highlight" type="MeshInstance3D" parent="World" unique_id=696768467]
+script = ExtResource("3_cegan")
 
-[node name="LastMove" type="MeshInstance3D" parent="World" unique_id=1835515609]
-script = ExtResource("4_getpj")
+[node name="LastMove" type="MeshInstance3D" parent="World" unique_id=610982665]
+script = ExtResource("4_82xsv")
 
-[node name="Pieces" type="Node3D" parent="World" unique_id=1990892215]
+[node name="Pieces" type="Node3D" parent="World" unique_id=782466233]
 
-[node name="WhiteBackRank" type="Node3D" parent="World/Pieces" unique_id=1077070787]
+[node name="WhiteBackRank" type="Node3D" parent="World/Pieces" unique_id=1025022289]
 
-[node name="WhiteRookA1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1195453865]
+[node name="WhiteRookA1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1293349609]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 piece_type = 3
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteRookA1" unique_id=1054815104]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteRookA1" unique_id=532012375]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookA1/PickArea" unique_id=877024037]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookA1/PickArea" unique_id=469512639]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
+shape = SubResource("CylinderShape3D_4k2k6")
+
+[node name="@CollisionShape3D@2" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookA1/PickArea" unique_id=948757509]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
+shape = SubResource("CylinderShape3D_0rl1p")
+
+[node name="WhiteKnightB1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=871033867]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 1
+
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteKnightB1" unique_id=1234890432]
+monitoring = false
+
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightB1/PickArea" unique_id=1302315953]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_ok6jj")
 
-[node name="@CollisionShape3D@2" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookA1/PickArea" unique_id=2110404122]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
+[node name="@CollisionShape3D@3" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightB1/PickArea" unique_id=890508050]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3750254, 0)
 shape = SubResource("CylinderShape3D_facbu")
 
-[node name="WhiteKnightB1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=2097533825]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 1
+[node name="WhiteBishopC1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=782822148]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 2
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteKnightB1" unique_id=2123911138]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteBishopC1" unique_id=1851197468]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightB1/PickArea" unique_id=1992987412]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopC1/PickArea" unique_id=1976895920]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_b1qrp")
 
-[node name="@CollisionShape3D@3" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightB1/PickArea" unique_id=836132323]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3750254, 0)
+[node name="@CollisionShape3D@4" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopC1/PickArea" unique_id=1526404130]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.435, 0)
 shape = SubResource("CylinderShape3D_come4")
 
-[node name="WhiteBishopC1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=871050336]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 2
+[node name="WhiteQueenD1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=671451116]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 4
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteBishopC1" unique_id=1619190179]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteQueenD1" unique_id=2061349404]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopC1/PickArea" unique_id=2074693747]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteQueenD1/PickArea" unique_id=1460150624]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_h8e4i")
 
-[node name="@CollisionShape3D@4" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopC1/PickArea" unique_id=701119090]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.435, 0)
+[node name="@CollisionShape3D@5" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteQueenD1/PickArea" unique_id=657507073]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.49999994, 0)
 shape = SubResource("CylinderShape3D_4lmeg")
 
-[node name="WhiteQueenD1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=885107246]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 4
+[node name="WhiteKingE1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=390354059]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 5
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteQueenD1" unique_id=419012433]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteKingE1" unique_id=1226947512]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteQueenD1/PickArea" unique_id=1263823568]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKingE1/PickArea" unique_id=1360882146]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_0cp0l")
 
-[node name="@CollisionShape3D@5" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteQueenD1/PickArea" unique_id=1517097366]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.49999994, 0)
+[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKingE1/PickArea" unique_id=1700155157]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.645025, 0)
 shape = SubResource("CylinderShape3D_d2t1y")
 
-[node name="WhiteKingE1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1244438213]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 5
+[node name="WhiteBishopF1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=245057817]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 2
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteKingE1" unique_id=581337989]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteBishopF1" unique_id=1806555569]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKingE1/PickArea" unique_id=1192153321]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopF1/PickArea" unique_id=1857175786]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_gngh3")
 
-[node name="@CollisionShape3D@6" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKingE1/PickArea" unique_id=1777479762]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.645025, 0)
+[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopF1/PickArea" unique_id=719060993]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.435, 0)
 shape = SubResource("CylinderShape3D_0n3wm")
 
-[node name="WhiteBishopF1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1949760816]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 2
+[node name="WhiteKnightG1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=502825369]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteBishopF1" unique_id=665400308]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteKnightG1" unique_id=1790660149]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopF1/PickArea" unique_id=156884342]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightG1/PickArea" unique_id=1296892433]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_qnost")
 
-[node name="@CollisionShape3D@7" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteBishopF1/PickArea" unique_id=1159355722]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.435, 0)
+[node name="@CollisionShape3D@8" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightG1/PickArea" unique_id=879888848]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3750254, 0)
 shape = SubResource("CylinderShape3D_wnkbs")
 
-[node name="WhiteKnightG1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=185710899]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 1
+[node name="WhiteRookH1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=1627925965]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -3.5)
+script = ExtResource("5_getpj")
+piece_type = 3
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteKnightG1" unique_id=1634516668]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteRookH1" unique_id=1373888052]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightG1/PickArea" unique_id=254410959]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookH1/PickArea" unique_id=1408417534]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_f6a44")
 
-[node name="@CollisionShape3D@8" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteKnightG1/PickArea" unique_id=1171499050]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3750254, 0)
+[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookH1/PickArea" unique_id=600785788]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
 shape = SubResource("CylinderShape3D_0cbny")
 
-[node name="WhiteRookH1" type="MeshInstance3D" parent="World/Pieces/WhiteBackRank" unique_id=771108205]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -3.5)
-script = ExtResource("5_ryguw")
-piece_type = 3
+[node name="WhitePawns" type="Node3D" parent="World/Pieces" unique_id=1140215542]
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhiteBackRank/WhiteRookH1" unique_id=374949361]
+[node name="WhitePawnA2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1156914180]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -2.5)
+script = ExtResource("5_getpj")
+
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnA2" unique_id=674555702]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookH1/PickArea" unique_id=648559424]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnA2/PickArea" unique_id=271202461]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_hrvbo")
 
-[node name="@CollisionShape3D@9" type="CollisionShape3D" parent="World/Pieces/WhiteBackRank/WhiteRookH1/PickArea" unique_id=538483301]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
+[node name="@CollisionShape3D@10" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnA2/PickArea" unique_id=661634181]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_uypp3")
 
-[node name="WhitePawns" type="Node3D" parent="World/Pieces" unique_id=2132140218]
+[node name="WhitePawnB2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1647158768]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="WhitePawnA2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1425756253]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -2.5)
-script = ExtResource("5_ryguw")
-
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnA2" unique_id=1592660497]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnB2" unique_id=1598090972]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnA2/PickArea" unique_id=1359603372]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnB2/PickArea" unique_id=1235290816]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_blkrb")
 
-[node name="@CollisionShape3D@10" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnA2/PickArea" unique_id=124578531]
+[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnB2/PickArea" unique_id=1733240552]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_abqjc")
 
-[node name="WhitePawnB2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1029706453]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="WhitePawnC2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1915096985]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnB2" unique_id=1516431209]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnC2" unique_id=1784128154]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnB2/PickArea" unique_id=2123695885]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnC2/PickArea" unique_id=438766612]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_6iyjs")
 
-[node name="@CollisionShape3D@11" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnB2/PickArea" unique_id=666903314]
+[node name="@CollisionShape3D@12" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnC2/PickArea" unique_id=832739491]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_4w656")
 
-[node name="WhitePawnC2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=114641797]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="WhitePawnD2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1383889011]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnC2" unique_id=401255143]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnD2" unique_id=1875984587]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnC2/PickArea" unique_id=1950304281]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnD2/PickArea" unique_id=1176132899]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_e71vb")
 
-[node name="@CollisionShape3D@12" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnC2/PickArea" unique_id=1854601113]
+[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnD2/PickArea" unique_id=823541785]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_rnkwl")
 
-[node name="WhitePawnD2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=213196220]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="WhitePawnE2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=2069543459]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnD2" unique_id=1124448985]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnE2" unique_id=210542200]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnD2/PickArea" unique_id=1891729198]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnE2/PickArea" unique_id=265734815]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_vke2r")
 
-[node name="@CollisionShape3D@13" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnD2/PickArea" unique_id=561975936]
+[node name="@CollisionShape3D@14" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnE2/PickArea" unique_id=698836234]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_uit24")
 
-[node name="WhitePawnE2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1497328977]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="WhitePawnF2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=376725331]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnE2" unique_id=1170614067]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnF2" unique_id=885150191]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnE2/PickArea" unique_id=672463911]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnF2/PickArea" unique_id=54589487]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_ruth0")
 
-[node name="@CollisionShape3D@14" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnE2/PickArea" unique_id=1482640817]
+[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnF2/PickArea" unique_id=826279141]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_rm4vd")
 
-[node name="WhitePawnF2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1377238812]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="WhitePawnG2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=350472090]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnF2" unique_id=769588848]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnG2" unique_id=1366576323]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnF2/PickArea" unique_id=1963569005]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnG2/PickArea" unique_id=1270757461]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_pjyto")
 
-[node name="@CollisionShape3D@15" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnF2/PickArea" unique_id=386657783]
+[node name="@CollisionShape3D@16" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnG2/PickArea" unique_id=1448229143]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_sm6fg")
 
-[node name="WhitePawnG2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=165664115]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="WhitePawnH2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=732203554]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -2.5)
+script = ExtResource("5_getpj")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnG2" unique_id=78870685]
+[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnH2" unique_id=725013271]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnG2/PickArea" unique_id=1638402708]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnH2/PickArea" unique_id=377796599]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_b17eg")
 
-[node name="@CollisionShape3D@16" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnG2/PickArea" unique_id=1022572829]
+[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnH2/PickArea" unique_id=804927295]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_ntx8l")
 
-[node name="WhitePawnH2" type="MeshInstance3D" parent="World/Pieces/WhitePawns" unique_id=1110954144]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackBackRank" type="Node3D" parent="World/Pieces" unique_id=224262537]
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/WhitePawns/WhitePawnH2" unique_id=227748381]
-monitoring = false
-
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnH2/PickArea" unique_id=670290733]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_uatky")
-
-[node name="@CollisionShape3D@17" type="CollisionShape3D" parent="World/Pieces/WhitePawns/WhitePawnH2/PickArea" unique_id=85979091]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_rqtf5")
-
-[node name="BlackBackRank" type="Node3D" parent="World/Pieces" unique_id=1613805345]
-
-[node name="BlackRookA8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1327746254]
+[node name="BlackRookA8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=345065270]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -3.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 3
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackRookA8" unique_id=1052958424]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackRookA8" unique_id=1164725081]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookA8/PickArea" unique_id=1131645643]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookA8/PickArea" unique_id=395851547]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_1vm84")
+shape = SubResource("CylinderShape3D_uatky")
 
-[node name="@CollisionShape3D@18" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookA8/PickArea" unique_id=380595527]
+[node name="@CollisionShape3D@18" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookA8/PickArea" unique_id=536495884]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
-shape = SubResource("CylinderShape3D_wu3dr")
+shape = SubResource("CylinderShape3D_rqtf5")
 
-[node name="BlackKnightB8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=341784671]
+[node name="BlackKnightB8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=874941511]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -2.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 1
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackKnightB8" unique_id=941235815]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackKnightB8" unique_id=543929876]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightB8/PickArea" unique_id=1049078315]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightB8/PickArea" unique_id=686281066]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_cyx1q")
+shape = SubResource("CylinderShape3D_1vm84")
 
-[node name="@CollisionShape3D@19" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightB8/PickArea" unique_id=852776146]
+[node name="@CollisionShape3D@19" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightB8/PickArea" unique_id=322617472]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3750254, 0)
-shape = SubResource("CylinderShape3D_0dhbp")
+shape = SubResource("CylinderShape3D_wu3dr")
 
-[node name="BlackBishopC8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=828643195]
+[node name="BlackBishopC8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=451093631]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -1.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 2
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackBishopC8" unique_id=1656079803]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackBishopC8" unique_id=293890740]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopC8/PickArea" unique_id=2117085583]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopC8/PickArea" unique_id=1743624741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_jx0wj")
+shape = SubResource("CylinderShape3D_cyx1q")
 
-[node name="@CollisionShape3D@20" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopC8/PickArea" unique_id=1215623230]
+[node name="@CollisionShape3D@20" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopC8/PickArea" unique_id=342219752]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.435, 0)
-shape = SubResource("CylinderShape3D_kkkcx")
+shape = SubResource("CylinderShape3D_0dhbp")
 
-[node name="BlackQueenD8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=407332878]
+[node name="BlackQueenD8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1147355472]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, -0.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 4
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackQueenD8" unique_id=2040117591]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackQueenD8" unique_id=352093957]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackQueenD8/PickArea" unique_id=887637663]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackQueenD8/PickArea" unique_id=1547183885]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_34ol3")
+shape = SubResource("CylinderShape3D_jx0wj")
 
-[node name="@CollisionShape3D@21" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackQueenD8/PickArea" unique_id=1469123369]
+[node name="@CollisionShape3D@21" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackQueenD8/PickArea" unique_id=1996371438]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.49999994, 0)
-shape = SubResource("CylinderShape3D_c2n8d")
+shape = SubResource("CylinderShape3D_kkkcx")
 
-[node name="BlackKingE8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=689101967]
+[node name="BlackKingE8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1254595807]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 5
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackKingE8" unique_id=2061529346]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackKingE8" unique_id=1467430375]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKingE8/PickArea" unique_id=143776659]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKingE8/PickArea" unique_id=1116793967]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_wy5fy")
+shape = SubResource("CylinderShape3D_34ol3")
 
-[node name="@CollisionShape3D@22" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKingE8/PickArea" unique_id=508036709]
+[node name="@CollisionShape3D@22" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKingE8/PickArea" unique_id=1265102000]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.645025, 0)
-shape = SubResource("CylinderShape3D_gx4rg")
+shape = SubResource("CylinderShape3D_c2n8d")
 
-[node name="BlackBishopF8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1115552886]
+[node name="BlackBishopF8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=156459346]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 1.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 2
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackBishopF8" unique_id=1154033792]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackBishopF8" unique_id=1353690253]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopF8/PickArea" unique_id=479319111]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopF8/PickArea" unique_id=83855806]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_5dllo")
+shape = SubResource("CylinderShape3D_wy5fy")
 
-[node name="@CollisionShape3D@23" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopF8/PickArea" unique_id=1582267117]
+[node name="@CollisionShape3D@23" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackBishopF8/PickArea" unique_id=191457311]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.435, 0)
-shape = SubResource("CylinderShape3D_phcyf")
+shape = SubResource("CylinderShape3D_gx4rg")
 
-[node name="BlackKnightG8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=936001762]
+[node name="BlackKnightG8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1424096505]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 2.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 1
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackKnightG8" unique_id=1607569594]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackKnightG8" unique_id=1143387180]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightG8/PickArea" unique_id=1556799402]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightG8/PickArea" unique_id=973482660]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_birbe")
+shape = SubResource("CylinderShape3D_5dllo")
 
-[node name="@CollisionShape3D@24" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightG8/PickArea" unique_id=1255347059]
+[node name="@CollisionShape3D@24" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackKnightG8/PickArea" unique_id=1606591304]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3750254, 0)
-shape = SubResource("CylinderShape3D_f1p13")
+shape = SubResource("CylinderShape3D_phcyf")
 
-[node name="BlackRookH8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=1257968551]
+[node name="BlackRookH8" type="MeshInstance3D" parent="World/Pieces/BlackBackRank" unique_id=100608818]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 3.5, 0, 3.5)
-script = ExtResource("5_ryguw")
+script = ExtResource("5_getpj")
 side = 1
 piece_type = 3
 face_opponent = true
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackRookH8" unique_id=1652345374]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackBackRank/BlackRookH8" unique_id=1774933545]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookH8/PickArea" unique_id=1935384586]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookH8/PickArea" unique_id=1129592907]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
+shape = SubResource("CylinderShape3D_birbe")
+
+[node name="@CollisionShape3D@25" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookH8/PickArea" unique_id=2047225465]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
+shape = SubResource("CylinderShape3D_f1p13")
+
+[node name="BlackPawns" type="Node3D" parent="World/Pieces" unique_id=206379944]
+
+[node name="BlackPawnA7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1098766370]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 2.5)
+script = ExtResource("5_getpj")
+side = 1
+
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnA7" unique_id=1768721743]
+monitoring = false
+
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnA7/PickArea" unique_id=1955621699]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_4obbf")
 
-[node name="@CollisionShape3D@25" type="CollisionShape3D" parent="World/Pieces/BlackBackRank/BlackRookH8/PickArea" unique_id=1431506464]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.40296, 0)
+[node name="@CollisionShape3D@26" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnA7/PickArea" unique_id=1294563334]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_ovcoh")
 
-[node name="BlackPawns" type="Node3D" parent="World/Pieces" unique_id=1870042008]
-
-[node name="BlackPawnA7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=93224107]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnB7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=900564459]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnA7" unique_id=603282452]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnB7" unique_id=242217618]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnA7/PickArea" unique_id=171166935]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnB7/PickArea" unique_id=1886717326]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_ppx11")
 
-[node name="@CollisionShape3D@26" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnA7/PickArea" unique_id=132166714]
+[node name="@CollisionShape3D@27" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnB7/PickArea" unique_id=2146237237]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_1yv1y")
 
-[node name="BlackPawnB7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=174656059]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnC7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=434446702]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnB7" unique_id=1715832531]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnC7" unique_id=815700956]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnB7/PickArea" unique_id=1008907056]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnC7/PickArea" unique_id=505744504]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_5yh34")
 
-[node name="@CollisionShape3D@27" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnB7/PickArea" unique_id=603774027]
+[node name="@CollisionShape3D@28" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnC7/PickArea" unique_id=1568288501]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_pjuso")
 
-[node name="BlackPawnC7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=269265760]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnD7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=702469431]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnC7" unique_id=394593606]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnD7" unique_id=2030586012]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnC7/PickArea" unique_id=1240133792]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnD7/PickArea" unique_id=1170791597]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_23xmf")
 
-[node name="@CollisionShape3D@28" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnC7/PickArea" unique_id=712490207]
+[node name="@CollisionShape3D@29" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnD7/PickArea" unique_id=639565528]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_swlj1")
 
-[node name="BlackPawnD7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1243680869]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnE7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=621600933]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnD7" unique_id=2064445770]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnE7" unique_id=1188351609]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnD7/PickArea" unique_id=1419633305]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnE7/PickArea" unique_id=917725313]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_yysqy")
 
-[node name="@CollisionShape3D@29" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnD7/PickArea" unique_id=376502379]
+[node name="@CollisionShape3D@30" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnE7/PickArea" unique_id=1305711800]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_n5t1e")
 
-[node name="BlackPawnE7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1742106526]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnF7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=633394138]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnE7" unique_id=1181730936]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnF7" unique_id=117728460]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnE7/PickArea" unique_id=1776938982]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnF7/PickArea" unique_id=1428442639]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_h6isl")
 
-[node name="@CollisionShape3D@30" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnE7/PickArea" unique_id=861509749]
+[node name="@CollisionShape3D@31" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnF7/PickArea" unique_id=821884250]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_53bls")
 
-[node name="BlackPawnF7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1580101436]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnG7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=308828259]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnF7" unique_id=1643059945]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnG7" unique_id=1526230578]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnF7/PickArea" unique_id=2025244143]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnG7/PickArea" unique_id=2144201324]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_lwnsi")
 
-[node name="@CollisionShape3D@31" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnF7/PickArea" unique_id=47883478]
+[node name="@CollisionShape3D@32" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnG7/PickArea" unique_id=1194128493]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_41lik")
 
-[node name="BlackPawnG7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=1376242224]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 2.5)
-script = ExtResource("5_ryguw")
+[node name="BlackPawnH7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=411531788]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 2.5)
+script = ExtResource("5_getpj")
 side = 1
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnG7" unique_id=256261702]
+[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnH7" unique_id=1068764739]
 monitoring = false
 
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnG7/PickArea" unique_id=1850008886]
+[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnH7/PickArea" unique_id=1479305180]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_jbvwl")
 
-[node name="@CollisionShape3D@32" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnG7/PickArea" unique_id=2056768060]
+[node name="@CollisionShape3D@33" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnH7/PickArea" unique_id=1898072210]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
 shape = SubResource("CylinderShape3D_sn1fb")
 
-[node name="BlackPawnH7" type="MeshInstance3D" parent="World/Pieces/BlackPawns" unique_id=407116258]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 2.5)
-script = ExtResource("5_ryguw")
-side = 1
+[node name="Table" type="MeshInstance3D" parent="World" unique_id=838447193]
+script = ExtResource("6_ryguw")
 
-[node name="PickArea" type="Area3D" parent="World/Pieces/BlackPawns/BlackPawnH7" unique_id=982741393]
-monitoring = false
-
-[node name="PickShape" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnH7/PickArea" unique_id=90263374]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_yvsr8")
-
-[node name="@CollisionShape3D@33" type="CollisionShape3D" parent="World/Pieces/BlackPawns/BlackPawnH7/PickArea" unique_id=1908123885]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.32, 0)
-shape = SubResource("CylinderShape3D_vieuh")
-
-[node name="Table" type="MeshInstance3D" parent="World" unique_id=32851943]
-script = ExtResource("6_d13ii")
-
-[node name="TrayLight" type="Node3D" parent="World" unique_id=1076602695]
+[node name="TrayLight" type="Node3D" parent="World" unique_id=331588883]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.45, -0.34, 0)
-script = ExtResource("7_1u8w0")
+script = ExtResource("7_d13ii")
 
-[node name="TrayDark" type="Node3D" parent="World" unique_id=2057901614]
+[node name="TrayDark" type="Node3D" parent="World" unique_id=974876895]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, 1, 5.45, -0.34, 0)
-script = ExtResource("7_1u8w0")
+script = ExtResource("7_d13ii")
 capturer = 1
 
-[node name="Room" type="Node3D" parent="World" unique_id=285091365]
-script = ExtResource("8_0odxb")
+[node name="Room" type="Node3D" parent="World" unique_id=836654326]
+script = ExtResource("8_1u8w0")
 
-[node name="KeyLight" type="DirectionalLight3D" parent="World" unique_id=23236579]
+[node name="KeyLight" type="DirectionalLight3D" parent="World" unique_id=1920280695]
 transform = Transform3D(0.5368755, -0.70674187, 0.46073934, 0, 0.54611874, 0.8377079, -0.8436615, -0.44974482, 0.29319775, 0, 0, 0)
 light_color = Color(1, 0.965, 0.91, 1)
 light_energy = 1.25
 shadow_enabled = true
 directional_shadow_max_distance = 40.0
 
-[node name="FillLight" type="DirectionalLight3D" parent="World" unique_id=1370368465]
+[node name="FillLight" type="DirectionalLight3D" parent="World" unique_id=1966846840]
 transform = Transform3D(-0.64594233, 0.4142058, -0.6412427, 0, 0.83999777, 0.54259, 0.7633863, 0.35048187, -0.54259, 0, 0, 0)
 light_color = Color(0.76, 0.83, 1, 1)
 light_energy = 0.35
 
-[node name="Environment" type="WorldEnvironment" parent="World" unique_id=1703184188]
-environment = SubResource("Environment_inymm")
+[node name="Environment" type="WorldEnvironment" parent="World" unique_id=1462129751]
+environment = SubResource("Environment_yjja3")
 
-[node name="Camera" type="Camera3D" parent="World" unique_id=1120233990]
+[node name="Camera" type="Camera3D" parent="World" unique_id=718503332]
 transform = Transform3D(1, 0, 0, 0, 0.82903755, 0.5591929, 0, -0.5591929, 0.82903755, 0, 6.542557, 9.699739)
 current = true
 fov = 45.0
-script = ExtResource("9_lswn8")
+script = ExtResource("9_0odxb")
 
-[node name="UILayer" type="CanvasLayer" parent="." unique_id=181821215]
+[node name="UILayer" type="CanvasLayer" parent="." unique_id=892562525]
 
-[node name="Hud" type="Control" parent="UILayer" unique_id=451662434]
+[node name="Hud" type="Control" parent="UILayer" unique_id=1375387225]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-script = ExtResource("10_a6jrf")
+script = ExtResource("10_lswn8")
 
-[node name="TurnLabel" type="Label" parent="UILayer/Hud" unique_id=2124105519]
+[node name="TurnLabel" type="Label" parent="UILayer/Hud" unique_id=1081186527]
 unique_name_in_owner = true
 layout_mode = 0
 anchor_left = 0.5
@@ -1101,7 +1100,7 @@ theme_override_constants/outline_size = 6
 text = "White to move    ·    0 moves"
 horizontal_alignment = 1
 
-[node name="ControlColumn" type="VBoxContainer" parent="UILayer/Hud" unique_id=421110656]
+[node name="ControlColumn" type="VBoxContainer" parent="UILayer/Hud" unique_id=1346949155]
 unique_name_in_owner = true
 layout_mode = 0
 anchor_left = 1.0
@@ -1115,17 +1114,17 @@ offset_bottom = 150.0
 theme_override_constants/separation = 14
 alignment = 1
 
-[node name="RotateLeftButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=1023309295]
+[node name="RotateLeftButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=388049326]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 tooltip_text = "rotateleft"
 focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_jcxqu")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_0arob")
-theme_override_styles/hover = SubResource("StyleBoxFlat_dij0e")
+theme_override_styles/normal = SubResource("StyleBoxFlat_l0gw7")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_inymm")
+theme_override_styles/hover = SubResource("StyleBoxFlat_jcxqu")
 
-[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/RotateLeftButton" unique_id=349576644]
+[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/RotateLeftButton" unique_id=1878894664]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -1134,21 +1133,21 @@ offset_top = 12.0
 offset_right = -12.0
 offset_bottom = -12.0
 mouse_filter = 2
-texture = ExtResource("11_xuqvo")
+texture = ExtResource("11_a6jrf")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="RotateRightButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=1016766808]
+[node name="RotateRightButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=316133426]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 tooltip_text = "rotateright"
 focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_k1udn")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_wat4s")
-theme_override_styles/hover = SubResource("StyleBoxFlat_ywjan")
+theme_override_styles/normal = SubResource("StyleBoxFlat_0arob")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_dij0e")
+theme_override_styles/hover = SubResource("StyleBoxFlat_k1udn")
 
-[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/RotateRightButton" unique_id=1564825054]
+[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/RotateRightButton" unique_id=448070172]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -1157,21 +1156,21 @@ offset_top = 12.0
 offset_right = -12.0
 offset_bottom = -12.0
 mouse_filter = 2
-texture = ExtResource("12_qsp4k")
+texture = ExtResource("12_xuqvo")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="FlipButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=1521575258]
+[node name="FlipButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=645692600]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 tooltip_text = "flip"
 focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_m74q3")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_tko6h")
-theme_override_styles/hover = SubResource("StyleBoxFlat_am8a1")
+theme_override_styles/normal = SubResource("StyleBoxFlat_wat4s")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_ywjan")
+theme_override_styles/hover = SubResource("StyleBoxFlat_m74q3")
 
-[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/FlipButton" unique_id=179375796]
+[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/FlipButton" unique_id=189735851]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -1180,21 +1179,21 @@ offset_top = 12.0
 offset_right = -12.0
 offset_bottom = -12.0
 mouse_filter = 2
-texture = ExtResource("13_kq58d")
+texture = ExtResource("13_qsp4k")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="ResetButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=803349957]
+[node name="ResetButton" type="Button" parent="UILayer/Hud/ControlColumn" unique_id=754656770]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 2
 tooltip_text = "reset"
 focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_8dc3g")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_htgcl")
-theme_override_styles/hover = SubResource("StyleBoxFlat_smeu8")
+theme_override_styles/normal = SubResource("StyleBoxFlat_tko6h")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_am8a1")
+theme_override_styles/hover = SubResource("StyleBoxFlat_8dc3g")
 
-[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/ResetButton" unique_id=130000095]
+[node name="Glyph" type="TextureRect" parent="UILayer/Hud/ControlColumn/ResetButton" unique_id=821660932]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -1203,11 +1202,11 @@ offset_top = 12.0
 offset_right = -12.0
 offset_bottom = -12.0
 mouse_filter = 2
-texture = ExtResource("14_seu75")
+texture = ExtResource("14_kq58d")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="VoiceRow" type="Control" parent="UILayer/Hud" unique_id=770479171]
+[node name="VoiceRow" type="Control" parent="UILayer/Hud" unique_id=1252211754]
 unique_name_in_owner = true
 anchors_preset = 0
 anchor_left = 1.0
@@ -1217,16 +1216,16 @@ offset_top = 16.0
 offset_right = -180.0
 offset_bottom = 80.0
 
-[node name="MicRing" type="Panel" parent="UILayer/Hud/VoiceRow" unique_id=1690141134]
+[node name="MicRing" type="Panel" parent="UILayer/Hud/VoiceRow" unique_id=1025079151]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_f3y11")
+theme_override_styles/panel = SubResource("StyleBoxFlat_htgcl")
 
-[node name="MicButton" type="Button" parent="UILayer/Hud/VoiceRow" unique_id=329760006]
+[node name="MicButton" type="Button" parent="UILayer/Hud/VoiceRow" unique_id=2037703274]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 0
@@ -1236,7 +1235,7 @@ tooltip_text = "voice"
 focus_mode = 0
 flat = true
 
-[node name="Glyph" type="TextureRect" parent="UILayer/Hud/VoiceRow/MicButton" unique_id=1124669778]
+[node name="Glyph" type="TextureRect" parent="UILayer/Hud/VoiceRow/MicButton" unique_id=927131955]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -1245,11 +1244,11 @@ offset_top = 12.0
 offset_right = -12.0
 offset_bottom = -12.0
 mouse_filter = 2
-texture = ExtResource("15_htxhm")
+texture = ExtResource("15_seu75")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="RemoteDot" type="Panel" parent="UILayer/Hud/VoiceRow" unique_id=2096382826]
+[node name="RemoteDot" type="Panel" parent="UILayer/Hud/VoiceRow" unique_id=547518744]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
@@ -1258,9 +1257,9 @@ offset_top = 50.0
 offset_right = 61.0
 offset_bottom = 61.0
 mouse_filter = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_cpm2s")
+theme_override_styles/panel = SubResource("StyleBoxFlat_smeu8")
 
-[node name="MenuButton" type="Button" parent="UILayer/Hud" unique_id=581349475]
+[node name="MenuButton" type="Button" parent="UILayer/Hud" unique_id=49026226]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(64, 64)
 layout_mode = 0
@@ -1272,11 +1271,11 @@ offset_right = -20.0
 offset_bottom = 80.0
 tooltip_text = "menu"
 focus_mode = 0
-theme_override_styles/normal = SubResource("StyleBoxFlat_u81y6")
-theme_override_styles/pressed = SubResource("StyleBoxFlat_rt5wr")
-theme_override_styles/hover = SubResource("StyleBoxFlat_mnw77")
+theme_override_styles/normal = SubResource("StyleBoxFlat_f3y11")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_cpm2s")
+theme_override_styles/hover = SubResource("StyleBoxFlat_u81y6")
 
-[node name="Glyph" type="TextureRect" parent="UILayer/Hud/MenuButton" unique_id=2007509124]
+[node name="Glyph" type="TextureRect" parent="UILayer/Hud/MenuButton" unique_id=2120834014]
 layout_mode = 0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -1285,11 +1284,11 @@ offset_top = 12.0
 offset_right = -12.0
 offset_bottom = -12.0
 mouse_filter = 2
-texture = ExtResource("16_jq2sk")
+texture = ExtResource("16_htxhm")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="GameOverLabel" type="Label" parent="UILayer/Hud" unique_id=1681061176]
+[node name="GameOverLabel" type="Label" parent="UILayer/Hud" unique_id=1847858232]
 unique_name_in_owner = true
 visible = false
 layout_mode = 0
@@ -1306,12 +1305,7 @@ theme_override_constants/outline_size = 8
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="SidePicker" type="Control" parent="UILayer/Hud" unique_id=1136428929]
+[node name="PromotionPicker" type="Control" parent="UILayer/Hud" unique_id=19529207]
 unique_name_in_owner = true
 anchors_preset = 0
-script = ExtResource("17_4k2k6")
-
-[node name="PromotionPicker" type="Control" parent="UILayer/Hud" unique_id=1727738340]
-unique_name_in_owner = true
-anchors_preset = 0
-script = ExtResource("18_0rl1p")
+script = ExtResource("17_jq2sk")

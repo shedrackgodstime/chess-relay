@@ -21,19 +21,6 @@ signal reset_view_requested
 signal flip_requested
 ## Emitted by the menu button. The settings screen will listen to this.
 signal menu_requested
-## Offers the side choice, marking the one already in effect.
-func offer_side_choice(current: int) -> void:
-	if side_picker != null:
-		side_picker.open(current)
-
-
-## Hides the side choice. Called once a move has been played, since changing
-## sides mid-game would hand the player a position that is not theirs.
-func close_side_choice() -> void:
-	if side_picker != null:
-		side_picker.close()
-
-
 ## Shows the end of the game over the board, or clears it.
 ##
 ## Checkmate is the one outcome that has to be said plainly: the board itself
@@ -88,7 +75,6 @@ signal voice_state_changed(state: VoiceState)
 @onready var menu_button: Button = %MenuButton
 @onready var promotion_picker: PromotionPicker = %PromotionPicker
 @onready var game_over_label: Label = %GameOverLabel
-@onready var side_picker: SidePicker = %SidePicker
 @onready var mic_button: Button = %MicButton
 
 ## Current presentation state of the mic control.

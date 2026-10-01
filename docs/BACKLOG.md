@@ -66,12 +66,18 @@ to be loud, unlike the last move.
 
 ### Choosing a side
 
-Done. `ui/side_picker.gd` asks before the first move, and the camera turns to
-face the chosen side, since a Black player otherwise opens the game looking at
-the back of White's pieces. The choice is closed once a move is played.
+**The lobby's job, not the board's.** Built here by mistake once and pulled
+again: a full-screen chooser over the board stops mouse input, so the game is
+unplayable while it is up.
 
-Still owed: the choice is not currently reachable again from the menu button, so
-a player who wants to change side has to restart. Fine for now, but it is a gap.
+What already exists and must keep working, because the lobby will depend on it:
+`Main.player_side`, `opponent_side()` derived from it, and `Main.yaw_for_side()`,
+which the reset view and flip are both derived from so the camera faces whichever
+side the player took. All of that is tested.
+
+So the lobby needs to do two things: set `player_side` before the game starts,
+and make sure whatever screen it uses has been dismissed by the time play
+begins. A test asserts nothing full-screen is left over the board at start.
 
 ### Promotion
 
