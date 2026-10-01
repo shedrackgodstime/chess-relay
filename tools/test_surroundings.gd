@@ -68,8 +68,19 @@ func _studio_checks() -> void:
 	_check("sky no longer contributes to ambient",
 		is_zero_approx(env.ambient_light_sky_contribution),
 		"%.2f" % env.ambient_light_sky_contribution)
-	_check("ambient is dim", env.ambient_light_energy < 0.6,
+	# Not near-black: surfaces facing away from the lamp live on ambient alone,
+	# and starving it turns the wood and the board's two square tones grey.
+	_check("ambient is bright enough to keep material colour",
+		env.ambient_light_energy >= 0.8 and env.ambient_light_energy < 1.6,
 		"energy=%.2f" % env.ambient_light_energy)
+	_check("ambient is warm, not neutral grey",
+		env.ambient_light_color.r >= env.ambient_light_color.b,
+		"%s" % env.ambient_light_color)
+	_check("exposure compensates for the filmic tonemap",
+		env.tonemap_exposure > 1.0, "exposure=%.2f" % env.tonemap_exposure)
+	_check("the floor is a brown, not a hole",
+		TableMesh.FLOOR_COLOR.r > TableMesh.FLOOR_COLOR.b,
+		"%s" % TableMesh.FLOOR_COLOR)
 	_check("fog is on so the floor fades rather than ends",
 		env.fog_enabled and env.fog_density > 0.0, "density=%.3f" % env.fog_density)
 	_check("background is a flat colour behind the dome",

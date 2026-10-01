@@ -30,7 +30,7 @@ const LAMP_HEIGHT := 5.6
 const LAMP_OFFSET := Vector3(-1.1, 0.0, -0.8)
 
 const LAMP_ANGLE_DEGREES := 58.0
-const LAMP_RANGE := 16.0
+const LAMP_RANGE := 18.0
 
 ## Warm, matching the amber the HUD already uses.
 const LAMP_COLOR := Color(1.0, 0.905, 0.775)
@@ -38,27 +38,34 @@ const LAMP_COLOR := Color(1.0, 0.905, 0.775)
 ## Spot energy runs on a different scale to a directional light, and there is
 ## no headless way to check how bright this actually looks. Kept as named
 ## constants rather than buried so it is one edit to tune on a device.
-const LAMP_ENERGY := 14.0
+const LAMP_ENERGY := 26.0
 
 ## Cool fill so the shaded sides of pieces are not solid black. Deliberately
 ## dim: it separates silhouettes, it does not light the room.
-const FILL_ENERGY := 0.30
+const FILL_ENERGY := 0.55
 const FILL_COLOR := Color(0.700, 0.790, 1.0)
 
 ## Dark enough that the floor never competes with the board, warm enough not to
 ## read as pure black on cheap phone panels.
-const FLOOR_COLOR := Color(0.030, 0.027, 0.026)
+## A dark room floor, but still a warm brown. Near-black was tried and reads as
+## a hole rather than a floor, and takes the wood's palette with it.
+const FLOOR_COLOR := Color(0.090, 0.064, 0.050)
 
 ## The dome is unlit on purpose. A shaded sphere would pick up the lamp and
 ## glow, which is the opposite of receding.
-const DOME_COLOR := Color(0.052, 0.047, 0.052)
-const FOG_COLOR := Color(0.052, 0.047, 0.052)
-const FOG_DENSITY := 0.030
+const DOME_COLOR := Color(0.105, 0.092, 0.088)
+const FOG_COLOR := Color(0.105, 0.092, 0.088)
+const FOG_DENSITY := 0.018
 
-## Fixed dark ambient rather than ambient from the sky. Pulling ambient out of
-## a sky is what was flattening everything; the light now comes from the lamp.
-const AMBIENT_COLOR := Color(0.115, 0.105, 0.115)
-const AMBIENT_ENERGY := 0.40
+## Warm and bright enough that materials keep their own colour. Ambient is what
+## a surface facing away from the lamp sees, and starving it is what turned the
+## wood and the board's two square tones into flat grey.
+const AMBIENT_COLOR := Color(0.300, 0.255, 0.225)
+const AMBIENT_ENERGY := 1.05
+
+## Filmic tonemap crushes saturation in the shadows, which is most of this
+## scene, so exposure is pulled up to put the colour back.
+const EXPOSURE := 1.30
 
 
 func _ready() -> void:
@@ -150,6 +157,7 @@ static func apply_to(env: Environment) -> void:
 	# still driving the light when reading the environment back.
 	env.ambient_light_sky_contribution = 0.0
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.tonemap_exposure = EXPOSURE
 	# Fog is what actually sells the falloff: without it the floor ends in a
 	# visible edge, and with it the floor simply gets further away.
 	env.fog_enabled = true
