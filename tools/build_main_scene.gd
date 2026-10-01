@@ -306,19 +306,23 @@ func _voice_row() -> Control:
 	var row := Control.new()
 	row.name = "VoiceRow"
 	row.unique_name_in_owner = true
-	# Measured from the menu rather than from the screen, because the two are
-	# one corner cluster and must keep their spacing at any width.
+	# Was top-right, 244px in from the right edge and 180px from it, measured as a
+	# VOICE_GAP of 160 to the left of the menu's centre: it was clustered with the
+	# menu as one corner of controls. It is now top-left at MENU_INSET from the edge,
+	# the same inset the menu uses from the other side, which is the whole reason the
+	# inset is a named constant.
 	#
-	# The menu centre is MENU_INSET back from the right edge, less half a touch
-	# target; the mic centre is a further VOICE_GAP to the left of that.
-	var menu_centre := Hud.MENU_INSET - Hud.TOUCH_SIZE.x * 0.5
-	var mic_centre := menu_centre + Hud.VOICE_GAP
-	row.anchor_left = 1.0
-	row.anchor_right = 1.0
+	# The move is justified by the layout rather than by anything that might sit
+	# here later. The right edge carries the menu and four view controls and the left
+	# carried none, so the balance was wrong on its own terms. A small frame of the
+	# opponent above this would make the corner read as a call, but that is a
+	# possibility, not a plan, and the position does not depend on it.
+	row.anchor_left = 0.0
+	row.anchor_right = 0.0
 	row.anchor_top = 0.0
 	row.anchor_bottom = 0.0
-	row.offset_left = -mic_centre - Hud.TOUCH_SIZE.x * 0.5
-	row.offset_right = -mic_centre + Hud.TOUCH_SIZE.x * 0.5
+	row.offset_left = Hud.MENU_INSET
+	row.offset_right = Hud.MENU_INSET + Hud.TOUCH_SIZE.x
 	row.offset_top = 16.0
 	row.offset_bottom = 16.0 + Hud.TOUCH_SIZE.y
 	row.visible = true

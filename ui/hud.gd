@@ -102,6 +102,9 @@ const MENU_INSET := 84.0
 ## belong to the same corner, so they should hold their spacing as the screen
 ## narrows. An anchor fraction drifts away from the menu on narrow displays,
 ## which is the same complaint as the original fixed offset.
+## How far the mic used to sit to the left of the menu, when the two shared the
+## top-right corner. Retained as the record of that layout; the mic is now measured
+## from the left edge by MENU_INSET instead.
 const VOICE_GAP := 160.0
 
 

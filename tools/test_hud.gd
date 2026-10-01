@@ -135,22 +135,26 @@ func _mic_checks(main: Main, hud: Hud) -> void:
 		main.ai_opponent = with_ai
 		hud.set_voice_visible(Main.DEV_SHOW_VOICE or not with_ai)
 		_check("voice visible with ai_opponent=%s" % with_ai, hud.voice_row.visible, "")
-	# Not "left of the menu" but exactly between the two references, measured
-	# rather than assumed so a resize cannot quietly undo it.
+	# The mic is top-left now, not in the menu's corner. It was 244px in from the
+	# right edge and 180px from it, VOICE_GAP to the left of the menu's centre; the
+	# contract is now MENU_INSET from the left edge, the same inset the menu keeps
+	# from the right. Measured rather than assumed, so a resize cannot undo it, and
+	# asserted from the left edge rather than relative to the menu so the two sides
+	# cannot quietly collapse into the same corner again.
 	var label := hud.get_node("TurnLabel") as Label
 	var label_mid := label.global_position.x + label.size.x * 0.5
 	var menu_mid := hud.menu_button.global_position.x + hud.menu_button.size.x * 0.5
 	var mic_mid := hud.mic_button.global_position.x + hud.mic_button.size.x * 0.5
-	# The gap is the contract: a fixed distance from the menu, measured, so it
-	# cannot silently drift. The old 'leans right' assertion is gone because
-	# at a fixed gap that only holds above a certain width, and would have
-	# failed on a narrow screen for a placement that is actually correct.
-	_check("mic holds its gap from the menu",
-		absf(menu_mid - mic_mid - Hud.VOICE_GAP) <= 1.0,
-		"gap=%.1f wanted=%.1f" % [menu_mid - mic_mid, Hud.VOICE_GAP])
-	_check("mic sits between the move count and the menu",
-		mic_mid > label_mid and mic_mid < menu_mid,
-		"mic=%.0f label=%.0f menu=%.0f" % [mic_mid, label_mid, menu_mid])
+	_check("mic holds its inset from the left edge",
+		absf(hud.mic_button.global_position.x - Hud.MENU_INSET) <= 1.0,
+		"x=%.1f wanted=%.1f" % [hud.mic_button.global_position.x, Hud.MENU_INSET])
+	_check("mic is on the opposite side from the menu", mic_mid < menu_mid,
+		"mic=%.0f menu=%.0f" % [mic_mid, menu_mid])
+	_check("mic does not overlap the move count", mic_mid < label_mid,
+		"mic=%.0f label=%.0f" % [mic_mid, label_mid])
+	_check("and it is on the left half of the board, so the two sides balance",
+		mic_mid < label_mid * 0.5 + Hud.MENU_INSET,
+		"mic=%.0f label=%.0f" % [mic_mid, label_mid])
 	_check("mic is in the top band", hud.mic_button.global_position.y < 100.0,
 		"y=%.0f" % hud.mic_button.global_position.y)
 	_check("mic has no panel behind it", hud.mic_button.flat, "")

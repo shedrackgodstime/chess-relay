@@ -187,9 +187,56 @@ incomplete. `Rules` is the only place that needs to change.
 - **Voice.** The button cycles off, requesting, live and emits
   `voice_state_changed`, which has no listener. Needs capture, an encode path,
   transport, and `RECORD_AUDIO` on Android.
-- **New game / rematch.** There is no way back to the opening position in play.
-  Note that `game.reset()` alone is not enough: capture frees the victim nodes, so
-  the piece registry and the scene both have to be rebuilt.
+- **New game / rematch.** Attempted and **reverted, not shipped**, because it could
+  not be made to pass. `Main.start_new_game()` was written and worked by hand:
+  `game.reset()` plus a full rebuild of the piece views, clearing selection, last
+  move, check marker, destination hints, capture trays and the banner. `game.reset()`
+  alone is genuinely not enough, since a capture frees the victim node and a finished
+  game leaves the scene short of the thirty-two it began with.
+  What is stuck: one failure in `_side_ownership_checks`, which runs *first* in the
+  suite and so cannot be caused by code added later in it. Ruled out: `face_opponent`
+  on rebuilt pieces (piece meshes are cached globally, so it was a fair suspect, but
+  matching the generator exactly changed nothing); the new button intercepting taps
+  (`set_game_over` never runs in that path, so it was never visible); and moving the
+  button clear of the board. Two other failures were cross-scene pollution from a
+  destructive test running mid-sequence and were fixed by running it last.
+  Next thing to try: run the new-game section alone in a fresh process, to tell a
+  global cache problem apart from genuine order dependence, before touching
+  `_rebuild_pieces` again.
+- **Move list / notation.** None. The last-move markers are the only record of what
+  has been played.
+- **Illegal-move feedback.** Nothing happens when a tap is refused. Agreed in the
+  indicator vocabulary: a brief shake or flash, and no indicator for the attempt.
+- **Draw claims.** Threefold and the fifty-move rule end the game automatically here.
+  Under the real rules they are claims the player makes. This becomes a button rather
+  than a rule, and a clock is what gives players a reason to press it.
+- **The mic moved from top-right to top-left. It was** 244px in from the right edge
+  and 180px from it, `VOICE_GAP` (160) to the left of the menu's centre, clustered
+  with the menu as one corner of controls. It is now `MENU_INSET` (84) from the left
+  edge, the same inset the menu keeps from the right. The contract in `test_hud` is
+  now measured from the left edge rather than from the menu, deliberately, so the two
+  sides cannot quietly collapse back into the same corner.
+  The `RemoteDot`, which lights when the opponent is speaking, lives inside the mic's
+  touch target and travelled with it. If a frame is ever built here, it must be
+  `MOUSE_FILTER_IGNORE`: overlaying the board is how the reverted new-game button
+  caught taps aimed at squares.
+- **Top-left reserved for a call frame, if ever wanted.** Not planned and not to be
+  built: noted only so the mic's move is not undone later for no reason. The
+  reasoning is that a mic beside a small video frame of the opponent reads as one
+  communication corner, where a mic alone in a corner is a little orphaned, so the
+  mic would sit top-left with a frame above or beside it if video were ever needed.
+  Worth being clear that the mic move is justified on its own: the right edge
+  carries five controls and the left none, so balancing it is worth doing whether or
+  not a frame ever appears. Do not let a speculative feature hold the layout
+  hostage, and do not build the frame.
+  If it ever were built, it would be mostly incremental work, since capture, encode
+  and transport are the same work voice needs first. One thing to get right from the
+  start: a frame sitting over the board must be `MOUSE_FILTER_IGNORE`. Overlaying the
+  board is how the new-game button caught taps aimed at squares, and a panel the size
+  of a video frame is a far bigger offender.
+- **Network status indicator.** Agreed in principle, for the corner the mic leaves.
+  Belongs with the clock work: a connection indicator and a clock that pauses on
+  disconnect are the two halves of the same requirement.
 - ~~**Hint the legal moves** for the selected piece.~~ Done, behind the
   `Indicators.show_legal_moves` setting, on temporarily for review.
 
