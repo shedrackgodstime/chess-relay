@@ -427,6 +427,15 @@ func _network_checks(hud: Hud) -> void:
 		tint[state] = total / maxi(lit, 1)
 		_check("state %d draws its frame even with nothing lit" % state, ghost > 0,
 			"ghost=%d lit=%d" % [ghost, lit])
+		# The frame has to be opaque enough to read, not merely to exist. A test that
+		# only counted pixels passed while the control was invisible on a real
+		# screen: drawn is not visible, and a headless pixel count cannot tell the
+		# difference. This at least holds the number somewhere a person can see.
+		_check("state %d draws its frame opaquely enough to see" % state,
+			Icons.SIGNAL_GHOST.a >= 0.35, "alpha=%.2f" % Icons.SIGNAL_GHOST.a)
+		_check("and the live bars stay clearly brighter than the frame",
+			Icons.NETWORK_LIT_ALPHA - Icons.SIGNAL_GHOST.a > 0.4,
+			"ghost=%.2f lit=%.2f" % [Icons.SIGNAL_GHOST.a, Icons.NETWORK_LIT_ALPHA])
 	# The frame is the same shape in every state, so the number of drawn pixels must
 	# not change. Ghost pixels on their own do fall as a state lights more bars,
 	# because a lit bar covers the frame beneath it, which is why the invariant is the

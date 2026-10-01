@@ -296,7 +296,9 @@ func _network_indicator() -> TextureRect:
 	# Right-anchored, a gap left of the menu: the menu's right edge is MENU_INSET in,
 	# it is one touch target wide, and the indicator is half that again.
 	var right := Hud.MENU_INSET + Hud.TOUCH_SIZE.x + 14.0
-	var side := 30.0
+	# 36 rather than 30. This is status, not a touch target, so it has no minimum to
+	# respect and can be sized for being read: at 30 the bars were two pixels wide.
+	var side := 36.0
 	indicator.anchor_left = 1.0
 	indicator.anchor_right = 1.0
 	indicator.anchor_top = 0.0

@@ -254,7 +254,12 @@ incomplete. `Rules` is the only place that needs to change.
   is or what it could show, and an idle state with nothing drawn looks identical to a
   broken one. With the frame in place idle says "a meter, at nothing". The frame is
   white at low opacity rather than a state colour, so it reads as capacity and never
-  as a level. The test pins that the drawn frame is the same size in every state, by
+  as a level. **The first attempt at 0.22 alpha was invisible on a real screen:** the
+  test counted the pixels, confirmed they were drawn and correctly separated from the
+  live bars, and the control still read as nothing but a stray dot, which is worse than
+  no frame because it looks broken. Drawn is not visible, and a headless pixel count
+  cannot tell the difference. It is at 0.42 with strokes wider than Lucide's 2, and
+  the test now holds the frame opaque enough to read rather than merely present. The test pins that the drawn frame is the same size in every state, by
   lit-plus-unlit, since a lit bar covers the frame beneath it.
   It is `MOUSE_FILTER_IGNORE` and takes no input: a control that looks live but does
   nothing is worse than none, and anything over the board can catch taps aimed at

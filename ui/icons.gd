@@ -84,7 +84,16 @@ const SIGNAL_BARS := 4
 
 ## The unlit frame. White at low opacity rather than a state colour, so it reads as
 ## capacity and can never be mistaken for a level.
-const SIGNAL_GHOST := Color(1.0, 1.0, 1.0, 0.22)
+## 0.22 was drawn, and drawn correctly, and read as nothing on a real screen: the
+## bars were too faint to see and only the baseline dot registered, which looks
+## exactly like a broken control. Drawn is not visible. At this size on a dark room
+## the frame needs to be near half opacity to read as a meter, and the strokes need
+## to be wide enough to survive being scaled down.
+const SIGNAL_GHOST := Color(1.0, 1.0, 1.0, 0.42)
+
+## The live bars. Opaque, so the two are separable by brightness alone, which is what
+## lets the test tell capacity from level without reading hues.
+const NETWORK_LIT_ALPHA := 1.0
 
 static func signal_bars(count: int, colour: Color) -> Texture2D:
 	var key := "signal_%d_%s" % [count, colour.to_html(false)]
@@ -96,7 +105,9 @@ static func signal_bars(count: int, colour: Color) -> Texture2D:
 	# four bars topping out at 16, 12, 8 and 4.
 	var scale := CANVAS / 24.0
 	var baseline := 20.0 * scale
-	var width := 2.0 * scale
+	# Thicker than Lucide's 2, deliberately. Faithful at 64 px, this is drawn at 36,
+	# where a 2-unit stroke lands on about two pixels and stops reading as a bar.
+	var width := 2.6 * scale
 	# The baseline dot belongs to the frame, not to any state.
 	stroke_disc_tinted(img, Vector2(2.0 * scale, baseline), 3.0, SIGNAL_GHOST)
 	# The whole frame first, faintly, then the live bars on top of it. The frame is
