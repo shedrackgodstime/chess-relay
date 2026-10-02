@@ -46,7 +46,8 @@ const SHADE := 0.90
 
 func _ready() -> void:
 	build()
-	computer_button.pressed.connect(func() -> void: open_game())
+	computer_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(
+		"res://lobby.tscn"))
 	p2p_button.pressed.connect(func() -> void: show_notice(
 		"P2P needs a transport, which is not built yet."))
 	settings_button.pressed.connect(func() -> void: show_notice(
@@ -56,7 +57,7 @@ func _ready() -> void:
 ## Loads the game. A separate scene rather than a layer over this one, so nothing of
 ## the board exists until a game is actually asked for.
 func open_game() -> void:
-	get_tree().change_scene_to_file("res://main.tscn")
+	get_tree().change_scene_to_file("res://lobby.tscn")
 
 
 func build() -> void:

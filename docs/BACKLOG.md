@@ -231,6 +231,31 @@ incomplete. `Rules` is the only place that needs to change.
   earlier version also set a board-paused flag as a backstop: the same rule stated
   twice, and the second copy broke every test that drives the board directly. Do not add
   it back.
+- **The lobby exists for a computer game, and is UI only.** `res://lobby.tscn`, built by
+  `tools/build_lobby_scene.gd`. Home asks *what kind of game*; the lobby asks *how this
+  one goes*, and it asks three things and hands them over: difficulty, side, go.
+  Difficulty and side are rows of buttons rather than dropdowns, so every option is
+  visible at once and the player reads the panel instead of opening it, and the chosen
+  one is visibly chosen rather than hidden behind a tap.
+  **`MatchConfig` is the seam between the lobby and the game.** They are separate scenes
+  with no object in common, so the choices live in one small static holder and nothing
+  else crosses. It holds only what the player chose, never game state, so the game stays
+  the only source of truth for a match.
+  **Random resolves in the lobby, before the board exists.** Main reads the side before
+  it aims the camera and places pieces, so the first frame is already correct and the
+  board is never seen turning around after it appears.
+  **Difficulty is UI only and is not acted on.** The AI plays a random legal move
+  whatever it says. Marking it is a lie in three buttons, and that matters more here
+  than anywhere else, because it is the most prominent control on the panel: a player who
+  picks Hard and loses to nonsense concludes the game is broken. It ships visible and
+  unbacked, and the search behind it is the next piece of work. It needs to be off the
+  main thread when it arrives, since `AiPlayer.choose_move` is synchronous and a
+  three-second freeze per move is not shippable.
+  Not built, deliberately: a room list, chat, and the clock. All three need the
+  transport, and a list of rooms that cannot be joined is the most misleading thing this
+  project could ship.
+  `tools/test_lobby.gd` is its own suite for the same reason as the home screen: a parse
+  error here is a game that cannot be started at all.
 - **Home is its own scene and the project's entry point.** `res://home.tscn`, built by
   `tools/build_home_scene.gd`, set as `run/main_scene`. It was a CanvasLayer over the
   loaded board first and that was wrong: the whole 3D world stayed alive behind a menu,

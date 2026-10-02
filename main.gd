@@ -121,6 +121,10 @@ var _press_moved := false
 
 
 func _ready() -> void:
+	# First, because the camera is aimed from the side and the pieces are placed into
+	# it: adopting the lobby's choice afterwards would aim the camera for the wrong
+	# player and then have to turn it.
+	_adopt_match_config()
 	frame_board()
 	game.reset()
 	game.moved.connect(_on_game_moved)
@@ -241,6 +245,18 @@ func _rebuild_pieces() -> void:
 			holder.add_child(view)
 			view.position = BoardMesh.square_position(file, rank)
 			pieces[Vector2i(file, rank)] = view
+
+
+## Applies what the lobby decided.
+##
+## Called before the board is built, so the first frame is already correct for whoever
+## is playing. The side is read rather than flipped in the lobby because the board is
+## built once and aimed from the player's side, and it is resolved before the lobby
+## leaves, so the picture a player arrives at is the picture they chose.
+func _adopt_match_config() -> void:
+	ai_opponent = true
+	if MatchConfig.side != MatchConfig.Difficulty.RANDOM_SIDE:
+		player_side = MatchConfig.side
 
 
 func _collect_pieces() -> void:
