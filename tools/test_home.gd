@@ -51,12 +51,17 @@ func _init() -> void:
 			"shade=%.0fx%.0f home=%.0fx%.0f" % [shade.size.x, shade.size.y,
 				home.size.x, home.size.y])
 
-	# Entries with nothing behind them must say so rather than do nothing.
-	home.p2p_button.pressed.emit()
+	# P2P leads to a screen of its own now, rather than dead-ending here.
+	_check("the multiplayer entry exists", home.p2p_button != null, "")
+	_check("and it leads to the multiplayer screen",
+		ResourceLoader.exists("res://p2p_lobby.tscn"), "")
+
+	# Settings is still nothing behind it, and must say so where it is pressed.
+	home.settings_button.pressed.emit()
 	await process_frame
 	var notice := home.column.get_node_or_null("HomeNotice") as Label
 	_check("an entry with nothing behind it explains itself",
-		notice != null and "P2P" in notice.text,
+		notice != null and notice.text.find("Settings") >= 0,
 		"notice=%s" % (notice.text if notice != null else "<none>"))
 
 	# The entry point is this scene. Getting that wrong is a game that boots into the

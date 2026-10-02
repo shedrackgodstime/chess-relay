@@ -49,8 +49,8 @@ func _ready() -> void:
 	build()
 	computer_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(
 		"res://lobby.tscn"))
-	p2p_button.pressed.connect(func() -> void: show_notice(
-		"P2P needs a transport, which is not built yet."))
+	p2p_button.pressed.connect(func() -> void: get_tree().change_scene_to_file(
+		"res://p2p_lobby.tscn"))
 	settings_button.pressed.connect(func() -> void: show_notice(
 		"Settings has no screen yet."))
 
@@ -126,7 +126,9 @@ func build() -> void:
 	column.add_child(computer_button)
 	column.add_child(p2p_button)
 	column.add_child(settings_button)
-	_notice("P2P and Settings are not ready yet.")
+	# Said up front rather than only when pressed: two of the three entries here go
+	# somewhere, and the one that does not should not look like it has been forgotten.
+	_notice("Settings is not ready yet.")
 
 
 ## The picture, or nothing if it has not been imported.

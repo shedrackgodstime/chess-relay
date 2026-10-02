@@ -1,5 +1,5 @@
 class_name LobbyScreen
-extends Control
+extends GameScreen
 
 ## Where a computer game is set up. One step in from the home screen, and built to
 ## look like the same application rather than a different interface.
@@ -26,18 +26,20 @@ const TITLE := "VS COMPUTER"
 const ACTION := "PLAY"
 
 
-var column: VBoxContainer = null
+## The screen title, kept so the tests and the measuring tool can read it. The title
+## node itself is added by GameScreen.
 var title_label: Label = null
 var difficulty_group: VBoxContainer = null
 var side_group: VBoxContainer = null
 var start_button: Button = null
-var back_button: Button = null
 
 
-func _ready() -> void:
+func _build_content() -> void:
 	build()
-	start_button.pressed.connect(_on_play)
-	back_button.pressed.connect(_on_back)
+
+
+## Shows the stored choices, called by GameScreen once the rows exist.
+func _show_defaults() -> void:
 	# Whatever was chosen last, shown rather than assumed. A screen with nothing
 	# chosen looks broken, and a player who has not chosen should still be able to play.
 	_show_difficulty(MatchConfig.difficulty)
@@ -45,104 +47,20 @@ func _ready() -> void:
 
 
 func build() -> void:
-	# The home screen's background treatment exactly: the same photograph, covered
-	# rather than fitted, under the same wash. Reusing it is what makes this read as
-	# the next screen of the same game.
-	var background := TextureRect.new()
-	background.name = "LobbyBackground"
-	background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.texture = ScreenStyle.background_texture()
-	add_child(background)
-
-	var shade := ColorRect.new()
-	shade.name = "LobbyShade"
-	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.color = ScreenStyle.background_shade(ScreenStyle.SHADE,
-		ScreenStyle.BACKGROUND_SHADE)
-	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(shade)
-
-	var centre := CenterContainer.new()
-	centre.name = "Centre"
-	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
-	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(centre)
-
-	column = VBoxContainer.new()
-	column.name = "LobbyColumn"
-	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	# Tight, with the room below the title coming from a spacer rather than from the
-	# column as a whole. Spacing every part this far apart made the lobby taller than
-	# the home screen, and the document asks for the opposite.
-	column.add_theme_constant_override("separation", 10)
-	centre.add_child(column)
-
 	# Less vertical space than the home screen. This is one step in a flow, not the
 	# cover, and it should not demand as much of the screen as the cover does.
-	title_label = Label.new()
-	title_label.name = "LobbyTitle"
-	title_label.text = TITLE
-	title_label.custom_minimum_size = Vector2(0.0, 44.0)
-	ScreenStyle.title_style(title_label, 40)
-	column.add_child(title_label)
-	var under_title := Control.new()
-	under_title.name = "UnderTitle"
-	under_title.custom_minimum_size = Vector2(0.0, 8.0)
-	under_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_child(under_title)
-
+	title_label = add_title(TITLE, 40)
+	add_gap(8.0)
 	_groups()
+	add_divider()
 
-	var rule := _divider()
-	# Centred inside its own slot rather than given a full row: at one pixel it was
-	# already the thinnest thing on the screen and the gap above and below it was doing
-	# the spacing, so the two gaps around it are what the space is actually made of.
-	column.add_child(rule)
-
-	start_button = Button.new()
-	start_button.name = "LobbyStart"
-	start_button.text = ACTION
-	start_button.focus_mode = Control.FOCUS_NONE
-	# Outlined like the home buttons, but narrower: this is one action on a screen with
-	# two decisions, and it should not outweigh them.
-	start_button.custom_minimum_size = Vector2(220.0, 52.0)
-	# Shrink, not fill. A Button in a VBox fills the column by default, so PLAY came
-	# out as wide as the whole composition, which is the same width as the title above
-	# it and made the two read as a pair rather than a title and an action.
-	start_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	ScreenStyle.button_styles(start_button, 22)
-	column.add_child(start_button)
-
-	# About leaving the screen, not about this game, so it is anchored to a corner
-	# rather than laid out in the column where it would read as a third choice.
-	back_button = Button.new()
-	back_button.name = "LobbyBack"
-	back_button.text = "Back"
-	back_button.focus_mode = Control.FOCUS_NONE
-	back_button.add_theme_font_size_override("font_size", 17)
-	back_button.add_theme_color_override("font_color", ScreenStyle.MUTED)
-	back_button.add_theme_color_override("font_hover_color", ScreenStyle.TEXT)
-	back_button.add_theme_stylebox_override("normal",
-		ScreenStyle.button_box(ScreenStyle.PANEL))
-	back_button.add_theme_stylebox_override("hover",
-		ScreenStyle.button_box(ScreenStyle.PANEL_HOVER))
-	back_button.add_theme_stylebox_override("pressed",
-		ScreenStyle.button_box(ScreenStyle.PANEL_PRESSED))
-	back_button.custom_minimum_size = Vector2(104.0, 48.0)
-	back_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	back_button.position = Vector2(ScreenStyle.EDGE, ScreenStyle.EDGE)
-	add_child(back_button)
+	start_button = add_action(ACTION, 220.0, 52.0, 22)
+	# Raised a shade over the plain outlined buttons, because it is the one thing on
+	# the screen that does something rather than choosing something.
+	start_button.add_theme_stylebox_override("normal", ScreenStyle.button_box(
+		ScreenStyle.PANEL_PRESSED))
 
 
-## The two questions, side by side.
-##
-## One row holding both groups rather than two rows, because the point of the
-## composition is that they are alternatives asked at the same time. The row is as wide
-## as both groups and their gap put together and no wider, which is what keeps the pair
-## balanced about the centre instead of drifting apart on a wide screen.
 func _groups() -> void:
 	var row := HBoxContainer.new()
 	row.name = "LobbyGroups"
@@ -416,19 +334,6 @@ func _marked(group: VBoxContainer) -> String:
 		var word := (child as Button).get_node_or_null("Row/Word") as Label
 		return word.text if word != null else (child as Button).text
 	return ""
-
-
-## A thin rule between configuration and action.
-func _divider() -> ColorRect:
-	var rule := ColorRect.new()
-	rule.name = "LobbyDivider"
-	rule.color = Color(ScreenStyle.BORDER, 0.75)
-	# Shorter than the content, so it marks a change of kind rather than spanning the
-	# composition like a border around it.
-	rule.custom_minimum_size = Vector2(ScreenStyle.DIVIDER_WIDTH, 1.0)
-	rule.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	return rule
 
 
 ## Starts the game, handing over the side already resolved, so the board is built for

@@ -70,6 +70,20 @@ func _init() -> void:
 		% [screen_mid - left_ink.y, right_ink.x - screen_mid])
 	print("  ink off balance by %.0f px"
 		% absf((screen_mid - left_ink.y) - (right_ink.x - screen_mid)))
+	# The multiplayer screen too, since it is the other one built on the shared frame.
+	var p2p := (load("res://p2p_lobby.tscn") as PackedScene).instantiate()
+	root.add_child(p2p)
+	await process_frame
+	await process_frame
+	var p2p_column := p2p.find_child("Column", true, false) as Control
+	print("\n-- P2P screen --")
+	if p2p_column != null:
+		print("  content %.0f x %.0f  (%.0f%% of screen height)"
+			% [p2p_column.size.x, p2p_column.size.y,
+				p2p_column.size.y / screen.y * 100.0])
+		for child in p2p_column.get_children():
+			print("    %s %.0fx%.0f" % [child.name, child.size.x, child.size.y])
+
 	# The home screen for comparison. The design document asks for the lobby to occupy
 	# LESS vertical space than the home screen, which has to be measured rather than
 	# assumed. It was assumed the other way until now.

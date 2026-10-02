@@ -326,14 +326,21 @@ func _marks_render(lobby: LobbyScreen) -> void:
 	_check("the action is called PLAY", (lobby.start_button as Button).text == "PLAY",
 		"play=%s" % (lobby.start_button as Button).text)
 	# On the central axis, below a rule that marks a change of kind.
-	var rule := lobby.column.get_node_or_null("LobbyDivider") as ColorRect
+	# Found by walking the column rather than by name: the frame and the divider now
+	# come from GameScreen, and a test that hard-codes a node name is a test that
+	# breaks the next time something is shared rather than rewritten.
+	var rule: ColorRect = null
+	for child in lobby.column.get_children():
+		if child is ColorRect:
+			rule = child
+			break
 	_check("a rule separates the decisions from the action", rule != null, "")
 	if rule != null:
 		_check("shorter than the content, so it is a rule and not a border",
 			rule.custom_minimum_size.x < ScreenStyle.CONTENT_WIDTH,
 			"rule=%.0f" % rule.custom_minimum_size.x)
-		var below := rule.get_index() < lobby.start_button.get_index()
-		_check("and the action is below it", below, "")
+		_check("and the action is below it",
+			rule.get_index() < lobby.start_button.get_index(), "")
 	_check("and the action is narrower than the home buttons",
 		(lobby.start_button as Button).custom_minimum_size.x < 300.0,
 		"width=%.0f" % (lobby.start_button as Button).custom_minimum_size.x)
@@ -395,14 +402,6 @@ func _action(lobby: LobbyScreen) -> void:
 	print("Action")
 	_check("the action is called PLAY", (lobby.start_button as Button).text == "PLAY",
 		"play=%s" % (lobby.start_button as Button).text)
-	var rule := lobby.column.get_node_or_null("LobbyDivider") as ColorRect
-	_check("a rule separates the decisions from the action", rule != null, "")
-	if rule != null:
-		_check("shorter than the content, so it is a rule and not a border",
-			rule.custom_minimum_size.x < ScreenStyle.CONTENT_WIDTH,
-			"rule=%.0f" % rule.custom_minimum_size.x)
-		_check("and the action is below it",
-			rule.get_index() < lobby.start_button.get_index(), "")
 	_check("and the action is narrower than the home buttons",
 		(lobby.start_button as Button).custom_minimum_size.x < 300.0,
 		"width=%.0f" % (lobby.start_button as Button).custom_minimum_size.x)
