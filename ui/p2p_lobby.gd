@@ -62,8 +62,12 @@ func _choice(node_name: String, text: String) -> Button:
 	return button
 
 
+## The two choices lead to two screens. Each one is its own decision, which is the
+## whole reason they are not on this screen.
 func _on_choice(button: Button) -> void:
 	if button.name == "CreateGame":
 		create_requested.emit()
+		get_tree().change_scene_to_file("res://create_game.tscn")
 	else:
 		join_requested.emit()
+		get_tree().change_scene_to_file("res://join_game.tscn")

@@ -106,9 +106,11 @@ func add_gap(height: float = 8.0) -> Control:
 ## needs to be. A Button in a VBoxContainer fills the column unless told otherwise,
 ## which would make the action as wide as the whole composition.
 func add_action(text: String, width: float = 220.0, height: float = 52.0,
-		font_size: int = 22) -> Button:
+		font_size: int = 22, node_name: String = "Action") -> Button:
 	var button := Button.new()
-	button.name = "Action"
+	# Named by the caller, because a screen with two actions would otherwise have two
+	# nodes called Action and nothing could tell them apart.
+	button.name = node_name
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size = Vector2(width, height)
@@ -130,6 +132,98 @@ func add_divider() -> ColorRect:
 	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(rule)
 	return rule
+
+
+## A quiet line that says something without asking for anything, such as why an entry
+## is not ready yet.
+func add_notice(text: String) -> Label:
+	var label := Label.new()
+	label.name = "Notice"
+	label.text = text
+	label.custom_minimum_size = Vector2(ScreenStyle.CONTENT_WIDTH, 0.0)
+	ScreenStyle.quiet_style(label)
+	column.add_child(label)
+	return label
+
+
+## A caption with its options stacked under it, the way the VS screen asks its
+## questions. Shared rather than copied so a change to how an option looks reaches
+## every screen that asks one.
+func add_options(caption_text: String, labels: Array) -> VBoxContainer:
+	var group := VBoxContainer.new()
+	group.name = "Group"
+	group.add_theme_constant_override("separation", 8)
+	group.custom_minimum_size = Vector2(ScreenStyle.GROUP_WIDTH, 0.0)
+	column.add_child(group)
+
+	var caption := Label.new()
+	caption.name = "Caption"
+	caption.text = caption_text
+	caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	caption.custom_minimum_size = Vector2(0.0, 20.0)
+	caption.add_theme_font_size_override("font_size", ScreenStyle.CAPTION_SIZE)
+	caption.add_theme_color_override("font_color", ScreenStyle.CAPTION)
+	group.add_child(caption)
+
+	var options := VBoxContainer.new()
+	options.name = "Options"
+	options.add_theme_constant_override("separation", 2)
+	options.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	group.add_child(options)
+
+	for i in labels.size():
+		var button := Button.new()
+		button.name = "Option%d" % i
+		button.text = ScreenStyle.MARK_OFF + str(labels[i])
+		button.focus_mode = Control.FOCUS_NONE
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(ScreenStyle.GROUP_WIDTH, 42.0)
+		button.add_theme_font_size_override("font_size", ScreenStyle.OPTION_SIZE)
+		button.add_theme_color_override("font_color", ScreenStyle.CAPTION)
+		button.add_theme_color_override("font_hover_color", ScreenStyle.TEXT)
+		var flat := StyleBoxEmpty.new()
+		button.add_theme_stylebox_override("normal", flat)
+		button.add_theme_stylebox_override("hover", ScreenStyle.faint_box())
+		button.add_theme_stylebox_override("pressed", flat)
+		button.add_theme_stylebox_override("focus", flat)
+		options.add_child(button)
+
+	fit_options_width(options)
+	return group
+
+
+## Gives every option the width of the widest one, so the labels line up and the block
+## can be centred as a whole.
+func fit_options_width(options: VBoxContainer) -> void:
+	var widest := 0.0
+	for child in options.get_children():
+		widest = maxf(widest, (child as Control).get_combined_minimum_size().x)
+	if widest <= 0.0:
+		return
+	for child in options.get_children():
+		(child as Control).custom_minimum_size = Vector2(widest, 42.0)
+
+
+## Marks one option and unmarks the rest, in one pass.
+func mark_option(options: VBoxContainer, chosen: int) -> void:
+	for i in options.get_child_count():
+		var button := options.get_child(i) as Button
+		if button == null:
+			continue
+		var label := str(button.text).trim_prefix(ScreenStyle.MARK_OFF) \
+			.trim_prefix(ScreenStyle.MARK_ON)
+		var marked := i == chosen
+		button.button_pressed = marked
+		button.text = (ScreenStyle.MARK_ON if marked else ScreenStyle.MARK_OFF) + label
+		button.add_theme_color_override("font_color",
+			ScreenStyle.TITLE if marked else ScreenStyle.CAPTION)
+
+
+## The options of a group added by add_options.
+func options_of(group: VBoxContainer) -> VBoxContainer:
+	if group == null:
+		return null
+	return group.get_node_or_null("Options") as VBoxContainer
 
 
 ## Overridden by a screen to put its own content into the column.
