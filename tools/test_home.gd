@@ -38,8 +38,18 @@ func _init() -> void:
 		home.background.mouse_filter == Control.MOUSE_FILTER_IGNORE, "")
 	_check("nothing is focusable, so a stray key cannot start a game",
 		(home.computer_button as Button).focus_mode == Control.FOCUS_NONE, "")
-	_check("and the words have darkness of their own behind them",
-		home.get_node_or_null("HomeShade") != null, "")
+	var shade := home.get_node_or_null("HomeShade") as ColorRect
+	_check("and the words have darkness of their own behind them", shade != null, "")
+	if shade != null:
+		# The picture must actually be held back, not just covered by a node that
+		# happens to exist. Asserting the node's presence is how 0.55 passed review
+		# while the image still shouted over the title.
+		_check("and it really dims the picture", shade.color.a >= 0.7,
+			"alpha=%.2f" % shade.color.a)
+		_check("over the whole screen", shade.size.x >= home.size.x * 0.9
+			and shade.size.y >= home.size.y * 0.9,
+			"shade=%.0fx%.0f home=%.0fx%.0f" % [shade.size.x, shade.size.y,
+				home.size.x, home.size.y])
 
 	# Entries with nothing behind them must say so rather than do nothing.
 	home.p2p_button.pressed.emit()

@@ -29,6 +29,12 @@ const BACKGROUND := "res://home_bg.jpg"
 ## must not land on his face.
 const COLUMN_WIDTH := 460.0
 
+## How much the picture is held back, so the words read first and the art second.
+## Named so it can be judged in one place and adjusted without hunting for it: this is
+## a value for the eye, not for a formula, and it will want to be looked at on a real
+## screen in daylight.
+const SHADE := 0.72
+
 
 @onready var background: TextureRect = %HomeBackground
 @onready var column: VBoxContainer = %HomeColumn
@@ -70,10 +76,17 @@ func build() -> void:
 	# The picture is dark at the edges and very bright behind the king, so the words
 	# need their own darkness to sit on rather than relying on the art being calm
 	# where the text happens to land.
+	#
+	# Heavier than it looks like it should be. At 0.55 the embers and the board behind
+	# the king still read at full strength and the title fought them, and on a phone in
+	# daylight that fight gets worse rather than better. The image is a mood, not the
+	# content; the words are the content. One flat wash rather than a gradient, because
+	# a gradient that leaves a clear window in the middle puts the brightest part of the
+	# art exactly where the title sits, which is the thing to avoid.
 	var shade := ColorRect.new()
 	shade.name = "HomeShade"
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.05, 0.04, 0.03, 0.55)
+	shade.color = Color(0.05, 0.04, 0.03, SHADE)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 

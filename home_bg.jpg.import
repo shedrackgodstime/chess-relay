@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://chessrelayhomebg"
-path="res://.godot/imported/home_bg.jpg-2f1c8a44b9d7e3106c5ab2f8d1e4b76.ctex"
+uid="uid://bvb7gtbn5h8cy"
+path="res://.godot/imported/home_bg.jpg-84d9556b5a068ff74d327ca79270c97a.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://home_bg.jpg"
-dest_files=["res://.godot/imported/home_bg.jpg-2f1c8a44b9d7e3106c5ab2f8d1e4b76.ctex"]
+dest_files=["res://.godot/imported/home_bg.jpg-84d9556b5a068ff74d327ca79270c97a.ctex"]
 
 [params]
 
