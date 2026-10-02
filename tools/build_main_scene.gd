@@ -47,9 +47,6 @@ func _init() -> void:
 	world.add_child(_environment())
 	world.add_child(_camera())
 	root.add_child(_hud_layer())
-	# The main menu is a layer over the board rather than a second scene, so the game
-	# boots into a chessboard that is already built and a game can start instantly.
-	root.add_child(_main_menu())
 
 	# Children must be owned by the root for PackedScene.pack to store them.
 	_own(root, root)
@@ -196,16 +193,6 @@ func square_name(file: int, rank: int) -> String:
 
 ## The HUD lives on its own CanvasLayer so its layout is resolution
 ## independent, which matters on a cross-platform build.
-## The screen the game opens on. Built here so the tree carries it, populated in its
-## own _ready so it keeps no copy in the scene file.
-func _main_menu() -> CanvasLayer:
-	var menu := CanvasLayer.new()
-	menu.name = "Menu"
-	menu.layer = 8
-	menu.set_script(load("res://ui/main_menu.gd"))
-	return menu
-
-
 func _hud_layer() -> CanvasLayer:
 	var layer := CanvasLayer.new()
 	layer.name = "UILayer"

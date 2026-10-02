@@ -219,14 +219,8 @@ incomplete. `Rules` is the only place that needs to change.
   earlier version also set a board-paused flag as a backstop: the same rule stated
   twice, and the second copy broke every test that drives the board directly. Do not add
   it back.
-- **The main menu exists and the game opens on it.** Title, `Vs computer`,
-  `P2P game`, `Settings`, built in `ui/main_menu.gd` and shown on start. It is a
-  **CanvasLayer over the loaded board**, not a second scene, so nothing is built when a
-  game starts and the thing behind the menu is a chessboard rather than a placeholder.
-  P2P and Settings exist and say they cannot work yet, which is honest while it is
-  clearly unwired; a button that silently does nothing is worse than one that explains.
-  This is the entry point the lobby hangs off: the lobby is a screen reached *from*
-  here, not a replacement for it.
+- ~~**The main menu exists and the game opens on it.**~~ Superseded: it was a layer over
+  the board rather than a scene of its own, and is now the home screen above.
 - **`Exit` is now `Quit game`,** and it returns to the main menu rather than closing
   the process. Exit was the word for leaving a screen and there is more than one to
   leave now; a player who reads Exit as closing the app and finds it does not will not
@@ -237,6 +231,20 @@ incomplete. `Rules` is the only place that needs to change.
   earlier version also set a board-paused flag as a backstop: the same rule stated
   twice, and the second copy broke every test that drives the board directly. Do not add
   it back.
+- **Home is its own scene and the project's entry point.** `res://home.tscn`, built by
+  `tools/build_home_scene.gd`, set as `run/main_scene`. It was a CanvasLayer over the
+  loaded board first and that was wrong: the whole 3D world stayed alive behind a menu,
+  costing memory and startup on a phone, and it let a player drag the camera and pick up
+  pieces before choosing to play. `main.tscn` is now loaded only when a game is asked
+  for, and quitting tears it down rather than hiding it, so nothing carries over.
+  `ui/main_menu.gd` is gone; `ui/home_screen.gd` replaces it.
+  The picture is `home_bg.jpg`, a lit king, drawn to **cover** rather than fit, so no
+  black bars appear on any aspect ratio. The words have their own dim behind them
+  because the art is bright behind the king and the two must not compete.
+  `tools/test_home.gd` is a suite of its own: a parse error here is a game that opens
+  on a blank window, and nothing in the in-game tests would catch it. It also asserts
+  that `home.tscn` is the configured main scene, which is the difference between a home
+  screen that works and a home screen someone wired up.
 - **The menu rows sit in an opaque card that hugs them.** A dimmed backdrop says the
   game is paused; the card is what the words are legible on. Sized by its contents
   rather than by fixed numbers, so a row cannot end up hanging outside it when the list

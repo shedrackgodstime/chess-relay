@@ -17,7 +17,6 @@ extends Node3D
 @onready var last_move_to: SquareHighlight = $World/LastMoveTo
 @onready var check_highlight: SquareHighlight = $World/CheckHighlight
 @onready var legal_pool: Node3D = $World/LegalHighlights
-@onready var menu: MainMenu = $Menu
 
 ## The squares the hints are currently marking, newest set first. Kept so the
 ## pool can be reused without anything having to reverse a world position back
@@ -140,16 +139,7 @@ func _ready() -> void:
 	hud.set_voice_visible(DEV_SHOW_VOICE or not ai_opponent)
 	hud.new_game_requested.connect(start_new_game)
 	hud.quit_requested.connect(_on_quit)
-	menu.play_computer_requested.connect(start_against_computer)
-	menu.p2p_requested.connect(_on_p2p_requested)
-	menu.settings_requested.connect(_on_settings_requested)
 	_refresh_trays()
-	# The menu comes up on its own. Nothing has to pause the board for it: the dim
-	# backdrop is a Control that stops mouse input, so a tap on it is consumed before
-	# it can reach _unhandled_input and become a move. An earlier version also set a
-	# board-paused flag as a backstop, which was the same rule stated twice, and the
-	# second copy broke every test that drove the board directly.
-	menu.present()
 
 
 ## The HUD emits intents; this is the only place that decides what they mean.
@@ -188,15 +178,12 @@ func _on_flip_requested() -> void:
 	camera.reset_view(Vector3.ZERO, target, _framing_pitch(), _framing_distance())
 
 
-## Registers every piece by the square it stands on. Positions come from the
-## scene layout, so the generator stays the single source of placement.
-## Leaves the game to the main menu, which is where the game now begins.
+## Back to the home screen, which is where the game came from.
 ##
-## Closing the process outright would also have been correct in the sense that nothing
-## else existed to go to, but a menu is the entry point and quitting to nowhere skips
-## it. The main menu decides whether this really means quitting.
+## A separate scene, so this tears the board down rather than hiding it, and the next
+## game is a fresh load with nothing carried over from the last one.
 func _on_quit() -> void:
-	menu.present()
+	get_tree().change_scene_to_file("res://home.tscn")
 
 
 ## Starts again from the opening position.
@@ -254,33 +241,6 @@ func _rebuild_pieces() -> void:
 			holder.add_child(view)
 			view.position = BoardMesh.square_position(file, rank)
 			pieces[Vector2i(file, rank)] = view
-
-
-## Starts a game against the computer and gets the menu out of the way.
-func start_against_computer() -> void:
-	ai_opponent = true
-	resume_board()
-
-
-## Pauses the board for the menu: no taps reach it, and the camera stops being
-## draggable so the board behind the menu is a picture rather than a toy.
-## Deselects, so nothing is held when the board stops being the thing on screen.
-func pause_board() -> void:
-	_deselect()
-	hud.menu_panel.visible = false
-
-
-func resume_board() -> void:
-	menu.dismiss()
-
-
-## Says so rather than opening a screen that cannot work yet.
-func _on_p2p_requested() -> void:
-	menu.show_notice("P2P needs a transport, which is not built yet.")
-
-
-func _on_settings_requested() -> void:
-	menu.show_notice("Settings has no screen yet.")
 
 
 func _collect_pieces() -> void:
