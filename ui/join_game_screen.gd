@@ -31,6 +31,12 @@ var join_button: Button = null
 var cancel_button: Button = null
 
 
+## The field is 240 px and the error line needs somewhere to wrap, so the composition
+## is wider than either.
+func content_width() -> float:
+	return 460.0
+
+
 func _build_content() -> void:
 	add_title(TITLE, 40)
 	add_gap(14.0)

@@ -89,19 +89,22 @@ func _create() -> void:
 	if screen == null:
 		return
 
-	# The first act asks for a side and ends; the code is the second act, reached by
-	# the same CONTINUE a player presses. Driving it is the only way to see the screen
-	# they will actually spend their time on.
-	var options_first := screen.column.find_child("Options", true, false) as VBoxContainer
-	_check("the first act asks for a side and nothing else",
-		options_first != null and options_first.get_child_count() == 3
-			and screen.find_child("Code", true, false) == null,
-		"first act has a code on it, which is the second act's job")
-	var continue_button := screen.find_child("Continue", true, false) as Button
-	_check("and offers a way on to the next thing", continue_button != null, "")
-	continue_button.pressed.emit()
-	await process_frame
-	await process_frame
+	# One screen, code first. Creating a game means giving someone something to join
+	# with, and that is what the player came for; the side is a preference underneath
+	# it. Putting the preference first, behind a CONTINUE, made the screen ask the
+	# secondary question before it would answer the primary one.
+	_check("the code is on the screen before anything is pressed",
+		screen.find_child("Code", true, false) != null, "")
+	_check("and it is above the side choice",
+		screen.find_child("Code", true, false).get_index()
+			< _index_of_side(screen), "")
+	_check("the side is a preference on one line, not a second question",
+		screen.find_child("OptionsRow", true, false) != null, "")
+	_check("with no gate between the player and the code",
+		screen.find_child("Continue", true, false) == null, "")
+	screen.choose_side(BoardState.LIGHT)
+	_check("and choosing one is recorded",
+		screen.side == BoardState.LIGHT, "")
 
 	_check("it shows a code without anyone asking for one",
 		GameCode.is_well_formed(screen.game_code()),
@@ -125,13 +128,7 @@ func _create() -> void:
 		_find(screen, "CopyCode") != null, "")
 	_check("and says it is waiting", _text_contains(screen, "Waiting for opponent"), "")
 
-	# The side survives the move to the next act, so a player who picked White is not
-	# asked again on the screen where the code appears.
-	_check("the side chosen before it is kept", screen.side == BoardState.LIGHT
-			or screen.side == BoardState.DARK, "")
-	_check("and the screen is now the code and nothing else",
-		screen.find_child("Options", true, false) == null
-			and screen.find_child("Code", true, false) != null, "")
+
 
 
 ## Code entry: a field, a button, and a way to say no.
@@ -205,6 +202,14 @@ func _spawn(path: String) -> Node:
 	await process_frame
 	await process_frame
 	return scene
+
+
+## Where the side choice sits in the column, or -1.
+func _index_of_side(screen: CreateGameScreen) -> int:
+	var row := screen.side_group
+	if row == null:
+		return -1
+	return row.get_index()
 
 
 func _find(node: Node, node_name: String) -> Node:

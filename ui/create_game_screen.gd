@@ -29,50 +29,32 @@ var side: int = BoardState.DARK
 
 var code_label: Label = null
 var status_label: Label = null
-var side_group: VBoxContainer = null
+var side_group: HBoxContainer = null
 var copy_button: Button = null
 var cancel_button: Button = null
 var _code := ""
 
 
-## Two acts, one at a time.
+## One screen, and the order of it is the whole point.
 ##
-## Choosing a side and being handed a code are sequential, not simultaneous: the
-## document's own flow is CREATE GAME, choose side, game created, show code. Showing
-## both meant a player had to hold a colour choice in their head while looking at a code
-## they could not use yet, and it made the screen 596 px tall, which is 92% of the
-## screen. The first act is brief and ends; the second is the reason the screen exists.
+## Creating a game means one thing: give someone something to join with. That is the
+## code, and it is at the top because it is what the player came for and it is what
+## they have to pass on.
 ##
-## Only one of the two is ever on the screen, so whichever it is gets the whole of it.
+## Play As is below it because it is not the job. It was a separate first act with a
+## CONTINUE in front of the code, which meant the screen asked a secondary question
+## before it would answer the primary one, and the player had to press a button to
+## reach the thing they came for. Both players choose their own side and neither is
+## told what the other picked, so this is a preference rather than a decision, and a
+## preference belongs below the thing that matters rather than in front of it.
+
+## Wide enough for a title and a row of options, rather than the 300 px the code
+## happened to need.
+func content_width() -> float:
+	return 460.0
+
+
 func _build_content() -> void:
-	_side_act()
-
-
-## The first act: choose a side, then move on. Deliberately short, because the player
-## has come here to make a game, not to configure one.
-func _side_act() -> void:
-	for child in column.get_children():
-		column.remove_child(child)
-		child.queue_free()
-	side_group = add_options("PLAY AS", SIDES)
-	var note := add_notice("The other player takes the other side.")
-	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_gap(14.0)
-	var cont := add_action("CONTINUE", 220.0, 52.0, 20, "Continue")
-	cont.pressed.connect(func() -> void: _code_act())
-	for i in options_of(side_group).get_child_count():
-		var button := options_of(side_group).get_child(i) as Button
-		button.pressed.connect(_on_option_pressed.bind(i))
-	mark_option(options_of(side_group), SIDES.find(
-		MatchConfig.label_for(MatchConfig.SIDES, side)))
-
-
-## The second act: the code, and waiting. Everything on this screen is either the code
-## or context for it.
-func _code_act() -> void:
-	for child in column.get_children():
-		column.remove_child(child)
-		child.queue_free()
 	add_title(TITLE, 40)
 	add_gap(4.0)
 
@@ -87,7 +69,6 @@ func _code_act() -> void:
 
 	code_label = Label.new()
 	code_label.name = "Code"
-	code_label.text = _code
 	code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	# As wide as the code and no wider. At the content width it claimed 760 px for
 	# seven characters, which made the code look like a heading rather than a thing to
@@ -106,12 +87,25 @@ func _code_act() -> void:
 	add_gap(2.0)
 	copy_button = add_action("COPY CODE", 190.0, 46.0, 17, "CopyCode")
 	copy_button.pressed.connect(_on_copy)
-	add_gap(10.0)
 
+	add_gap(8.0)
 	status_label = add_notice("Waiting for opponent...")
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+	# The secondary question, below the rule that says the main part is done, and on
+	# one line so it reads as a preference rather than as a second decision.
+	add_gap(4.0)
+	side_group = add_options_row("PLAY AS", SIDES)
+	var index := 0
+	for child in side_group.get_children():
+		if child is Button:
+			(child as Button).pressed.connect(_on_option_pressed.bind(index))
+			index += 1
+	mark_option_row(side_group, SIDES.find(
+		MatchConfig.label_for(MatchConfig.SIDES, side)))
+
 	cancel_button = _quiet_cancel()
-	add_divider()
+	add_gap(2.0)
 	column.add_child(cancel_button)
 	cancel_button.pressed.connect(_on_cancel)
 
@@ -137,8 +131,13 @@ func _quiet_cancel() -> Button:
 	return button
 
 
+## The code is made here, after the label that shows it exists, so the screen is never
+## built showing nothing and then filled in behind the player's back.
 func _show_defaults() -> void:
-	_code = GameCode.generate()
+	if _code == "":
+		_code = GameCode.generate()
+	if code_label != null:
+		code_label.text = _code
 
 
 ## The code, for a test or a host that needs it before the room exists.
@@ -150,9 +149,10 @@ func game_code() -> String:
 ## adds up to a game.
 func choose_side(value: int) -> void:
 	side = value
-	mark_option(options_of(side_group), SIDES.find(
+	mark_option_row(side_group, SIDES.find(
 		MatchConfig.label_for(MatchConfig.SIDES, value)))
 	side_chosen.emit(value)
+
 
 
 ## Choosing an option. The side is recorded as it is chosen rather than on Continue,

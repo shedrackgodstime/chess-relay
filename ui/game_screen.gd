@@ -56,7 +56,11 @@ func _frame() -> void:
 	column = VBoxContainer.new()
 	column.name = "Column"
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 16)
+	column.add_theme_constant_override("separation", 12)
+	# A width of its own, rather than one decided by whichever child happens to be
+	# widest. Without it a screen is as narrow as its shortest content and as wide as
+	# its longest, so two screens of equal importance end up different sizes.
+	column.custom_minimum_size = Vector2(content_width(), 0.0)
 	centre.add_child(column)
 
 	# About leaving the screen, not about what is on it, so it is anchored to a corner
@@ -148,7 +152,12 @@ func add_notice(text: String) -> Label:
 	label.name = "Notice"
 	label.text = text
 	label.custom_minimum_size = Vector2(0.0, 0.0)
-	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	# Fills the column rather than shrinking to its text. Shrinking gave it a width of
+	# one pixel, and a label that wraps and is one pixel wide puts every character on
+	# its own line: the quiet lines grew to 547 and 606 px tall and took the screen to
+	# 271%. Filling means it never asks for width of its own, so it cannot resize the
+	# column either, which is what the previous fix was for.
+	label.size_flags_horizontal = Control.SIZE_FILL
 	ScreenStyle.quiet_style(label)
 	column.add_child(label)
 	return label
@@ -227,11 +236,81 @@ func mark_option(options: VBoxContainer, chosen: int) -> void:
 			ScreenStyle.TITLE if marked else ScreenStyle.CAPTION)
 
 
+## Options on one line rather than stacked, for a choice that is not the point of the
+## screen.
+##
+## Stacking is right for the questions a player came to answer, because it gives each
+## option a full-width target. It is wrong for a preference sitting underneath the main
+## content: it spent 158 px of a 648 px screen on a secondary choice and made the screen
+## as tall as the whole interface, which is itself a way of saying the two are equally
+## important.
+func add_options_row(caption_text: String, labels: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.name = "OptionsRow"
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 8)
+	column.add_child(row)
+
+	var caption := Label.new()
+	caption.name = "Caption"
+	caption.text = caption_text
+	caption.custom_minimum_size = Vector2(120.0, 42.0)
+	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	caption.add_theme_font_size_override("font_size", ScreenStyle.CAPTION_SIZE)
+	caption.add_theme_color_override("font_color", ScreenStyle.CAPTION)
+	row.add_child(caption)
+
+	for i in labels.size():
+		var button := Button.new()
+		button.name = "Option%d" % i
+		button.text = ScreenStyle.MARK_OFF + str(labels[i])
+		button.focus_mode = Control.FOCUS_NONE
+		button.toggle_mode = true
+		button.custom_minimum_size = Vector2(92.0, 42.0)
+		button.add_theme_font_size_override("font_size", ScreenStyle.OPTION_SIZE)
+		button.add_theme_color_override("font_color", ScreenStyle.CAPTION)
+		button.add_theme_color_override("font_hover_color", ScreenStyle.TEXT)
+		var flat := StyleBoxEmpty.new()
+		button.add_theme_stylebox_override("normal", flat)
+		button.add_theme_stylebox_override("hover", ScreenStyle.faint_box())
+		button.add_theme_stylebox_override("pressed", flat)
+		button.add_theme_stylebox_override("focus", flat)
+		row.add_child(button)
+	return row
+
+
+## Marks one option in a one-line group, in one pass.
+func mark_option_row(row: HBoxContainer, chosen: int) -> void:
+	var buttons := 0
+	for child in row.get_children():
+		if child is Button:
+			buttons += 1
+	var index := 0
+	for child in row.get_children():
+		if not child is Button:
+			continue
+		var button := child as Button
+		var label := str(button.text).trim_prefix(ScreenStyle.MARK_OFF) \
+			.trim_prefix(ScreenStyle.MARK_ON)
+		var marked := index == chosen
+		button.button_pressed = marked
+		button.text = (ScreenStyle.MARK_ON if marked else ScreenStyle.MARK_OFF) + label
+		button.add_theme_color_override("font_color",
+			ScreenStyle.TITLE if marked else ScreenStyle.CAPTION)
+		index += 1
+
+
 ## The options of a group added by add_options.
 func options_of(group: VBoxContainer) -> VBoxContainer:
 	if group == null:
 		return null
 	return group.get_node_or_null("Options") as VBoxContainer
+
+
+## How wide the composition is. Overridden by a screen that needs a different shape;
+## the default suits a column of short choices.
+func content_width() -> float:
+	return 460.0
 
 
 ## Overridden by a screen to put its own content into the column.

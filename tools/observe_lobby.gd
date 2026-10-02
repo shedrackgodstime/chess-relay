@@ -92,10 +92,6 @@ func _init() -> void:
 		root.add_child(page)
 		await process_frame
 		await process_frame
-		# The create screen has a second act, and the first one is not the screen a
-		# player spends their time on, so both are measured.
-		if page is CreateGameScreen:
-			await (page as CreateGameScreen)._code_act()
 		var body := page.find_child("Column", true, false) as Control
 		print("\n-- %s --" % path.get_file())
 		if body == null:
