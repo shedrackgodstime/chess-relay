@@ -149,6 +149,125 @@ static func stroke_bar_v(
 			img.set_pixel(px, y, colour)
 
 
+## The piece that stands for a side in the lobby.
+##
+## Two authored files rather than one recoloured, because Godot cannot recolour an
+## imported texture and a black piece on a dark photograph needs a light border around
+## it to exist at all. Outlining a black piece instead leaves a hollow ghost, which on
+## this background is a slightly darker patch and reads as nothing.
+## One glyph, two colours. The border and the fill are ours, so a second file for the
+## black side would be a second copy of a shape nobody edits, which is exactly the
+## thing that drifts.
+static func side_piece(black: bool) -> Texture2D:
+	var source: Texture2D = null
+	var path := "res://ui/icons/side-piece.svg"
+	if ResourceLoader.exists(path):
+		var loaded := ResourceLoader.load(path)
+		if loaded is Texture2D:
+			source = loaded
+	if source == null:
+		source = ImageTexture.create_from_image(_fallback_piece())
+	return outlined(source, DARK_BODY if black else LIGHT_BODY,
+		LIGHT_BODY if black else WARM_RIM)
+
+
+## The diamond that stands for Random, so all three options are marked the same way.
+static func side_diamond() -> Texture2D:
+	return outlined(_icon("side-diamond", _fallback_diamond), LIGHT_BODY, WARM_RIM)
+
+
+## The two colours a piece is drawn in, and the rim that keeps it on a dark screen.
+const LIGHT_BODY := Color(1.0, 0.96, 0.91)
+const DARK_BODY := Color(0.09, 0.075, 0.06)
+const WARM_RIM := Color(0.80, 0.71, 0.53)
+
+
+## Puts a border around a glyph by dilating its own silhouette.
+##
+## Not by asking the SVG for a stroke. Godot rasterises SVG through ThorVG at import
+## time and its support is explicitly limited, so a stroke width that looks right in
+## the source is not something that can be relied on to arrive, and a black piece on a
+## dark photograph has no margin for that. Dilating the alpha mask is the same picture
+## every time: it is the glyph's own shape, grown by a pixel or two, and it works
+## identically on the procedural fallback because that is a mask too.
+static func outlined(source: Texture2D, body: Color, rim: Color,
+		width: int = 2) -> Texture2D:
+	if source == null:
+		return null
+	var image := source.get_image()
+	if image == null:
+		return source
+	var w := image.get_width()
+	var h := image.get_height()
+	var solid := PackedByteArray()
+	solid.resize(w * h)
+	for y in h:
+		for x in w:
+			solid[y * w + x] = 1 if image.get_pixel(x, y).a > 0.5 else 0
+
+	var out := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	out.fill(Color(0, 0, 0, 0))
+	for y in h:
+		for x in w:
+			var inside := solid[y * w + x] == 1
+			var grown := false
+			if not inside:
+				for dy in range(-width, width + 1):
+					for dx in range(-width, width + 1):
+						var nx := x + dx
+						var ny := y + dy
+						if nx < 0 or nx >= w or ny < 0 or ny >= h:
+							continue
+						if solid[ny * w + nx] == 1:
+							grown = true
+							break
+					if grown:
+						break
+			if inside:
+				# The source alpha still softens the edge, so the body is not a
+				# staircase even though its colour is now ours.
+				var coverage := image.get_pixel(x, y).a
+				out.set_pixel(x, y, Color(body.r, body.g, body.b, coverage))
+			elif grown:
+				out.set_pixel(x, y, rim)
+	return ImageTexture.create_from_image(out)
+
+
+## A pawn-shaped silhouette, for when the SVG has not been imported. A mask, like
+## the SVG is, so both go through the same outlining.
+## A pawn-shaped silhouette, for when the SVG has not been imported. A mask, like the
+## SVG is, so both go through the same outlining and cannot drift apart.
+static func _fallback_piece() -> Image:
+	var image := Image.create(CANVAS, CANVAS, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var base := Vector2(CANVAS * 0.5, CANVAS * 0.88)
+	# A head, a neck and a base: enough to read as a chess piece at 18 px, which is all
+	# this is ever drawn at. Drawn in the cream the light side uses, because the
+	# outline step decides which colour the body ends up.
+	stroke_disc(image, Vector2(CANVAS * 0.5, CANVAS * 0.26), CANVAS * 0.14)
+	for y in range(int(CANVAS * 0.40), int(base.y)):
+		var t := float(y - CANVAS * 0.40) / (CANVAS * 0.48)
+		var half := lerpf(CANVAS * 0.07, CANVAS * 0.17, t)
+		for x in range(int(CANVAS * 0.5 - half), int(CANVAS * 0.5 + half)):
+			if x >= 0 and x < CANVAS:
+				image.set_pixel(x, y, COLOUR)
+	stroke_bar(image, Vector2(CANVAS * 0.22, base.y), Vector2(CANVAS * 0.78, base.y),
+		CANVAS * 0.09)
+	return image
+
+
+static func _fallback_diamond() -> Image:
+	var image := Image.create(CANVAS, CANVAS, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+	var top := Vector2(CANVAS * 0.5, CANVAS * 0.14)
+	var right := Vector2(CANVAS * 0.86, CANVAS * 0.5)
+	var bottom := Vector2(CANVAS * 0.5, CANVAS * 0.86)
+	var left := Vector2(CANVAS * 0.14, CANVAS * 0.5)
+	for edge in [[top, right], [right, bottom], [bottom, left], [left, top]]:
+		stroke_bar(image, edge[0], edge[1], 2.0)
+	return image
+
+
 static func _icon(name: String, fallback: Callable) -> Texture2D:
 	if _cache.has(name):
 		return _cache[name]

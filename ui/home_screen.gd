@@ -34,12 +34,15 @@ const COLUMN_WIDTH := 460.0
 const SHADE := ScreenStyle.BACKGROUND_SHADE
 
 
-@onready var background: TextureRect = %HomeBackground
-@onready var column: VBoxContainer = %HomeColumn
-@onready var title_label: Label = %HomeTitle
-@onready var computer_button: Button = %HomeComputer
-@onready var p2p_button: Button = %HomeP2P
-@onready var settings_button: Button = %HomeSettings
+## Built in build() rather than found with %: the nodes do not exist until this screen
+## builds itself, so looking them up at ready time finds nothing and reports an error
+## for every one of them. build() assigns them instead.
+var background: TextureRect = null
+var column: VBoxContainer = null
+var title_label: Label = null
+var computer_button: Button = null
+var p2p_button: Button = null
+var settings_button: Button = null
 
 
 func _ready() -> void:

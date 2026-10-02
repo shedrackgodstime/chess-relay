@@ -1,0 +1,354 @@
+Yes. The VS Computer screen now gives us a solid visual reference for the P2P side.
+
+The important thing is that multiplayer has a different lifecycle. It shouldn't simply copy the VS Computer screen with different labels.
+
+1. First: what the P2P screen actually needs to do
+
+There are really three stages:
+
+P2P GAME
+   │
+   ├── Create Game
+   │      ↓
+   │   Waiting for opponent
+   │      ↓
+   │   Opponent connected
+   │      ↓
+   │   Chess board
+   │
+   └── Join Game
+          ↓
+       Enter game code
+          ↓
+       Connecting
+          ↓
+       Chess board
+
+So I would make the first P2P screen a choice between hosting and joining, rather than immediately showing connection controls.
+
+
+---
+
+P2P Landing Screen
+
+Keep the exact visual language of your VS Computer screen.
+
+Something like:
+
+P2P GAME
+
+
+                    CREATE GAME
+                   Host a new game
+
+
+                     JOIN GAME
+                  Enter a game code
+
+
+                         Back
+
+But visually, I would not literally add the descriptions unless we find they are necessary.
+
+A cleaner version:
+
+P2P GAME
+
+
+                      CREATE GAME
+
+                       JOIN GAME
+
+
+                           Back
+
+However, because your home screen already has Back in the top-left on the VS screen, I would keep that convention:
+
+[ Back ]
+
+                         P2P GAME
+
+
+                      CREATE GAME
+
+                       JOIN GAME
+
+The two choices can use the same outlined-button treatment as your home screen.
+
+Why two buttons?
+
+Because the user's mental decision is extremely simple:
+
+> Am I creating the game, or joining somebody else's game?
+
+
+
+Don't expose networking terminology like:
+
+Host
+
+Peer
+
+Signaling
+
+Connection
+
+Network ID
+
+Server
+
+Address
+
+
+The player doesn't need to know any of that.
+
+
+---
+
+2. Create Game
+
+After CREATE GAME, the UI changes substantially.
+
+Now the application has created a P2P session and needs to give the other player something to use.
+
+I'd make this a waiting room:
+
+[ Back ]
+
+                       CREATE GAME
+
+
+                    YOUR GAME CODE
+
+                       A7K4-X9
+
+
+                  Waiting for opponent...
+
+
+                       [ CANCEL ]
+
+The game code becomes the important object on this screen.
+
+The hierarchy should be:
+
+CREATE GAME
+
+↓
+
+GAME CODE
+
+↓
+
+A7K4-X9
+
+↓
+
+Waiting for opponent...
+
+The code should be visually prominent, because that's what the host needs to communicate.
+
+There could also be a small:
+
+COPY CODE
+
+button beneath it.
+
+That is actually useful on a phone because the host can copy the code and send it through whatever communication channel they're already using.
+
+
+---
+
+3. Join Game
+
+JOIN GAME should lead to a very simple code-entry screen.
+
+[ Back ]
+
+                        JOIN GAME
+
+
+                    ENTER GAME CODE
+
+                    ┌─────────────┐
+                    │ A7K4-X9     │
+                    └─────────────┘
+
+
+                         JOIN
+
+Again, no networking terminology.
+
+The user has received a code from another person. They enter it and press JOIN.
+
+
+---
+
+4. Connecting State
+
+This should not become another full screen design.
+
+After pressing JOIN:
+
+JOIN GAME
+
+
+                       A7K4-X9
+
+
+                     Connecting...
+
+Potentially a small animated indicator.
+
+If the connection succeeds:
+
+Connected
+
+                         ↓
+
+                    Chess Board
+
+If it fails, show the actual actionable problem:
+
+Couldn't connect
+
+                Check the game code
+                 and try again.
+
+                       RETRY
+
+Not a technical error dump.
+
+
+---
+
+5. Waiting Room Needs One More State
+
+The host can be in:
+
+Waiting for opponent...
+
+Then:
+
+Opponent found
+
+       [ START GAME ]
+
+But whether you actually need a START GAME button depends on your game model.
+
+If connecting automatically starts the game, that's even cleaner:
+
+Waiting for opponent...
+        ↓
+Opponent connected
+        ↓
+Chess board
+
+For a chess game, I would lean toward automatic transition unless you specifically want a pre-game confirmation step.
+
+
+---
+
+6. One thing we should decide: who chooses White?
+
+This matters for the P2P lobby.
+
+You have several possible models:
+
+A. Host is White
+
+Create Game → White
+Join Game   → Black
+
+Extremely simple.
+
+B. Host chooses
+
+Create screen could have:
+
+CREATE GAME
+
+PLAY AS
+
+● White
+  Black
+  Random
+
+Then the joiner gets the opposite color.
+
+C. Randomize automatically
+
+Neither player chooses. The application assigns colors.
+
+
+---
+
+For your current minimalist design, I would keep this decision out of the first P2P landing screen.
+
+The first screen should only answer:
+
+> Create or Join?
+
+
+
+If color selection is required, it belongs inside Create Game, after the user chooses to host.
+
+So the eventual flow becomes:
+
+P2P GAME
+   │
+   ├── CREATE GAME
+   │       ↓
+   │   Choose side
+   │       ↓
+   │   Game created
+   │       ↓
+   │   Show code
+   │       ↓
+   │   Waiting
+   │       ↓
+   │   Chess
+   │
+   └── JOIN GAME
+           ↓
+        Enter code
+           ↓
+        Connecting
+           ↓
+        Chess
+
+The visual relationship with your VS screen
+
+Your VS screen currently has:
+
+VS COMPUTER
+
+              DIFFICULTY          PLAY AS
+
+                 Easy              ♟ White
+               • Medium            ♟ Black
+                 Hard                ◇ Random
+
+
+                         [ PLAY ]
+
+The P2P landing screen should deliberately be simpler:
+
+P2P GAME
+
+
+                        CREATE GAME
+
+                         JOIN GAME
+
+Then each choice gets its own focused screen.
+
+That gives Chess Relay a nice principle:
+
+> One screen, one decision.
+
+
+
+VS Computer has multiple configuration decisions, so they coexist.
+
+P2P starts with one decision—create or join—so we don't need to cram the entire multiplayer workflow onto one screen.
