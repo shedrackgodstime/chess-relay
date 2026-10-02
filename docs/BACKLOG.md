@@ -240,9 +240,9 @@ incomplete. `Rules` is the only place that needs to change.
   `ui/main_menu.gd` is gone; `ui/home_screen.gd` replaces it.
   The picture is `home_bg.jpg`, a lit king, drawn to **cover** rather than fit, so no
   black bars appear on any aspect ratio.
-  **The wash over it is `HomeScreen.SHADE`, at 0.86.** It went 0.55, then 0.72, then
-  0.86, and each step was judged on a real screen and each was wrong in the same
-  direction. The lesson is that the glow behind the king survives a light wash almost
+  **The wash over it is `HomeScreen.SHADE`, at 0.90.** It went 0.55, then 0.72, both too
+  light, then 0.86 which was a touch too dark, so 0.90. All four judged on a real
+  screen. The lesson is that the glow behind the king survives a light wash almost
   intact, because it is a large luminance *contrast* rather than a bright area, and
   dimming a contrast is not the same as dimming a highlight. If it ever wants to be
   brighter, the fix is a vignette that darkens the middle where the title sits, not a

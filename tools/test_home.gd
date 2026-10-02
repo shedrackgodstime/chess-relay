@@ -44,7 +44,7 @@ func _init() -> void:
 		# The picture must actually be held back, not just covered by a node that
 		# happens to exist. Asserting the node's presence is how 0.55 passed review
 		# while the image still shouted over the title.
-		_check("and it really dims the picture", shade.color.a >= 0.85,
+		_check("and it really dims the picture", shade.color.a >= 0.88,
 			"alpha=%.2f" % shade.color.a)
 		_check("over the whole screen", shade.size.x >= home.size.x * 0.9
 			and shade.size.y >= home.size.y * 0.9,

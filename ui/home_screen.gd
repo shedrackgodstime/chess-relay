@@ -33,7 +33,7 @@ const COLUMN_WIDTH := 460.0
 ## Named so it can be judged in one place and adjusted without hunting for it: this is
 ## a value for the eye, not for a formula, and it will want to be looked at on a real
 ## screen in daylight.
-const SHADE := 0.86
+const SHADE := 0.90
 
 
 @onready var background: TextureRect = %HomeBackground
@@ -77,13 +77,13 @@ func build() -> void:
 	# need their own darkness to sit on rather than relying on the art being calm
 	# where the text happens to land.
 	#
-	# Heavier than it looks like it should be, and heavier than seemed defensible when
-	# it was first chosen. 0.55 was too light, 0.72 was still too light, and this is
-	# 0.86. Each step was judged on a real screen and each was wrong in the same
-	# direction, which is worth recording: the glow behind the king survives a light
-	# wash almost intact, because it is a large luminance contrast rather than a bright
-	# area, and dimming a contrast is not the same as dimming a highlight. On a phone in
-	# daylight it is worse again.
+	# Heavier than it looks like it should be. The walk was 0.55, then 0.72, then 0.86
+	# too dark at 0.86 was close, so 0.90 and no further. Each step was judged on a real
+	# screen, and the lesson from the two that were wrong in the same direction is worth
+	# keeping: the glow behind the king survives a light wash almost intact, because it
+	# is a large luminance contrast rather than a bright area, and dimming a contrast is
+	# not the same as dimming a highlight. That is why the early guesses were so far off
+	# and why the last two steps were small.
 	#
 	# The image is a mood; the words are the content. It is still recognisably that
 	# picture and it is plainly not competing. If a day comes when it wants to be
