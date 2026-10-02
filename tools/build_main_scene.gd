@@ -68,9 +68,26 @@ func _init() -> void:
 		printerr("save failed: %d" % err)
 		quit(1)
 		return
+	_strip_unique_ids()
 
 	print("Wrote %s" % OUTPUT)
 	quit(0)
+
+
+## Removes the random per-node IDs Godot writes on every save.
+##
+## Those numbers change even when nothing in the board changes, so regenerating an
+## unchanged scene produced a large diff that could hide a real one. Unique scene
+## names still work because the nodes retain unique_name_in_owner; the stripped
+## numbers are only the engine's fast lookup cache.
+static func _strip_unique_ids() -> void:
+	var source := FileAccess.get_file_as_string(OUTPUT)
+	var pattern := RegEx.new()
+	pattern.compile(" unique_id=\\d+")
+	var normalized := pattern.sub(source, "", true)
+	var file := FileAccess.open(OUTPUT, FileAccess.WRITE)
+	file.store_string(normalized)
+	file.close()
 
 
 func _board() -> MeshInstance3D:
