@@ -21,7 +21,6 @@ signal cancel_requested
 
 const TITLE := "JOIN GAME"
 
-var field: LineEdit = null
 var code_label: Label = null
 var status_label: Label = null
 ## Set while a complaint is on screen, so the quiet line and the complaint are not
@@ -69,6 +68,10 @@ func _build_content() -> void:
 	# Also on focus lost, since a player can paste into a field without the signal
 	# arriving, and the join button has to agree with what is in the box.
 	field.focus_exited.connect(_on_typed)
+	# Handed to the shared frame, which watches the keyboard on its behalf.
+	field = self.field
+	# Handed to the shared frame, which is what watches the keyboard on its behalf.
+	field = self.field
 	column.add_child(field)
 
 	# The code is shown back as it is typed, normalised, so a player can see the field

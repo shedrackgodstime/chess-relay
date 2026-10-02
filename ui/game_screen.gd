@@ -16,6 +16,16 @@ extends Control
 var column: VBoxContainer = null
 var back_button: Button = null
 
+## The centred box the words sit in. Held onto because the keyboard moves it, and
+## because moving it is the whole of the fix.
+var frame_centre: CenterContainer = null
+
+## The field on this screen, if it has one, so the keyboard has something to move for.
+var field: LineEdit = null
+
+## The last keyboard height applied, so an unchanged one is not written again.
+var _keyboard_height := 0.0
+
 
 ## Builds the frame, then lets the screen put whatever it is about into the column.
 func _ready() -> void:
@@ -48,6 +58,7 @@ func _frame() -> void:
 	add_child(shade)
 
 	var centre := CenterContainer.new()
+	frame_centre = centre
 	centre.name = "Centre"
 	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
 	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -311,6 +322,51 @@ func options_of(group: VBoxContainer) -> VBoxContainer:
 ## the default suits a column of short choices.
 func content_width() -> float:
 	return 460.0
+
+
+## Watches the soft keyboard, which covers whatever is underneath it.
+##
+## A phone keyboard can take roughly half the screen, and Android leaves coping with
+## it to the app rather than pushing the viewport the way iOS does. The fix is to
+## shrink the centred box by however tall the keyboard is, so the column re-centres
+## in whatever is left on its own.
+##
+## Squeezing rather than panning, and by measurement rather than by a fixed amount,
+## because a keyboard can be any height and can float. Anything that shifts the
+## content by a constant is wrong on somebody's phone.
+##
+## Polled rather than signalled, because Godot 4.7 has virtual_keyboard_get_height and
+## no signal for the keyboard opening. It is polled only while a field has focus, which
+## is the difference between a check while someone is typing and a check every frame for
+## the life of the game.
+func _process(_delta: float) -> void:
+	if field == null or not is_instance_valid(field) or not field.has_focus():
+		set_keyboard_height(0.0)
+		return
+	set_keyboard_height(_keyboard_height_in_viewport(
+		DisplayServer.virtual_keyboard_get_height()))
+
+
+## The keyboard's height in the units the layout is using.
+##
+## Android reports the keyboard in physical pixels. When the viewport is scaled those
+## are not the units the layout is in, and using them directly shifts the content by
+## the wrong amount by exactly the scale factor.
+func _keyboard_height_in_viewport(pixels: int) -> float:
+	if pixels <= 0:
+		return 0.0
+	var screen_scale := get_viewport().get_screen_transform().get_scale().x
+	return float(pixels) / screen_scale if screen_scale > 0.0 else float(pixels)
+
+
+## Shrinks the centred box by the keyboard, so the content re-centres above it.
+##
+## Separate from the polling and public, so a test can put a keyboard of any height on
+## a screen without needing a real one.
+func set_keyboard_height(height: float) -> void:
+	_keyboard_height = maxf(height, 0.0)
+	if frame_centre != null:
+		frame_centre.offset_bottom = -_keyboard_height
 
 
 ## Overridden by a screen to put its own content into the column.

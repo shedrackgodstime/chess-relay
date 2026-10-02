@@ -180,6 +180,52 @@ func _join() -> void:
 			% [before, column.size.x])
 
 
+## The keyboard, which covers whatever is underneath it on a phone.
+func _keyboard() -> void:
+	print("Keyboard")
+	var screen := await _spawn("res://join_game.tscn") as JoinGameScreen
+	if screen == null:
+		return
+	# It is a shared concern, not this screen's: any field anywhere gets it.
+	_check("the screen hands its field to the shared frame",
+		screen.field != null, "")
+	_check("the frame knows how tall the keyboard is",
+		screen.frame_centre != null, "")
+
+	var full_height: float = screen.frame_centre.size.y
+	_check("and starts with no keyboard in the way",
+		is_zero_approx(screen.frame_centre.offset_bottom), "")
+	# A phone keyboard can take roughly half the screen. The content has to end up
+	# above it, which it does by the centred box shrinking rather than by the words
+	# being moved by hand.
+	screen.set_keyboard_height(320.0)
+	await process_frame
+	await process_frame
+	_check("the centred box shrinks by the keyboard's height",
+		is_equal_approx(screen.frame_centre.offset_bottom, -320.0),
+		"offset=%.1f" % screen.frame_centre.offset_bottom)
+	_check("which pulls the content up rather than letting it be covered",
+		screen.frame_centre.size.y < full_height,
+		"was=%.0f now=%.0f" % [full_height, screen.frame_centre.size.y])
+	_check("and the field stays inside what is left",
+		screen.column.size.y + screen.field.global_position.y
+			- screen.frame_centre.global_position.y
+			<= screen.frame_centre.size.y + 1.0, "")
+
+	screen.set_keyboard_height(0.0)
+	await process_frame
+	await process_frame
+	_check("closing the keyboard gives the space back",
+		is_zero_approx(screen.frame_centre.offset_bottom)
+			and is_equal_approx(screen.frame_centre.size.y, full_height),
+		"offset=%.1f" % screen.frame_centre.offset_bottom)
+	# A screen with no field must not be shoving its layout around all game.
+	var lobby := await _spawn("res://p2p_lobby.tscn") as P2pLobby
+	if lobby != null:
+		_check("a screen with no field is left alone",
+			lobby.frame_centre.offset_bottom == 0.0, "")
+
+
 ## The screens the player can actually reach, and nothing that leads nowhere.
 func _flow() -> void:
 	print("Flow")
