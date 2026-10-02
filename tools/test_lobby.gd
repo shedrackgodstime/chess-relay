@@ -102,6 +102,10 @@ func _init() -> void:
 	_check("and the action right-aligned, so the eye crosses to it after the list",
 		(lobby.start_button as Button).size_flags_horizontal
 			== Control.SIZE_SHRINK_END, "")
+	_check("with nothing in the column after it but the action itself",
+		lobby.column.get_child(lobby.column.get_child_count() - 1) == lobby.start_button,
+		"last=%s" % lobby.column.get_child(
+			lobby.column.get_child_count() - 1).name)
 
 	# Choosing records it and moves the mark.
 	lobby.choose_difficulty(MatchConfig.Difficulty.HARD)
@@ -176,8 +180,22 @@ func _init() -> void:
 		"")
 	_check("and its action is called PLAY", (lobby.start_button as Button).text == "PLAY",
 		"play=%s" % (lobby.start_button as Button).text)
-	_check("with a way back, because a screen with no way out is a trap",
-		(lobby.back_button as Button).text == "Back", "")
+	# Back is about leaving the screen, not about this game, so it is anchored to the
+	# top-left corner and is not part of the column. In the column it read as one more
+	# choice and had to be found before anyone could use it.
+	var back := lobby.back_button as Button
+	_check("there is a way back, because a screen with no way out is a trap",
+		back != null and back.text == "Back", "")
+	_check("and it is not part of the form", back.get_parent() == lobby
+			and not lobby.column.has_node("LobbyBack"), "")
+	_check("it is in the top left corner", back.position.x <= ScreenStyle.EDGE + 1.0
+			and back.position.y <= ScreenStyle.EDGE + 1.0,
+		"pos=%s" % str(back.position))
+	_check("with somewhere to put a thumb on it",
+		back.custom_minimum_size.x >= 90.0 and back.custom_minimum_size.y >= 44.0,
+		"size=%s" % str(back.custom_minimum_size))
+	_check("and it stays in the corner at any width",
+		back.anchor_left == 0.0 and back.anchor_top == 0.0, "")
 	# MEDIUM is the value behind the dot, not its position in the list. The earlier
 	# version compared to MatchConfig.Difficulty.MEDIUM after the suite had already
 	# chosen something else, so it could never pass.

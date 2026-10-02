@@ -252,6 +252,12 @@ incomplete. `Rules` is the only place that needs to change.
   sideways and three small targets side by side are three small targets. The rules
   between the parts exist because a gap alone has to be guessed at, and configuration
   and action are genuinely different kinds of thing.
+  **Back sits in the top-left corner, anchored, and is not part of the column.** It is
+  about leaving the screen rather than about this game, so it belongs to the screen. In
+  the column it read as one more choice, and a player who wanted out had to find it
+  first. Anchored rather than laid out so it is in the same corner on every screen
+  size, at `ScreenStyle.EDGE` so it cannot creep towards the edge on whichever screen
+  was adjusted last, and a 104x48 target so it is reachable without aiming.
   Difficulty carries its choice **in its own label** as `○` and `●`, so an option says
   what it is and whether it is picked in the same breath, and the three keep the same
   size either way. Play as fills the chosen button instead, since a ring would imply a

@@ -123,14 +123,11 @@ func build() -> void:
 	start_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	column.add_child(start_button)
 
-	# Back is present and small, because a screen with no way out is a trap, but it is
-	# not the thing the eye should land on.
-	back_button = _wide("LobbyBack", "Back")
-	back_button.custom_minimum_size = Vector2(0.0, 38.0)
-	back_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	ScreenStyle.button_styles(back_button, 16)
-	back_button.add_theme_color_override("font_color", ScreenStyle.MUTED)
-	column.add_child(back_button)
+	# Back is not added to the column at all. It is about leaving this screen rather
+	# than about this game, so it belongs to the screen and not to the form; sitting in
+	# the column it read as one more choice, and every player who wanted out had to
+	# find it first.
+	_back_button()
 
 
 ## A caption with its options stacked under it, added to the column as a single unit
@@ -181,6 +178,34 @@ func _options(group: VBoxContainer) -> Array:
 		return []
 	var row := group.get_node_or_null("%sRow" % group.name) as VBoxContainer
 	return [] if row == null else row.get_children()
+
+
+## Pinned to the top left of the screen, out of the way of the column.
+##
+## Anchored rather than laid out, because it is the same place on every screen size
+## and a player who backs out of one game expects to find it in the same corner next
+## time. Muted, because a screen with no way out is a trap but this is still not the
+## thing anyone came here to do.
+func _back_button() -> void:
+	back_button = Button.new()
+	back_button.name = "LobbyBack"
+	back_button.text = "Back"
+	back_button.focus_mode = Control.FOCUS_NONE
+	back_button.add_theme_font_size_override("font_size", 17)
+	back_button.add_theme_color_override("font_color", ScreenStyle.MUTED)
+	back_button.add_theme_color_override("font_hover_color", ScreenStyle.TEXT)
+	back_button.add_theme_stylebox_override("normal", ScreenStyle.button_box(
+		ScreenStyle.PANEL))
+	back_button.add_theme_stylebox_override("hover", ScreenStyle.button_box(
+		ScreenStyle.PANEL_HOVER))
+	back_button.add_theme_stylebox_override("pressed", ScreenStyle.button_box(
+		ScreenStyle.PANEL_PRESSED))
+	# A wide target in the corner rather than a word: it is the way out and it should
+	# be reachable without aiming.
+	back_button.custom_minimum_size = Vector2(104.0, 48.0)
+	back_button.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	back_button.position = Vector2(ScreenStyle.EDGE, ScreenStyle.EDGE)
+	add_child(back_button)
 
 
 ## A thin rule between one part of the column and the next. A line rather than a gap

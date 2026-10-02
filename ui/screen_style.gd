@@ -51,6 +51,11 @@ const BORDER := Color(0.30, 0.24, 0.18)
 const BORDER_WIDTH := 2
 const CORNER := 12
 
+## How far in from the screen edge a screen-level control sits, such as the lobby's
+## Back. One value so it does not creep towards the edge on whichever screen was
+## adjusted last.
+const EDGE := 20.0
+
 ## The picture used on the front door. Static so every screen that shows one reads the
 ## same file rather than loading its own idea of it.
 const BACKGROUND := "res://home_bg.jpg"
