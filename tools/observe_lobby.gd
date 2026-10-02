@@ -84,6 +84,47 @@ func _init() -> void:
 		for child in p2p_column.get_children():
 			print("    %s %.0fx%.0f" % [child.name, child.size.x, child.size.y])
 
+	# Every multiplayer screen, measured the way the VS one was measured. Built
+	# without looking first is how four bugs got into the last screen, so these are
+	# looked at before they are judged.
+	for path: String in ["res://create_game.tscn", "res://join_game.tscn"]:
+		var page := (load(path) as PackedScene).instantiate()
+		root.add_child(page)
+		await process_frame
+		await process_frame
+		# The create screen has a second act, and the first one is not the screen a
+		# player spends their time on, so both are measured.
+		if page is CreateGameScreen:
+			await (page as CreateGameScreen)._code_act()
+		var body := page.find_child("Column", true, false) as Control
+		print("\n-- %s --" % path.get_file())
+		if body == null:
+			print("  no column")
+			continue
+		print("  content %.0f x %.0f at %.0f,%.0f (%.0f%% of screen height)"
+			% [body.size.x, body.size.y, body.global_position.x,
+				body.global_position.y, body.size.y / screen.y * 100.0])
+		var previous_bottom := -1.0
+		for child in body.get_children():
+			var gap := -1.0
+			if previous_bottom >= 0.0:
+				gap = child.global_position.y - previous_bottom
+			previous_bottom = child.global_position.y + child.size.y
+			var text := ""
+			var font_size := 0
+			if child is Label:
+				text = (child as Label).text
+				font_size = (child as Label).get_theme_font_size("font_size")
+			elif child is Button:
+				text = (child as Button).text
+				font_size = (child as Button).get_theme_font_size("font_size")
+			print("    %-12s %4.0fx%-3.0f gap=%5.1f %2dpx %s"
+				% [child.name, child.size.x, child.size.y, gap, font_size, text])
+		var widest := 0.0
+		for child in body.get_children():
+			widest = maxf(widest, child.size.x)
+		print("  widest row %.0f, column %.0f" % [widest, body.size.x])
+
 	# The home screen for comparison. The design document asks for the lobby to occupy
 	# LESS vertical space than the home screen, which has to be measured rather than
 	# assumed. It was assumed the other way until now.

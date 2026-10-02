@@ -136,11 +136,19 @@ func add_divider() -> ColorRect:
 
 ## A quiet line that says something without asking for anything, such as why an entry
 ## is not ready yet.
+## Not given a width of its own.
+##
+## It was set to the full content width, which meant a hidden complaint was still
+## demanding 760 px: on the join screen the column measured 240, and the first time a
+## player mistyped a code the complaint appeared and widened the whole screen to 760.
+## A layout that rearranges itself when it has something to say is a layout that moves
+## under the player's finger.
 func add_notice(text: String) -> Label:
 	var label := Label.new()
 	label.name = "Notice"
 	label.text = text
-	label.custom_minimum_size = Vector2(ScreenStyle.CONTENT_WIDTH, 0.0)
+	label.custom_minimum_size = Vector2(0.0, 0.0)
+	label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	ScreenStyle.quiet_style(label)
 	column.add_child(label)
 	return label

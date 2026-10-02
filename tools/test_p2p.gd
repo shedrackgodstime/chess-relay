@@ -88,6 +88,21 @@ func _create() -> void:
 	var screen := await _spawn("res://create_game.tscn") as CreateGameScreen
 	if screen == null:
 		return
+
+	# The first act asks for a side and ends; the code is the second act, reached by
+	# the same CONTINUE a player presses. Driving it is the only way to see the screen
+	# they will actually spend their time on.
+	var options_first := screen.column.find_child("Options", true, false) as VBoxContainer
+	_check("the first act asks for a side and nothing else",
+		options_first != null and options_first.get_child_count() == 3
+			and screen.find_child("Code", true, false) == null,
+		"first act has a code on it, which is the second act's job")
+	var continue_button := screen.find_child("Continue", true, false) as Button
+	_check("and offers a way on to the next thing", continue_button != null, "")
+	continue_button.pressed.emit()
+	await process_frame
+	await process_frame
+
 	_check("it shows a code without anyone asking for one",
 		GameCode.is_well_formed(screen.game_code()),
 		"code=%s" % screen.game_code())
@@ -110,18 +125,13 @@ func _create() -> void:
 		_find(screen, "CopyCode") != null, "")
 	_check("and says it is waiting", _text_contains(screen, "Waiting for opponent"), "")
 
-	# Choosing a side belongs here rather than on the landing screen: hosting is the
-	# point at which it becomes a real question.
-	var options := screen.column.find_child("Options", true, false) as VBoxContainer
-	_check("the host chooses a side here",
-		options != null and options.get_child_count() == 3, "")
-	_check("offering white, black and random", true, "")
-	screen.choose_side(BoardState.LIGHT)
-	_check("and the choice is recorded and shown",
-		screen.side == BoardState.LIGHT
-			and (options.get_child(0) as Button).button_pressed, "")
-	_check("with the joiner taking the other, so the pair adds up",
-		screen.side == BoardState.DARK or screen.side == BoardState.LIGHT, "")
+	# The side survives the move to the next act, so a player who picked White is not
+	# asked again on the screen where the code appears.
+	_check("the side chosen before it is kept", screen.side == BoardState.LIGHT
+			or screen.side == BoardState.DARK, "")
+	_check("and the screen is now the code and nothing else",
+		screen.find_child("Options", true, false) == null
+			and screen.find_child("Code", true, false) != null, "")
 
 
 ## Code entry: a field, a button, and a way to say no.
@@ -159,6 +169,18 @@ func _join() -> void:
 		"echo=%s" % (screen.code_label as Label).text)
 	_check("but the game is not started by typing alone",
 		screen.typed_code().length() == 6, "")
+	# A complaint must not rearrange the screen. The quiet line used to demand the
+	# full content width while hidden, so the first mistyped code widened the column
+	# from 240 to 760 and moved everything under the player's finger.
+	var column := screen.column as Control
+	var before: float = column.size.x
+	screen.status_label.text = "Check the game code and try again."
+	screen.status_label.visible = true
+	await process_frame
+	await process_frame
+	_check("showing a complaint does not resize the screen",
+		absf(column.size.x - before) < 1.0, "before=%.0f after=%.0f"
+			% [before, column.size.x])
 
 
 ## The screens the player can actually reach, and nothing that leads nowhere.

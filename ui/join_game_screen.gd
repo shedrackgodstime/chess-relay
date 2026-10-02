@@ -24,6 +24,9 @@ const TITLE := "JOIN GAME"
 var field: LineEdit = null
 var code_label: Label = null
 var status_label: Label = null
+## Set while a complaint is on screen, so the quiet line and the complaint are not
+## two labels fighting over the same space.
+var _notice_hidden := true
 var join_button: Button = null
 var cancel_button: Button = null
 
@@ -74,6 +77,7 @@ func _build_content() -> void:
 
 	status_label = add_notice("")
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.visible = false
 
 	add_gap(8.0)
 	join_button = add_action("JOIN", 200.0, 52.0, 20, "Join")
@@ -112,14 +116,24 @@ func _on_typed(_text: String) -> void:
 	_update_join()
 
 
+## Both of these are hidden while they have nothing to say.
+##
+## They were 48 px of empty rows in the middle of the screen before the first
+## keystroke, which is most of what made this screen feel padded: the space was there
+## before the content, rather than appearing with it.
 func _update_echo() -> void:
-	if code_label != null:
-		code_label.text = readable(field.text if field != null else "")
+	if code_label == null:
+		return
+	var text := readable(field.text if field != null else "")
+	code_label.text = text
+	code_label.visible = text != ""
 
 
 func _update_join() -> void:
 	if join_button != null:
 		join_button.disabled = typed_code().length() < GameCode.GROUPS * GameCode.LENGTH
+	if status_label != null:
+		status_label.visible = not _notice_hidden
 
 
 func _on_join() -> void:

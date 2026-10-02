@@ -35,13 +35,47 @@ var cancel_button: Button = null
 var _code := ""
 
 
+## Two acts, one at a time.
+##
+## Choosing a side and being handed a code are sequential, not simultaneous: the
+## document's own flow is CREATE GAME, choose side, game created, show code. Showing
+## both meant a player had to hold a colour choice in their head while looking at a code
+## they could not use yet, and it made the screen 596 px tall, which is 92% of the
+## screen. The first act is brief and ends; the second is the reason the screen exists.
+##
+## Only one of the two is ever on the screen, so whichever it is gets the whole of it.
 func _build_content() -> void:
-	add_title(TITLE, 40)
-	add_gap(6.0)
+	_side_act()
 
+
+## The first act: choose a side, then move on. Deliberately short, because the player
+## has come here to make a game, not to configure one.
+func _side_act() -> void:
+	for child in column.get_children():
+		column.remove_child(child)
+		child.queue_free()
 	side_group = add_options("PLAY AS", SIDES)
+	var note := add_notice("The other player takes the other side.")
+	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	add_gap(14.0)
+	var cont := add_action("CONTINUE", 220.0, 52.0, 20, "Continue")
+	cont.pressed.connect(func() -> void: _code_act())
+	for i in options_of(side_group).get_child_count():
+		var button := options_of(side_group).get_child(i) as Button
+		button.pressed.connect(_on_option_pressed.bind(i))
+	mark_option(options_of(side_group), SIDES.find(
+		MatchConfig.label_for(MatchConfig.SIDES, side)))
 
-	add_gap(6.0)
+
+## The second act: the code, and waiting. Everything on this screen is either the code
+## or context for it.
+func _code_act() -> void:
+	for child in column.get_children():
+		column.remove_child(child)
+		child.queue_free()
+	add_title(TITLE, 40)
+	add_gap(4.0)
+
 	var caption := Label.new()
 	caption.name = "CodeCaption"
 	caption.text = "YOUR GAME CODE"
@@ -53,31 +87,58 @@ func _build_content() -> void:
 
 	code_label = Label.new()
 	code_label.name = "Code"
+	code_label.text = _code
 	code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	code_label.custom_minimum_size = Vector2(ScreenStyle.CONTENT_WIDTH, 68.0)
+	# As wide as the code and no wider. At the content width it claimed 760 px for
+	# seven characters, which made the code look like a heading rather than a thing to
+	# read out.
+	code_label.custom_minimum_size = Vector2(300.0, 74.0)
+	code_label.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	code_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	code_label.add_theme_font_size_override("font_size", 44)
+	code_label.add_theme_font_size_override("font_size", 46)
 	code_label.add_theme_color_override("font_color", ScreenStyle.TITLE)
 	code_label.add_theme_color_override("font_outline_color", ScreenStyle.OUTLINE)
 	code_label.add_theme_constant_override("outline_size", ScreenStyle.OUTLINE_SIZE)
 	column.add_child(code_label)
 
+	# Close under the code, because the two are one thing: this is what you read out
+	# and this is what you do about it.
+	add_gap(2.0)
+	copy_button = add_action("COPY CODE", 190.0, 46.0, 17, "CopyCode")
+	copy_button.pressed.connect(_on_copy)
+	add_gap(10.0)
+
 	status_label = add_notice("Waiting for opponent...")
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-
-	add_gap(6.0)
-	copy_button = add_action("COPY CODE", 200.0, 48.0, 18, "CopyCode")
-	copy_button.pressed.connect(_on_copy)
+	cancel_button = _quiet_cancel()
 	add_divider()
-	cancel_button = add_action("Cancel", 200.0, 46.0, 18, "Cancel")
+	column.add_child(cancel_button)
 	cancel_button.pressed.connect(_on_cancel)
+
+
+## Cancel is the way out, so it does not get the language of the thing you came for.
+## A player who is looking for COPY CODE should not have a second outlined button
+## below it offering the same kind of tap.
+func _quiet_cancel() -> Button:
+	var button := Button.new()
+	button.name = "Cancel"
+	button.text = "Cancel"
+	button.focus_mode = Control.FOCUS_NONE
+	button.custom_minimum_size = Vector2(190.0, 40.0)
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	button.add_theme_font_size_override("font_size", 16)
+	button.add_theme_color_override("font_color", ScreenStyle.MUTED)
+	button.add_theme_color_override("font_hover_color", ScreenStyle.TEXT)
+	var flat := StyleBoxEmpty.new()
+	button.add_theme_stylebox_override("normal", flat)
+	button.add_theme_stylebox_override("hover", ScreenStyle.faint_box())
+	button.add_theme_stylebox_override("pressed", flat)
+	button.add_theme_stylebox_override("focus", flat)
+	return button
 
 
 func _show_defaults() -> void:
 	_code = GameCode.generate()
-	code_label.text = _code
-	mark_option(options_of(side_group), SIDES.find(MatchConfig.label_for(
-		MatchConfig.SIDES, side)))
 
 
 ## The code, for a test or a host that needs it before the room exists.
@@ -94,6 +155,8 @@ func choose_side(value: int) -> void:
 	side_chosen.emit(value)
 
 
+## Choosing an option. The side is recorded as it is chosen rather than on Continue,
+## so the button and the choice cannot drift apart.
 func _on_option_pressed(index: int) -> void:
 	var values := [BoardState.LIGHT, BoardState.DARK,
 		MatchConfig.Difficulty.RANDOM_SIDE]
