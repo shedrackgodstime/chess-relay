@@ -68,26 +68,9 @@ func _init() -> void:
 		printerr("save failed: %d" % err)
 		quit(1)
 		return
-	_strip_unique_ids()
 
 	print("Wrote %s" % OUTPUT)
 	quit(0)
-
-
-## Removes the random per-node IDs Godot writes on every save.
-##
-## Those numbers change even when nothing in the board changes, so regenerating an
-## unchanged scene produced a large diff that could hide a real one. Unique scene
-## names still work because the nodes retain unique_name_in_owner; the stripped
-## numbers are only the engine's fast lookup cache.
-static func _strip_unique_ids() -> void:
-	var source := FileAccess.get_file_as_string(OUTPUT)
-	var pattern := RegEx.new()
-	pattern.compile(" unique_id=\\d+")
-	var normalized := pattern.sub(source, "", true)
-	var file := FileAccess.open(OUTPUT, FileAccess.WRITE)
-	file.store_string(normalized)
-	file.close()
 
 
 func _board() -> MeshInstance3D:
@@ -356,7 +339,8 @@ func _menu_panel() -> Control:
 	panel.visible = false
 
 	var backdrop := ColorRect.new()
-	backdrop.name = "Backdrop"
+	backdrop.name = "MenuBackdrop"
+	backdrop.unique_name_in_owner = true
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	backdrop.color = Color(0.05, 0.04, 0.03, 0.72)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -377,7 +361,10 @@ func _menu_panel() -> Control:
 	var card := PanelContainer.new()
 	card.name = "Card"
 	card.unique_name_in_owner = true
-	card.custom_minimum_size = Vector2(340.0, 0.0)
+	card.custom_minimum_size = Vector2(300.0, 0.0)
+	# Stops, so a tap inside the card does not reach the backdrop and close the menu
+	# under the player's finger while they are reaching for a row.
+	card.mouse_filter = Control.MOUSE_FILTER_STOP
 	card.add_theme_stylebox_override("panel", _card_box())
 	centre.add_child(card)
 
@@ -392,24 +379,17 @@ func _menu_panel() -> Control:
 	rows.add_theme_constant_override("separation", 8)
 	column.add_child(rows)
 
+	# Two rows, and that is the whole menu.
+	#
+	# Settings used to live here, on the reasoning that they are what a player wants to
+	# change mid-game. That was wrong twice over: a player cannot tell what
+	# "Resign" or a bare "Medium" dropdown does from the word alone, and settings
+	# chosen before a game are settings chosen once, not on every visit. They belong in
+	# the lobby, where there is time to explain them, and the menu is now only the two
+	# things that are unambiguous and both destroy what is on the board.
 	rows.add_child(_menu_row("MenuNewGame", "New game"))
-	rows.add_child(_menu_row("MenuResign", "Resign"))
-	var hints := CheckButton.new()
-	hints.name = "MenuHints"
-	hints.unique_name_in_owner = true
-	hints.text = "Show legal moves"
-	hints.focus_mode = Control.FOCUS_NONE
-	hints.custom_minimum_size = Vector2(0.0, 44.0)
-	rows.add_child(hints)
-	var quality := OptionButton.new()
-	quality.name = "MenuQuality"
-	quality.unique_name_in_owner = true
-	quality.focus_mode = Control.FOCUS_NONE
-	quality.custom_minimum_size = Vector2(0.0, 44.0)
-	for name: String in ["Low", "Medium", "High"]:
-		quality.add_item(name)
-	rows.add_child(quality)
 	rows.add_child(_menu_row("MenuExit", "Exit"))
+	rows.add_child(_menu_row("MenuCancel", "Close"))
 
 	var question := Label.new()
 	question.name = "MenuConfirmLabel"
@@ -426,10 +406,13 @@ func _menu_panel() -> Control:
 	var confirm := _menu_row("MenuConfirm", "Confirm")
 	confirm.visible = false
 	column.add_child(confirm)
-	var cancel := _menu_row("MenuCancel", "Cancel")
+	# Only shown while a confirmation is up, where Cancel means "never mind" rather
+	# than "close", and the question's own answer row is right beside it.
+	var cancel := _menu_row("MenuCancel", "Never mind")
 	cancel.visible = false
 	column.add_child(cancel)
 	return panel
+
 
 
 ## The card the menu rows sit in: opaque, rounded to match the buttons, with margins

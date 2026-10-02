@@ -31,7 +31,6 @@ func set_network_state(state: NetworkState) -> void:
 	var visual: Array = NETWORK_VISUALS[state]
 	network_indicator.texture = Icons.signal_bars(visual[0], visual[1])
 
-
 ## Emitted by the menu button when it wants to be opened or closed. The board
 ## listens, because whether a tap lands on a square depends on whether the panel is
 ## up, and the panel is hidden whenever play is live.
@@ -39,7 +38,6 @@ signal menu_requested
 
 ## What the player chose from the menu.
 signal new_game_requested
-signal resign_requested
 signal exit_requested
 ## Shows the end of the game over the board, or clears it.
 ##
@@ -51,20 +49,17 @@ func set_game_over(text: String) -> void:
 	game_over_label.text = text
 	game_over_label.visible = text != ""
 
-
 ## Asks the player which piece a pawn becomes. Routed through the HUD because
 ## the picker is presentation and Main should not have to know it exists.
 func ask_promotion(promoting_side: int) -> void:
 	if promotion_picker != null:
 		promotion_picker.open(promoting_side)
 
-
 ## Closes the picker without a choice. The caller still has to finish the move:
 ## dismissing the prompt does not cancel it.
 func close_promotion() -> void:
 	if promotion_picker != null:
 		promotion_picker.close()
-
 
 ## The three states the mic control can present. Requesting is separate from
 ## live on purpose: asking for voice and speaking are different things, and
@@ -97,18 +92,16 @@ signal voice_state_changed(state: VoiceState)
 @onready var game_over_label: Label = %GameOverLabel
 @onready var network_indicator: TextureRect = %NetworkIndicator
 @onready var menu_panel: Control = %MenuPanel
+@onready var menu_backdrop: Control = %MenuBackdrop
 @onready var menu_new_game_button: Button = %MenuNewGame
-@onready var menu_resign_button: Button = %MenuResign
 @onready var menu_exit_button: Button = %MenuExit
-@onready var menu_hints_toggle: CheckButton = %MenuHints
-@onready var menu_quality_option: OptionButton = %MenuQuality
 @onready var menu_confirm_label: Label = %MenuConfirmLabel
 @onready var menu_confirm_button: Button = %MenuConfirm
 @onready var menu_cancel_button: Button = %MenuCancel
 @onready var menu_rows: Control = %MenuRows
 
 ## The action a confirmation is asking about, or MENU_NONE when nothing is pending.
-enum MenuAction { NONE, NEW_GAME, RESIGN, EXIT }
+enum MenuAction { NONE, NEW_GAME, EXIT }
 
 var _menu_pending := MenuAction.NONE
 
@@ -173,10 +166,8 @@ const MENU_INSET := 84.0
 ## from the left edge by MENU_INSET instead.
 const VOICE_GAP := 160.0
 
-
 func _ready() -> void:
 	bind()
-
 
 ## Shows whose turn it is. Call after any move.
 func set_turn(side: int, moves: int) -> void:
@@ -186,7 +177,6 @@ func set_turn(side: int, moves: int) -> void:
 	turn_label.text = "%s to move    ·    %d %s" % [
 		who, moves, "move" if moves == 1 else "moves"
 	]
-
 
 ## Wires the buttons. Safe to call twice, so tests can drive the HUD right
 ## after instantiation without waiting for _ready.
@@ -200,45 +190,31 @@ func bind() -> void:
 	_connect(menu_button, _on_menu)
 	if menu_new_game_button != null:
 		_connect(menu_new_game_button, _on_menu_new_game)
-		_connect(menu_resign_button, _on_menu_resign)
 		_connect(menu_exit_button, _on_menu_exit)
 		_connect(menu_confirm_button, _on_menu_confirm)
 		_connect(menu_cancel_button, _on_menu_cancel)
-		# Connected to their own signals rather than through _connect, which is typed
-		# to Button and wires pressed. A CheckButton's pressed carries no arguments and
-		# an OptionButton's says nothing about which entry was chosen, so both would
-		# have been connected to the wrong thing and quietly done nothing.
-		if menu_hints_toggle != null \
-				and not menu_hints_toggle.toggled.is_connected(_on_hints_toggled):
-			menu_hints_toggle.toggled.connect(_on_hints_toggled)
-		if menu_quality_option != null \
-				and not menu_quality_option.item_selected.is_connected(
-					_on_quality_selected):
-			menu_quality_option.item_selected.connect(_on_quality_selected)
-		refresh_menu_settings()
+		# A tap on the dimmed board closes the menu. Without this it could only be left
+		# by choosing something, which is a trap rather than a menu.
+		if menu_backdrop != null \
+				and not menu_backdrop.gui_input.is_connected(_on_backdrop_input):
+			menu_backdrop.gui_input.connect(_on_backdrop_input)
 	_connect(mic_button, _on_voice)
-
 
 func _connect(button: Button, method: Callable) -> void:
 	if button != null and not button.pressed.is_connected(method):
 		button.pressed.connect(method)
 
-
 func _on_rotate_left() -> void:
 	rotate_requested.emit(-1)
-
 
 func _on_rotate_right() -> void:
 	rotate_requested.emit(1)
 
-
 func _on_flip() -> void:
 	flip_requested.emit()
 
-
 func _on_reset() -> void:
 	reset_view_requested.emit()
-
 
 ## Opens or closes the panel. Closing is always allowed, including mid-confirmation:
 ## a player who opened a confirmation and changed their mind must never be trapped.
@@ -253,13 +229,11 @@ func toggle_menu() -> void:
 		_clear_confirmation()
 	menu_requested.emit()
 
-
 ## Puts the panel back to its question, dropping any pending confirmation.
 func _show_menu_rows() -> void:
 	_clear_confirmation()
 	if menu_rows != null:
 		menu_rows.visible = true
-
 
 func _clear_confirmation() -> void:
 	_menu_pending = MenuAction.NONE
@@ -271,7 +245,6 @@ func _clear_confirmation() -> void:
 		menu_confirm_button.visible = false
 	if menu_cancel_button != null:
 		menu_cancel_button.visible = false
-
 
 ## Asks before doing the things that cannot be undone.
 ##
@@ -292,59 +265,63 @@ func _confirm(action: MenuAction, question: String) -> void:
 	if menu_cancel_button != null:
 		menu_cancel_button.visible = true
 
-
 func _on_menu() -> void:
 	toggle_menu()
 
+## Closes the menu when the player taps outside it. Guarded, because this fires for
+## every event the backdrop receives, including ones that are not a decision to close
+## anything.
+func _on_backdrop_input(event: InputEvent) -> void:
+	var pressed: bool = false
+	if event is InputEventMouseButton:
+		pressed = event.pressed and event.button_index == MOUSE_BUTTON_LEFT
+	elif event is InputEventScreenTouch:
+		pressed = event.pressed
+	if not pressed:
+		return
+	if not menu_panel.visible:
+		return
+	if menu_confirm_label != null and menu_confirm_label.visible:
+		# A confirmation has to be answered or dismissed, not silently dropped by a
+		# stray tap on the board.
+		_show_menu_rows()
+		return
+	toggle_menu()
+
+## Closes the menu on the back gesture or Escape. Returns whether it consumed it, so
+## the board can decide whether that means anything else.
+func handle_cancel() -> bool:
+	if menu_panel == null or not menu_panel.visible:
+		return false
+	if menu_confirm_label != null and menu_confirm_label.visible:
+		_show_menu_rows()
+	else:
+		toggle_menu()
+	return true
 
 func _on_menu_new_game() -> void:
 	_confirm(MenuAction.NEW_GAME, "Abandon this game and start again?")
 
 
-func _on_menu_resign() -> void:
-	_confirm(MenuAction.RESIGN, "Resign and lose this game?")
-
 
 func _on_menu_exit() -> void:
 	_confirm(MenuAction.EXIT, "Leave the game?")
-
 
 func _on_menu_confirm() -> void:
 	match _menu_pending:
 		MenuAction.NEW_GAME:
 			toggle_menu()
 			new_game_requested.emit()
-		MenuAction.RESIGN:
-			toggle_menu()
-			resign_requested.emit()
 		MenuAction.EXIT:
 			exit_requested.emit()
 		_:
 			pass
 	_clear_confirmation()
 
-
 func _on_menu_cancel() -> void:
 	_show_menu_rows()
 
 
-## Reflects the live settings in the menu, so it never offers to change something to
-## the value it already holds.
-func refresh_menu_settings() -> void:
-	if menu_hints_toggle != null:
-		menu_hints_toggle.set_pressed_no_signal(Indicators.show_legal_moves())
-	if menu_quality_option != null:
-		menu_quality_option.select(Quality.preset())
-
-
-func _on_hints_toggled(pressed: bool) -> void:
-	Indicators.set_show_legal_moves(pressed)
-	menu_requested.emit()
-
-
-func _on_quality_selected(index: int) -> void:
-	Quality.set_preset(index)
-	menu_requested.emit()
 
 
 ## Swaps the glyph between live and muted rather than tinting one, so "you are
@@ -366,10 +343,8 @@ func set_voice_state(state: VoiceState) -> void:
 	if mic_ring != null:
 		mic_ring.visible = state == VoiceState.LIVE
 
-
 func is_voice_live() -> bool:
 	return voice_state == VoiceState.LIVE
-
 
 func _on_voice() -> void:
 	# Off, then asking, then transmitting. Requesting sits in the middle so the
@@ -377,7 +352,6 @@ func _on_voice() -> void:
 	# is the less surprising thing to do to the opponent.
 	set_voice_state(voice_state + 1 if voice_state < VoiceState.LIVE else VoiceState.OFF)
 	voice_state_changed.emit(voice_state)
-
 
 ## Shows or hides the whole voice cluster. Turning it off also mutes, so the
 ## mic can never come back live behind a hidden button.
@@ -388,7 +362,6 @@ func set_voice_visible(shown: bool) -> void:
 	if not shown:
 		set_voice_state(VoiceState.OFF)
 		set_remote_speaking(false)
-
 
 ## Lights the dot that shows the opponent is transmitting. Kept separate from
 ## the mic glyph so you can tell 'they are talking' from 'I am unmuted'.

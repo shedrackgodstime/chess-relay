@@ -138,7 +138,6 @@ func _ready() -> void:
 	# on every move. DEV_SHOW_VOICE keeps it up without a second device.
 	hud.set_voice_visible(DEV_SHOW_VOICE or not ai_opponent)
 	hud.new_game_requested.connect(start_new_game)
-	hud.resign_requested.connect(_on_resign)
 	hud.exit_requested.connect(_on_exit)
 	_refresh_trays()
 
@@ -185,12 +184,6 @@ func _on_flip_requested() -> void:
 ## somewhere. When there is one, this is the single line that changes.
 func _on_exit() -> void:
 	get_tree().quit()
-
-
-## Gives up the game on behalf of whoever is to move, and says so on the board.
-func _on_resign() -> void:
-	game.resign()
-	_deselect()
 
 
 ## Starts again from the opening position.
@@ -296,6 +289,12 @@ func _framing_distance() -> float:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Escape and the Android back gesture close the menu and nothing else, so a
+	# player is never left inside it with no way out.
+	if event.is_action_pressed("ui_cancel"):
+		if hud.handle_cancel():
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseButton:
 		_tap_button((event as InputEventMouseButton).pressed,
 			(event as InputEventMouseButton).position,
