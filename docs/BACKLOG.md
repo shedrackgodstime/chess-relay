@@ -256,6 +256,18 @@ incomplete. `Rules` is the only place that needs to change.
   project could ship.
   `tools/test_lobby.gd` is its own suite for the same reason as the home screen: a parse
   error here is a game that cannot be started at all.
+  **Styling now lives in `ui/screen_style.gd` and nowhere else.** The lobby was first
+  built with its own colours and its own button factory, and rendered flush to the
+  corner of a blank screen one tap after a centred menu over artwork. Both screens were
+  individually defensible; together they were inconsistent, which is what happens when
+  styling is written per screen. Every colour, corner radius, outline and the background
+  wash is now read from one place, and home and the lobby both take their faces from it.
+  If two screens ever need to differ, change it there and look at both rather than
+  opening a third copy.
+  **The lobby has no picture.** The artwork is the front door's identity; putting the
+  same photograph behind every screen would make them all look like the same screen. The
+  lobby is the shared dark with the words centred on it, which is what every other
+  in-app screen is.
 - **Home is its own scene and the project's entry point.** `res://home.tscn`, built by
   `tools/build_home_scene.gd`, set as `run/main_scene`. It was a CanvasLayer over the
   loaded board first and that was wrong: the whole 3D world stayed alive behind a menu,

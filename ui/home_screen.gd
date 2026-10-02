@@ -22,18 +22,16 @@ signal p2p_requested
 signal settings_requested
 
 const TITLE := "CHESS RELAY"
-const BACKGROUND := "res://home_bg.jpg"
+const BACKGROUND := ScreenStyle.BACKGROUND
 
 ## Long enough for a title and three entries to read as one column, and short enough
 ## to sit clear of the middle of the picture: the king is the subject and the words
 ## must not land on his face.
 const COLUMN_WIDTH := 460.0
 
-## How much the picture is held back, so the words read first and the art second.
-## Named so it can be judged in one place and adjusted without hunting for it: this is
-## a value for the eye, not for a formula, and it will want to be looked at on a real
-## screen in daylight.
-const SHADE := 0.90
+## How much the picture is held back. Read from ScreenStyle, which is where the value
+## and the reasoning behind it now live.
+const SHADE := ScreenStyle.BACKGROUND_SHADE
 
 
 @onready var background: TextureRect = %HomeBackground
@@ -71,7 +69,7 @@ func build() -> void:
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	background.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background.texture = _background()
+	background.texture = background_texture()
 	add_child(background)
 
 	# The picture is dark at the edges and very bright behind the king, so the words
@@ -93,7 +91,8 @@ func build() -> void:
 	var shade := ColorRect.new()
 	shade.name = "HomeShade"
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.05, 0.04, 0.03, SHADE)
+	shade.color = ScreenStyle.background_shade(ScreenStyle.SHADE,
+		ScreenStyle.BACKGROUND_SHADE)
 	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(shade)
 
@@ -114,12 +113,8 @@ func build() -> void:
 	title_label.name = "HomeTitle"
 	title_label.unique_name_in_owner = true
 	title_label.text = TITLE
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.custom_minimum_size = Vector2(COLUMN_WIDTH, 64.0)
-	title_label.add_theme_font_size_override("font_size", 44)
-	title_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62))
-	title_label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
-	title_label.add_theme_constant_override("outline_size", 8)
+	ScreenStyle.title_style(title_label, 44)
 	column.add_child(title_label)
 
 	computer_button = _row("HomeComputer", "Vs computer")
@@ -136,10 +131,12 @@ func build() -> void:
 ## A missing background is not worth a crash and is not worth a fallback that pretends
 ## to be the art. The shade behind the words is enough to read them either way, so an
 ## absent texture leaves a plain dark screen rather than an error.
-func _background() -> Texture2D:
-	if not ResourceLoader.exists(BACKGROUND):
-		return null
-	return load(BACKGROUND) as Texture2D
+## The picture, or nothing if it has not been imported.
+##
+## Static because the lobby uses the same one, and two screens reading the same file
+## through their own private loaders is how they drift apart.
+static func background_texture() -> Texture2D:
+	return ScreenStyle.background_texture()
 
 
 ## Says so, in the same place, when something is asked for that cannot be done yet. An
@@ -156,13 +153,8 @@ func _notice(text: String) -> void:
 	var label := Label.new()
 	label.name = "HomeNotice"
 	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	label.custom_minimum_size = Vector2(COLUMN_WIDTH, 40.0)
-	label.add_theme_font_size_override("font_size", 15)
-	label.add_theme_color_override("font_color", Color(0.72, 0.66, 0.58))
-	label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
-	label.add_theme_constant_override("outline_size", 6)
+	ScreenStyle.quiet_style(label)
 	column.add_child(label)
 
 
@@ -175,12 +167,7 @@ func _row(node_name: String, text: String) -> Button:
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size = Vector2(COLUMN_WIDTH, 56.0)
-	button.add_theme_font_size_override("font_size", 22)
-	button.add_theme_color_override("font_color", Color(1.0, 0.90, 0.72))
-	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
-	button.add_theme_stylebox_override("normal", _button_box())
-	button.add_theme_stylebox_override("hover", _button_box(Color(0.16, 0.13, 0.11)))
-	button.add_theme_stylebox_override("pressed", _button_box(Color(0.26, 0.20, 0.15)))
+	ScreenStyle.button_styles(button)
 	return button
 
 

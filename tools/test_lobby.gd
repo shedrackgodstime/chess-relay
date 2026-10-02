@@ -88,9 +88,42 @@ func _init() -> void:
 	_check("and says which side the player has", int(started["side"]) == BoardState.DARK,
 		"side=%d" % int(started["side"]))
 
+	# The lobby must be built like every other screen: centred, on something, with the
+	# shared styling. This is here because the first version wrapped nothing at all and
+	# hung a column off the root, so it rendered flush to the corner of a blank screen
+	# one tap after a centred menu. Two screens a player moves between in a single tap
+	# must not be visibly built by different people.
+	var backdrop := lobby.get_node_or_null("LobbyBackdrop") as ColorRect
+	var centre := lobby.get_node_or_null("Centre") as CenterContainer
+	_check("the lobby sits on something rather than on nothing", backdrop != null, "")
+	_check("and that something takes no taps meant for a button",
+		backdrop != null and backdrop.mouse_filter == Control.MOUSE_FILTER_STOP, "")
+	_check("the column is centred rather than hung off the corner",
+		centre != null and lobby.column.get_parent() == centre, "")
+	if backdrop != null:
+		# Dark, but not the picture: the artwork belongs to the front door, and
+		# putting it behind every screen would make them all look like the same screen.
+		_check("and is the shared dark rather than the home artwork",
+			is_equal_approx(backdrop.color.a, 1.0), "alpha=%.2f" % backdrop.color.a)
+	if centre != null and centre.size.x > 0:
+		var content := centre.get_combined_minimum_size().x
+		_check("which means the words sit in the middle of the screen",
+			absf(centre.get_child(0).position.x - (centre.size.x - content) * 0.5) < 2.0,
+			"column_x=%.1f expected=%.1f centre=%.1f" % [centre.get_child(0).position.x,
+				(centre.size.x - content) * 0.5, centre.size.x])
+
 	# Both scenes must exist, or the flow is a dead end.
 	_check("the lobby is reachable as a scene", ResourceLoader.exists("res://lobby.tscn"),
 		"")
+	# And the two screens must read as one game, which is what the shared style file is
+	# for. Checked rather than assumed: styling written per screen drifts per screen.
+	var lobby_title := (lobby.title_label as Label).get_theme_color("font_color")
+	var option := lobby.difficulty_group.get_child(1) as Button
+	_check("and it reads its colours from the shared palette, not its own",
+		lobby_title == ScreenStyle.TITLE
+			and option.get_theme_stylebox("normal").bg_color == ScreenStyle.PANEL,
+		"title=%s panel=%s" % [str(lobby_title),
+			str(option.get_theme_stylebox("normal").bg_color)])
 	_check("and the game is a scene of its own", ResourceLoader.exists("res://main.tscn"),
 		"")
 

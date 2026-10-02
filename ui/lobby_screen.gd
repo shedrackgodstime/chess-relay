@@ -44,23 +44,36 @@ func _ready() -> void:
 
 
 func build() -> void:
+	# Dark and centred, like every other screen, but with no picture. The artwork
+	# belongs to the front door; the lobby is a step inside it and putting the same
+	# photograph behind every screen would make them all look like the same screen.
+	var backdrop := ColorRect.new()
+	backdrop.name = "LobbyBackdrop"
+	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = ScreenStyle.SHADE
+	# Stops, so a tap on the dark cannot fall through to whatever is underneath.
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(backdrop)
+
+	var centre := CenterContainer.new()
+	centre.name = "Centre"
+	centre.set_anchors_preset(Control.PRESET_FULL_RECT)
+	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(centre)
+
 	column = VBoxContainer.new()
 	column.name = "LobbyColumn"
 	column.unique_name_in_owner = true
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
 	column.add_theme_constant_override("separation", 14)
-	add_child(column)
+	centre.add_child(column)
 
 	title_label = Label.new()
 	title_label.name = "LobbyTitle"
 	title_label.unique_name_in_owner = true
 	title_label.text = TITLE
-	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	title_label.custom_minimum_size = Vector2(COLUMN_WIDTH, 56.0)
-	title_label.add_theme_font_size_override("font_size", 34)
-	title_label.add_theme_color_override("font_color", Color(1.0, 0.88, 0.62))
-	title_label.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
-	title_label.add_theme_constant_override("outline_size", 8)
+	ScreenStyle.title_style(title_label, 34)
 	column.add_child(title_label)
 
 	# Each question is a label on the left and its options on the right, so the panel
@@ -100,9 +113,9 @@ func _row(node_name: String, label_text: String, into: Control) -> HBoxContainer
 	caption.custom_minimum_size = Vector2(150.0, 48.0)
 	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	caption.add_theme_font_size_override("font_size", 19)
-	caption.add_theme_color_override("font_color", Color(0.92, 0.86, 0.74))
-	caption.add_theme_color_override("font_outline_color", Color(0.05, 0.04, 0.03))
-	caption.add_theme_constant_override("outline_size", 6)
+	caption.add_theme_color_override("font_color", ScreenStyle.CAPTION)
+	caption.add_theme_color_override("font_outline_color", ScreenStyle.OUTLINE)
+	caption.add_theme_constant_override("outline_size", ScreenStyle.OUTLINE_SIZE_SMALL)
 	row.add_child(caption)
 	return row
 
@@ -114,12 +127,7 @@ func _wide(node_name: String, text: String) -> Button:
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size = Vector2(COLUMN_WIDTH, 56.0)
-	button.add_theme_font_size_override("font_size", 22)
-	button.add_theme_color_override("font_color", Color(1.0, 0.90, 0.72))
-	button.add_theme_color_override("font_hover_color", Color(1.0, 1.0, 1.0))
-	button.add_theme_stylebox_override("normal", _box(Color(0.11, 0.09, 0.08)))
-	button.add_theme_stylebox_override("hover", _box(Color(0.16, 0.13, 0.11)))
-	button.add_theme_stylebox_override("pressed", _box(Color(0.26, 0.20, 0.15)))
+	ScreenStyle.button_styles(button)
 	return button
 
 
@@ -130,18 +138,9 @@ func _choice(parent: Control, node_name: String, text: String) -> Button:
 	var button := _wide(node_name, text)
 	button.toggle_mode = true
 	button.custom_minimum_size = Vector2(0.0, 48.0)
-	button.add_theme_stylebox_override("pressed", _box(Color(0.42, 0.32, 0.12)))
+	ScreenStyle.choice_styles(button)
 	parent.add_child(button)
 	return button
-
-
-static func _box(tint: Color) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = tint
-	box.border_color = Color(0.30, 0.24, 0.18)
-	box.set_border_width_all(2)
-	box.set_corner_radius_all(12)
-	return box
 
 
 ## Records the difficulty and shows which one is chosen.
