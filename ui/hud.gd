@@ -38,7 +38,7 @@ signal menu_requested
 
 ## What the player chose from the menu.
 signal new_game_requested
-signal exit_requested
+signal quit_requested
 ## Shows the end of the game over the board, or clears it.
 ##
 ## Checkmate is the one outcome that has to be said plainly: the board itself
@@ -94,14 +94,14 @@ signal voice_state_changed(state: VoiceState)
 @onready var menu_panel: Control = %MenuPanel
 @onready var menu_backdrop: Control = %MenuBackdrop
 @onready var menu_new_game_button: Button = %MenuNewGame
-@onready var menu_exit_button: Button = %MenuExit
+@onready var menu_quit_button: Button = %MenuQuit
 @onready var menu_confirm_label: Label = %MenuConfirmLabel
 @onready var menu_confirm_button: Button = %MenuConfirm
 @onready var menu_cancel_button: Button = %MenuCancel
 @onready var menu_rows: Control = %MenuRows
 
 ## The action a confirmation is asking about, or MENU_NONE when nothing is pending.
-enum MenuAction { NONE, NEW_GAME, EXIT }
+enum MenuAction { NONE, NEW_GAME, QUIT }
 
 var _menu_pending := MenuAction.NONE
 
@@ -190,7 +190,7 @@ func bind() -> void:
 	_connect(menu_button, _on_menu)
 	if menu_new_game_button != null:
 		_connect(menu_new_game_button, _on_menu_new_game)
-		_connect(menu_exit_button, _on_menu_exit)
+		_connect(menu_quit_button, _on_menu_quit)
 		_connect(menu_confirm_button, _on_menu_confirm)
 		_connect(menu_cancel_button, _on_menu_cancel)
 		# A tap on the dimmed board closes the menu. Without this it could only be left
@@ -304,16 +304,16 @@ func _on_menu_new_game() -> void:
 
 
 
-func _on_menu_exit() -> void:
-	_confirm(MenuAction.EXIT, "Leave the game?")
+func _on_menu_quit() -> void:
+	_confirm(MenuAction.QUIT, "Leave this game and return to the menu?")
 
 func _on_menu_confirm() -> void:
 	match _menu_pending:
 		MenuAction.NEW_GAME:
 			toggle_menu()
 			new_game_requested.emit()
-		MenuAction.EXIT:
-			exit_requested.emit()
+		MenuAction.QUIT:
+			quit_requested.emit()
 		_:
 			pass
 	_clear_confirmation()

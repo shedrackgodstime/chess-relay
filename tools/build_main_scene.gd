@@ -47,6 +47,9 @@ func _init() -> void:
 	world.add_child(_environment())
 	world.add_child(_camera())
 	root.add_child(_hud_layer())
+	# The main menu is a layer over the board rather than a second scene, so the game
+	# boots into a chessboard that is already built and a game can start instantly.
+	root.add_child(_main_menu())
 
 	# Children must be owned by the root for PackedScene.pack to store them.
 	_own(root, root)
@@ -193,6 +196,16 @@ func square_name(file: int, rank: int) -> String:
 
 ## The HUD lives on its own CanvasLayer so its layout is resolution
 ## independent, which matters on a cross-platform build.
+## The screen the game opens on. Built here so the tree carries it, populated in its
+## own _ready so it keeps no copy in the scene file.
+func _main_menu() -> CanvasLayer:
+	var menu := CanvasLayer.new()
+	menu.name = "Menu"
+	menu.layer = 8
+	menu.set_script(load("res://ui/main_menu.gd"))
+	return menu
+
+
 func _hud_layer() -> CanvasLayer:
 	var layer := CanvasLayer.new()
 	layer.name = "UILayer"
@@ -388,7 +401,10 @@ func _menu_panel() -> Control:
 	# the lobby, where there is time to explain them, and the menu is now only the two
 	# things that are unambiguous and both destroy what is on the board.
 	rows.add_child(_menu_row("MenuNewGame", "New game"))
-	rows.add_child(_menu_row("MenuExit", "Exit"))
+	# "Quit game" rather than "Exit": Exit is the word for leaving a screen and there
+	# is more than one screen to leave once the main menu exists, and a player who
+	# reads Exit as closing the app then finds it does not. It names the consequence.
+	rows.add_child(_menu_row("MenuQuit", "Quit game"))
 	rows.add_child(_menu_row("MenuCancel", "Close"))
 
 	var question := Label.new()

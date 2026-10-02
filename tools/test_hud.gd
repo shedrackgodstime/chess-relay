@@ -21,6 +21,7 @@ func _init() -> void:
 	_asset_checks()
 	await _network_checks(hud)
 	await _menu_checks(main, hud)
+	await _main_menu_checks(main, hud)
 	_layout_checks(main, hud)
 	_menu_check(main, hud)
 	_rotate_checks(main, hud)
@@ -525,7 +526,7 @@ func _menu_checks(main: Main, hud: Hud) -> void:
 		if row is Button:
 			labels.append((row as Button).text)
 	_check("the menu offers only new game, exit and a way out",
-		labels == ["New game", "Exit", "Close"], "%s" % str(labels))
+		labels == ["New game", "Quit game", "Close"], "%s" % str(labels))
 
 	# Leaving without choosing anything, which the first version made impossible.
 	hud.toggle_menu()
@@ -586,7 +587,7 @@ func _menu_checks(main: Main, hud: Hud) -> void:
 	hud.toggle_menu()
 
 	hud.toggle_menu()
-	hud.menu_exit_button.pressed.emit()
+	hud.menu_quit_button.pressed.emit()
 	await process_frame
 	_check("exit asks first as well", hud.menu_confirm_label.visible, "")
 	hud.menu_cancel_button.pressed.emit()
@@ -611,6 +612,51 @@ func _press(button: Button) -> bool:
 		return false
 	button.pressed.emit()
 	return true
+
+
+## The main menu, which is where the game now begins.
+func _main_menu_checks(main: Main, hud: Hud) -> void:
+	print("Main menu")
+	var menu := main.menu
+	_check("the menu exists", menu != null, "")
+	if menu == null:
+		return
+	_check("and is up when the game opens", menu.visible, "")
+	_check("it offers a title", (menu.title_label as Label).text == "CHESS RELAY",
+		"title=%s" % (menu.title_label as Label).text)
+	var labels: Array = []
+	for row in menu.column.get_children():
+		if row is Button:
+			labels.append((row as Button).text)
+	_check("with exactly the three entries agreed",
+		labels == ["Vs computer", "P2P game", "Settings"], "%s" % str(labels))
+	_check("nothing is focused, so no stray key starts a game",
+		(menu.computer_button as Button).focus_mode == Control.FOCUS_NONE, "")
+	_check("and the dim stops taps from reaching the board",
+		menu.dim.mouse_filter == Control.MOUSE_FILTER_STOP, "")
+
+	# Starting against the computer must dismiss the menu, since the menu is the
+	# entry point and leaving it up would cover the game just begun.
+	menu.computer_button.pressed.emit()
+	await process_frame
+	_check("choosing a game takes the menu away", not menu.visible, "")
+	_check("and hands the board over", main.ai_opponent, "")
+
+	# Back to the menu, from the in-game quit.
+	main._on_quit()
+	await process_frame
+	_check("quitting to the menu brings it back", menu.visible, "")
+	_check("and leaves the game intact rather than throwing it away",
+		main.game.history.size() >= 0, "")
+
+	# Entries that cannot work yet must say so, not do nothing.
+	menu.p2p_button.pressed.emit()
+	await process_frame
+	var notice := menu.column.get_node_or_null("MenuNotice") as Label
+	_check("an entry with nothing behind it explains itself",
+		notice != null and "P2P" in notice.text, "notice=%s"
+			% (notice.text if notice != null else "<none>"))
+	_check("and stays on screen to be read", menu.visible, "")
 
 
 ## How far apart two mean colours are, so "distinguishable" is a number and not a

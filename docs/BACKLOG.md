@@ -201,6 +201,42 @@ incomplete. `Rules` is the only place that needs to change.
   menu change produced a 1021-line scene diff and the two real numbers hid inside it. A
   diff you cannot read is a diff you cannot trust, which is the argument for the stripping
   and also why a suite should be read before committing rather than after.
+- **The main menu exists and the game opens on it.** Title, `Vs computer`,
+  `P2P game`, `Settings`, built in `ui/main_menu.gd` and shown on start. It is a
+  **CanvasLayer over the loaded board**, not a second scene, so nothing is built when
+  a game starts and the thing behind the menu is a chessboard rather than a placeholder.
+  P2P and Settings exist and say they cannot work yet, which is honest while it is
+  clearly unwired; a button that silently does nothing is worse than one that explains.
+  This is the entry point the lobby hangs off: the lobby is a screen reached *from*
+  here, not a replacement for it.
+- **`Exit` is now `Quit game`,** and it returns to the main menu rather than closing
+  the process. Exit was the word for leaving a screen and there is more than one to
+  leave now; a player who reads Exit as closing the app and finds it does not will not
+  read it again. Closing the app is a decision the main menu should make, since only it
+  knows whether there is anywhere to go back to.
+- **Nothing pauses the board for the menu.** The dim backdrop is a Control that stops
+  mouse input, so a tap on it never reaches `_unhandled_input` and becomes a move. An
+  earlier version also set a board-paused flag as a backstop: the same rule stated
+  twice, and the second copy broke every test that drives the board directly. Do not add
+  it back.
+- **The main menu exists and the game opens on it.** Title, `Vs computer`,
+  `P2P game`, `Settings`, built in `ui/main_menu.gd` and shown on start. It is a
+  **CanvasLayer over the loaded board**, not a second scene, so nothing is built when a
+  game starts and the thing behind the menu is a chessboard rather than a placeholder.
+  P2P and Settings exist and say they cannot work yet, which is honest while it is
+  clearly unwired; a button that silently does nothing is worse than one that explains.
+  This is the entry point the lobby hangs off: the lobby is a screen reached *from*
+  here, not a replacement for it.
+- **`Exit` is now `Quit game`,** and it returns to the main menu rather than closing
+  the process. Exit was the word for leaving a screen and there is more than one to
+  leave now; a player who reads Exit as closing the app and finds it does not will not
+  read it again. Closing the app is a decision the main menu should make, since only it
+  knows whether there is anywhere to go back to.
+- **Nothing pauses the board for the menu.** The dim backdrop is a Control that stops
+  mouse input, so a tap on it never reaches `_unhandled_input` and becomes a move. An
+  earlier version also set a board-paused flag as a backstop: the same rule stated
+  twice, and the second copy broke every test that drives the board directly. Do not add
+  it back.
 - **The menu rows sit in an opaque card that hugs them.** A dimmed backdrop says the
   game is paused; the card is what the words are legible on. Sized by its contents
   rather than by fixed numbers, so a row cannot end up hanging outside it when the list
