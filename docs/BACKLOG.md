@@ -188,6 +188,19 @@ incomplete. `Rules` is the only place that needs to change.
 - **Voice.** The button cycles off, requesting, live and emits
   `voice_state_changed`, which has no listener. Needs capture, an encode path,
   transport, and `RECORD_AUDIO` on Android.
+- ~~**Regenerating `main.tscn` breaks picking, and the generator is non-deterministic.**~~
+  **Fixed** in `c2056bc`: `build_main_scene.gd` strips the random `unique_id` Godot writes
+  on every save, so the scene is byte-stable. Generated twice, identical checksums, and the
+  full suite now passes against a regenerated scene, which is the first time that has been
+  true.
+  How it was found, kept because the reasoning still applies. The committed scene and the
+  regenerated one disagreed on a `CylinderShape3D` **pick shape** height, 0.80592 against
+  0.7500508. Those are the hit areas, so the board answered taps on different pixels and
+  `_pick_square` resolved to the wrong square, putting pieces two ranks out. The menu was
+  the obvious suspect and was not involved. It took this long to find because a five-line
+  menu change produced a 1021-line scene diff and the two real numbers hid inside it. A
+  diff you cannot read is a diff you cannot trust, which is the argument for the stripping
+  and also why a suite should be read before committing rather than after.
 - **The menu rows sit in an opaque card that hugs them.** A dimmed backdrop says the
   game is paused; the card is what the words are legible on. Sized by its contents
   rather than by fixed numbers, so a row cannot end up hanging outside it when the list
