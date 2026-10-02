@@ -239,12 +239,22 @@ incomplete. `Rules` is the only place that needs to change.
   for, and quitting tears it down rather than hiding it, so nothing carries over.
   `ui/main_menu.gd` is gone; `ui/home_screen.gd` replaces it.
   The picture is `home_bg.jpg`, a lit king, drawn to **cover** rather than fit, so no
-  black bars appear on any aspect ratio. The words have their own dim behind them
-  because the art is bright behind the king and the two must not compete.
+  black bars appear on any aspect ratio.
+  **The wash over it is `HomeScreen.SHADE`, at 0.86.** It went 0.55, then 0.72, then
+  0.86, and each step was judged on a real screen and each was wrong in the same
+  direction. The lesson is that the glow behind the king survives a light wash almost
+  intact, because it is a large luminance *contrast* rather than a bright area, and
+  dimming a contrast is not the same as dimming a highlight. If it ever wants to be
+  brighter, the fix is a vignette that darkens the middle where the title sits, not a
+  lighter wash. Flat rather than a gradient for the same reason: a gradient with a clear
+  window in the middle puts the brightest part of the art exactly where the title is.
+  The image is a mood; the words are the content.
   `tools/test_home.gd` is a suite of its own: a parse error here is a game that opens
-  on a blank window, and nothing in the in-game tests would catch it. It also asserts
-  that `home.tscn` is the configured main scene, which is the difference between a home
-  screen that works and a home screen someone wired up.
+  on a blank window, and nothing in the in-game tests would catch it. It asserts the
+  wash really dims the picture, because the first version only checked that a node
+  named HomeShade existed, which is how 0.55 passed review while the picture still
+  shouted over the words.
+
 - **The menu rows sit in an opaque card that hugs them.** A dimmed backdrop says the
   game is paused; the card is what the words are legible on. Sized by its contents
   rather than by fixed numbers, so a row cannot end up hanging outside it when the list

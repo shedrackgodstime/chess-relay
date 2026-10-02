@@ -33,7 +33,7 @@ const COLUMN_WIDTH := 460.0
 ## Named so it can be judged in one place and adjusted without hunting for it: this is
 ## a value for the eye, not for a formula, and it will want to be looked at on a real
 ## screen in daylight.
-const SHADE := 0.72
+const SHADE := 0.86
 
 
 @onready var background: TextureRect = %HomeBackground
@@ -77,12 +77,18 @@ func build() -> void:
 	# need their own darkness to sit on rather than relying on the art being calm
 	# where the text happens to land.
 	#
-	# Heavier than it looks like it should be. At 0.55 the embers and the board behind
-	# the king still read at full strength and the title fought them, and on a phone in
-	# daylight that fight gets worse rather than better. The image is a mood, not the
-	# content; the words are the content. One flat wash rather than a gradient, because
-	# a gradient that leaves a clear window in the middle puts the brightest part of the
-	# art exactly where the title sits, which is the thing to avoid.
+	# Heavier than it looks like it should be, and heavier than seemed defensible when
+	# it was first chosen. 0.55 was too light, 0.72 was still too light, and this is
+	# 0.86. Each step was judged on a real screen and each was wrong in the same
+	# direction, which is worth recording: the glow behind the king survives a light
+	# wash almost intact, because it is a large luminance contrast rather than a bright
+	# area, and dimming a contrast is not the same as dimming a highlight. On a phone in
+	# daylight it is worse again.
+	#
+	# The image is a mood; the words are the content. It is still recognisably that
+	# picture and it is plainly not competing. If a day comes when it wants to be
+	# brighter, the right move is a vignette that darkens the middle where the title
+	# sits, not a lighter wash, since that is the part that actually has to go.
 	var shade := ColorRect.new()
 	shade.name = "HomeShade"
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
