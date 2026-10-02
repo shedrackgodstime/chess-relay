@@ -244,6 +244,25 @@ incomplete. `Rules` is the only place that needs to change.
   **Random resolves in the lobby, before the board exists.** Main reads the side before
   it aims the camera and places pieces, so the first frame is already correct and the
   board is never seen turning around after it appears.
+  **The lobby is one narrow centred column, options stacked, action right-aligned.**
+  Title, rule, `DIFFICULTY` with its three options one per line, `PLAY AS` with its
+  three, rule, then `PLAY` sitting to the right rather than centred under the list. That
+  is the reading flow: down the options, then across to the one thing to do. Options are
+  full-width and one per line rather than three across, because this is a phone held
+  sideways and three small targets side by side are three small targets. The rules
+  between the parts exist because a gap alone has to be guessed at, and configuration
+  and action are genuinely different kinds of thing.
+  Difficulty carries its choice **in its own label** as `○` and `●`, so an option says
+  what it is and whether it is picked in the same breath, and the three keep the same
+  size either way. Play as fills the chosen button instead, since a ring would imply a
+  scale and these are not one.
+  The default is **Medium**, not the easiest: a first game a player cannot win teaches
+  them the controls faster than one they can.
+  **`MatchConfig` holds labels and values as pairs, not as two parallel arrays.**
+  Reordering the side labels to put Random last while the values still had it first
+  meant choosing Black marked Random, and it looked like a marking bug rather than a
+  data one. Two parallel arrays have to be kept in step by hand and nothing enforces
+  it.
   **Difficulty is UI only and is not acted on.** The AI plays a random legal move
   whatever it says. Marking it is a lie in three buttons, and that matters more here
   than anywhere else, because it is the most prominent control on the panel: a player who

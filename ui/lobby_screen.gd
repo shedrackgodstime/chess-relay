@@ -22,15 +22,25 @@ signal start_requested(side: int)
 signal back_requested
 
 const TITLE := "VS COMPUTER"
-const COLUMN_WIDTH := 460.0
+## The wide action, half the band's height so PLAY reads as the thing to press.
+## Narrow, because a lobby that fills a landscape screen asks the eye to travel for
+## three small decisions. One column, centred, read downwards.
+const COLUMN_WIDTH := 300.0
+
+## The wide action, narrower than the screen and right-aligned within the column so
+## the reading runs down the options and then across to the one thing to do.
+const ACTION_WIDTH := 180.0
 
 
-@onready var column: VBoxContainer = %LobbyColumn
-@onready var title_label: Label = %LobbyTitle
-@onready var difficulty_group: HBoxContainer = %LobbyDifficulty
-@onready var side_group: HBoxContainer = %LobbySide
-@onready var start_button: Button = %LobbyStart
-@onready var back_button: Button = %LobbyBack
+var column: VBoxContainer = null
+var title_label: Label = null
+## Built in build() rather than found with %: the nodes do not exist until this screen
+## builds itself, and a lookup for a node that is not there yet would silently leave
+## the whole thing unconnected.
+var difficulty_group: VBoxContainer = null
+var side_group: VBoxContainer = null
+var start_button: Button = null
+var back_button: Button = null
 
 
 func _ready() -> void:
@@ -44,14 +54,12 @@ func _ready() -> void:
 
 
 func build() -> void:
-	# Dark and centred, like every other screen, but with no picture. The artwork
-	# belongs to the front door; the lobby is a step inside it and putting the same
-	# photograph behind every screen would make them all look like the same screen.
+	# The shared dark, centred. No picture: the artwork belongs to the front door, and
+	# putting it behind every screen would make them all look like the same screen.
 	var backdrop := ColorRect.new()
 	backdrop.name = "LobbyBackdrop"
 	backdrop.set_anchors_preset(Control.PRESET_FULL_RECT)
 	backdrop.color = ScreenStyle.SHADE
-	# Stops, so a tap on the dark cannot fall through to whatever is underneath.
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(backdrop)
 
@@ -61,63 +69,130 @@ func build() -> void:
 	centre.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(centre)
 
+	# One column down the screen. The two questions stack, each with its own options
+	# beside them, and PLAY sits below them: something to decide, the ways to decide
+	# it, then go. Read downwards rather than across, which is how a form is read on a
+	# screen held sideways.
 	column = VBoxContainer.new()
 	column.name = "LobbyColumn"
 	column.unique_name_in_owner = true
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 14)
+	column.add_theme_constant_override("separation", 16)
 	centre.add_child(column)
 
 	title_label = Label.new()
 	title_label.name = "LobbyTitle"
 	title_label.unique_name_in_owner = true
 	title_label.text = TITLE
-	title_label.custom_minimum_size = Vector2(COLUMN_WIDTH, 56.0)
-	ScreenStyle.title_style(title_label, 34)
+	title_label.custom_minimum_size = Vector2(0.0, 48.0)
+	ScreenStyle.title_style(title_label, 32)
 	column.add_child(title_label)
+	column.add_child(_divider("TitleDivider"))
 
-	# Each question is a label on the left and its options on the right, so the panel
-	# reads as a form: something to decide, then the ways to decide it.
-	difficulty_group = _row("LobbyDifficulty", "Difficulty", column)
-	for i in MatchConfig.DIFFICULTY_LABELS.size():
-		var name: String = MatchConfig.DIFFICULTY_LABELS[i]
-		var button := _choice(difficulty_group, "Diff%s" % name, name)
-		var value: int = MatchConfig.DIFFICULTY_VALUES[i]
+	# Difficulty, with radio marks in the labels. The marks are text rather than a
+	# second widget, so the chosen option says so in the same breath as its name
+	# instead of a player having to compare three lit boxes and work out which.
+	difficulty_group = _row("LobbyDifficulty", "DIFFICULTY", column)
+	for pair in MatchConfig.DIFFICULTIES:
+		var name: String = str(pair[0])
+		var button := _choice(_row_node(difficulty_group), "Diff%s" % name, name)
+		var value: int = int(pair[1])
 		button.pressed.connect(func() -> void: choose_difficulty(value))
 
-	side_group = _row("LobbySide", "Your color", column)
-	for i in MatchConfig.SIDE_LABELS.size():
-		var name: String = MatchConfig.SIDE_LABELS[i]
-		var button := _choice(side_group, "Side%s" % name, name)
-		var value: int = MatchConfig.SIDE_VALUES[i]
+	# Play as, with the chosen one filled in rather than circled: these are not a
+	# scale, so a ring would imply one.
+	side_group = _row("LobbySide", "PLAY AS", column)
+	for pair in MatchConfig.SIDES:
+		var name: String = str(pair[0])
+		var button := _choice(_row_node(side_group), "Side%s" % name, name)
+		var value: int = int(pair[1])
 		button.pressed.connect(func() -> void: choose_side(value))
 
-	start_button = _wide("LobbyStart", "START")
+	# A rule above the action, so PLAY is not just the next thing down from the last
+	# option. Configuration and action are different kinds of thing and the gap says
+	# so; without it the last option and the button read as one list.
+	column.add_child(_divider("LobbyDivider"))
+
+	start_button = _wide("LobbyStart", "PLAY")
+	start_button.custom_minimum_size = Vector2(ACTION_WIDTH, 58.0)
+	ScreenStyle.button_styles(start_button, 24)
+	start_button.add_theme_stylebox_override("normal", ScreenStyle.button_box(
+		ScreenStyle.PANEL_PRESSED))
+	# Right-aligned within the column rather than centred: the eye finishes the list
+	# and then moves across to the one thing to do, instead of dropping down onto it.
+	start_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	column.add_child(start_button)
+
+	# Back is present and small, because a screen with no way out is a trap, but it is
+	# not the thing the eye should land on.
 	back_button = _wide("LobbyBack", "Back")
+	back_button.custom_minimum_size = Vector2(0.0, 38.0)
+	back_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	ScreenStyle.button_styles(back_button, 16)
+	back_button.add_theme_color_override("font_color", ScreenStyle.MUTED)
 	column.add_child(back_button)
 
 
-## A labelled row of choices, added to the column as one unit so the form cannot end
-## up with a label beside the wrong set of buttons.
-func _row(node_name: String, label_text: String, into: Control) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.name = node_name
-	row.unique_name_in_owner = true
-	row.add_theme_constant_override("separation", 10)
-	into.add_child(row)
+## A caption with its options stacked under it, added to the column as a single unit
+## so a caption cannot end up beside the wrong set of buttons.
+func _row(node_name: String, label_text: String, into: Control) -> VBoxContainer:
+	# Caption, then the options stacked one per line. Stacked rather than in a row
+	# across the screen because this is a phone held sideways and a full-width target
+	# per option is a thumb tap rather than a small label to aim at; three options
+	# across on a narrow screen are three small targets side by side.
+	var group := VBoxContainer.new()
+	group.name = node_name
+	group.unique_name_in_owner = true
+	group.add_theme_constant_override("separation", 6)
+	into.add_child(group)
 
 	var caption := Label.new()
 	caption.name = "%sLabel" % node_name
 	caption.text = label_text
-	caption.custom_minimum_size = Vector2(150.0, 48.0)
-	caption.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	caption.add_theme_font_size_override("font_size", 19)
+	caption.custom_minimum_size = Vector2(0.0, 24.0)
+	caption.add_theme_font_size_override("font_size", 15)
 	caption.add_theme_color_override("font_color", ScreenStyle.CAPTION)
-	caption.add_theme_color_override("font_outline_color", ScreenStyle.OUTLINE)
-	caption.add_theme_constant_override("outline_size", ScreenStyle.OUTLINE_SIZE_SMALL)
-	row.add_child(caption)
-	return row
+	group.add_child(caption)
+
+	var options := VBoxContainer.new()
+	options.name = "%sRow" % node_name
+	options.add_theme_constant_override("separation", 4)
+	group.add_child(options)
+	return group
+
+
+## The node that holds a group's buttons. The build path needs the container to add
+## to; everything else wants the buttons themselves.
+func _row_node(group: VBoxContainer) -> VBoxContainer:
+	if group == null:
+		return null
+	return group.get_node_or_null("%sRow" % group.name) as VBoxContainer
+
+
+## The buttons inside a labelled group, as opposed to the caption above them.
+##
+## Returned as an array rather than as the row itself. Iterating a live node means
+## every caller holds a reference into the tree, and a caller that outlives a
+## queue_free then walks freed children and fails on the next step of the loop rather
+## than on the line that caused it. An array of the buttons is what every caller
+## actually wanted.
+func _options(group: VBoxContainer) -> Array:
+	if group == null:
+		return []
+	var row := group.get_node_or_null("%sRow" % group.name) as VBoxContainer
+	return [] if row == null else row.get_children()
+
+
+## A thin rule between one part of the column and the next. A line rather than a gap
+## because a gap alone has to be guessed at, and this screen has three parts that are
+## genuinely different from each other.
+func _divider(node_name: String) -> ColorRect:
+	var rule := ColorRect.new()
+	rule.name = node_name
+	rule.color = Color(ScreenStyle.BORDER, 0.7)
+	rule.custom_minimum_size = Vector2(0.0, 1.0)
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return rule
 
 
 func _wide(node_name: String, text: String) -> Button:
@@ -126,7 +201,7 @@ func _wide(node_name: String, text: String) -> Button:
 	button.unique_name_in_owner = true
 	button.text = text
 	button.focus_mode = Control.FOCUS_NONE
-	button.custom_minimum_size = Vector2(COLUMN_WIDTH, 56.0)
+	button.custom_minimum_size = Vector2(ACTION_WIDTH, 56.0)
 	ScreenStyle.button_styles(button)
 	return button
 
@@ -137,7 +212,7 @@ func _wide(node_name: String, text: String) -> Button:
 func _choice(parent: Control, node_name: String, text: String) -> Button:
 	var button := _wide(node_name, text)
 	button.toggle_mode = true
-	button.custom_minimum_size = Vector2(0.0, 48.0)
+	button.custom_minimum_size = Vector2(COLUMN_WIDTH, 46.0)
 	ScreenStyle.choice_styles(button)
 	parent.add_child(button)
 	return button
@@ -159,28 +234,45 @@ func choose_side(value: int) -> void:
 ## Shows a difficulty as chosen without recording it, so the screen can display a
 ## stored decision without quietly rewriting the store on the way past.
 func _choose_difficulty(value: int) -> void:
-	var index := MatchConfig.DIFFICULTY_VALUES.find(value)
-	_mark(difficulty_group, MatchConfig.DIFFICULTY_LABELS[index]
-		if index >= 0 else "")
+	_mark(difficulty_group, MatchConfig.DIFFICULTIES,
+		MatchConfig.label_for(MatchConfig.DIFFICULTIES, value), true)
 
 
 func _choose_side(value: int) -> void:
-	var index := MatchConfig.SIDE_VALUES.find(value)
-	_mark(side_group, MatchConfig.SIDE_LABELS[index] if index >= 0 else "")
+	_mark(side_group, MatchConfig.SIDES,
+		MatchConfig.label_for(MatchConfig.SIDES, value), false)
 
 
-## Marks whichever option is chosen, so the state is visible in one place and there is
-## no second copy of it to fall out of step.
+## Marks whichever option is chosen, and rewrites the difficulty labels to carry
+## their radio circles.
 ##
-## Counts only Buttons rather than indexing children: a row is a caption followed by
-## its options, and walking all children would make the caption's position part of the
-## answer, so adding a label to a row would silently shift every choice after it.
-func _mark(group: HBoxContainer, wanted: String) -> void:
+## One pass, from the chosen value, rather than setting the pressed state and then
+## decorating the labels: two passes meant the decoration could be applied to the
+## previous selection, and the split had already produced a row that said one thing
+## and showed another. Marking by position rather than by text, because the labels are
+## rewritten and stop identifying their own options.
+func _mark(group: VBoxContainer, labels: Array, wanted: String, circled: bool) -> void:
 	if group == null:
 		return
-	for child in group.get_children():
-		if child is Button:
-			(child as Button).button_pressed = (child as Button).text == wanted
+	var buttons := _options(group)
+	for i in mini(buttons.size(), labels.size()):
+		var child: Node = buttons[i]
+		if not child is Button:
+			continue
+		var label: String = str((labels[i] as Array)[0])
+		var chosen: bool = label == wanted
+		(child as Button).button_pressed = chosen
+		if circled:
+			(child as Button).text = "%s %s" % ["●" if chosen else "○", label]
+
+
+## The difficulty label that is currently marked, circles included. Read rather than
+## reconstructed, so a test can see what a player sees.
+func marked_difficulty() -> String:
+	for child in _options(difficulty_group):
+		if child is Button and (child as Button).button_pressed:
+			return (child as Button).text
+	return ""
 
 
 ## Walks back home, forgetting what was chosen, so a later game does not inherit it.
