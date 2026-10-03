@@ -348,6 +348,13 @@ func _marks_render(lobby: LobbyScreen) -> void:
 	# PLAY has to go somewhere. It used to emit a signal nothing in the game listened
 	# to, so the screen could look finished and still lead nowhere.
 	_check("play leads to the game", ResourceLoader.exists("res://main.tscn"), "")
+	# Pressing the button is not the same as calling start(). This called start(),
+	# which is why the button being wired to nothing went unnoticed.
+	var pressed := {"count": 0}
+	lobby.start_button.pressed.connect(func() -> void: pressed["count"] += 1)
+	_check("the play button is connected to something",
+		(lobby.start_button.pressed.get_connections() as Array).size() > 0,
+		"connections=%d" % (lobby.start_button.pressed.get_connections() as Array).size())
 	_check("and resolves the side before the board is built for it",
 		MatchConfig.resolve_side(_seeded(1)) in [BoardState.LIGHT, BoardState.DARK],
 		"")

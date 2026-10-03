@@ -59,6 +59,7 @@ func build() -> void:
 	# the screen that does something rather than choosing something.
 	start_button.add_theme_stylebox_override("normal", ScreenStyle.button_box(
 		ScreenStyle.PANEL_PRESSED))
+	start_button.pressed.connect(_on_play)
 
 
 func _groups() -> void:
