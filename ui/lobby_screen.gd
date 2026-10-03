@@ -342,8 +342,17 @@ func start() -> void:
 	start_requested.emit(MatchConfig.resolve_side())
 
 
+## PLAY, which is the one button on this screen that actually goes somewhere.
+##
+## It used to emit a signal that nothing in the game listened to, so the whole screen
+## could be filled in and pressing PLAY did nothing. Resolved here rather than in the
+## game, because the lobby is a separate scene and MatchConfig is the only thing the two
+## share; writing the resolved side back means the board is built for whoever is
+## playing, and that Random really is random instead of quietly becoming White.
 func _on_play() -> void:
+	MatchConfig.side = MatchConfig.resolve_side()
 	start()
+	get_tree().change_scene_to_file("res://main.tscn")
 
 
 ## Back to the home screen, which is where the lobby was reached from.

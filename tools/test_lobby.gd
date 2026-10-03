@@ -345,6 +345,13 @@ func _marks_render(lobby: LobbyScreen) -> void:
 		(lobby.start_button as Button).custom_minimum_size.x < 300.0,
 		"width=%.0f" % (lobby.start_button as Button).custom_minimum_size.x)
 
+	# PLAY has to go somewhere. It used to emit a signal nothing in the game listened
+	# to, so the screen could look finished and still lead nowhere.
+	_check("play leads to the game", ResourceLoader.exists("res://main.tscn"), "")
+	_check("and resolves the side before the board is built for it",
+		MatchConfig.resolve_side(_seeded(1)) in [BoardState.LIGHT, BoardState.DARK],
+		"")
+
 	# Starting hands over the side, already resolved.
 	lobby.choose_side(BoardState.DARK)
 	var started := {"count": 0, "side": -1}
@@ -356,6 +363,8 @@ func _marks_render(lobby: LobbyScreen) -> void:
 		"count=%d" % int(started["count"]))
 	_check("and says which side the player has", int(started["side"]) == BoardState.DARK,
 		"side=%d" % int(started["side"]))
+	_check("and writes the resolved side back for the game to read",
+		MatchConfig.side == BoardState.DARK, "stored=%d" % MatchConfig.side)
 
 	# Back is about leaving the screen, so it is in a corner and not in the column.
 	var back := lobby.back_button as Button
