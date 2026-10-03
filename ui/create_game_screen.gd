@@ -29,7 +29,6 @@ var side: int = BoardState.DARK
 
 var code_label: Label = null
 var status_label: Label = null
-var side_group: HBoxContainer = null
 var copy_button: Button = null
 var cancel_button: Button = null
 var _code := ""
@@ -41,7 +40,8 @@ var _code := ""
 ## code, and it is at the top because it is what the player came for and it is what
 ## they have to pass on.
 ##
-## Play As is below it because it is not the job. It was a separate first act with a
+## This screen has exactly one job, which is to get a person into the room behind a
+## code. It used to also ask what colour they wanted. That was a separate first act with a
 ## CONTINUE in front of the code, which meant the screen asked a secondary question
 ## before it would answer the primary one, and the player had to press a button to
 ## reach the thing they came for. Both players choose their own side and neither is
@@ -92,18 +92,11 @@ func _build_content() -> void:
 	status_label = add_notice("Waiting for opponent...")
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 
-	# The secondary question, below the rule that says the main part is done, and on
-	# one line so it reads as a preference rather than as a second decision.
-	add_gap(4.0)
-	side_group = add_options_row("PLAY AS", SIDES)
-	var index := 0
-	for child in side_group.get_children():
-		if child is Button:
-			(child as Button).pressed.connect(_on_option_pressed.bind(index))
-			index += 1
-	mark_option_row(side_group, SIDES.find(
-		MatchConfig.label_for(MatchConfig.SIDES, side)))
-
+	## Play As is not here. Choosing a colour before there is anybody to play it
+	## against is answering a question that has not been asked, and it made the one
+	## screen with a job to do look like a form. It belongs on the table, where both
+	## players are in the room and it is a choice between two people rather than a
+	## setting for one.
 	cancel_button = _quiet_cancel()
 	add_gap(2.0)
 	column.add_child(cancel_button)
@@ -145,27 +138,30 @@ func game_code() -> String:
 	return _code
 
 
-## Records the side and shows it. The joiner gets the other one, so the pair always
-## adds up to a game.
+## The joiner gets the other colour, so the pair always adds up to a game. Which
+## colour is whose is not decided here either.
 func choose_side(value: int) -> void:
 	side = value
-	mark_option_row(side_group, SIDES.find(
-		MatchConfig.label_for(MatchConfig.SIDES, value)))
 	side_chosen.emit(value)
 
 
 
-## Choosing an option. The side is recorded as it is chosen rather than on Continue,
+## Choosing an option, recorded as it is chosen rather than on a later button, so a
+## button and the value it stands for cannot drift apart.
 ## so the button and the choice cannot drift apart.
 ## Somebody arrived. The document would go straight to the board from here rather
 ## than asking, which is right for chess: a confirmation step before a game that is
 ## both players already in is only something to get wrong.
 ##
 ## The copy button goes away because the code has stopped being the thing to do.
+## Somebody arrived, which is the end of this screen's job. It goes to the table,
+## which is where what they play for gets agreed; a waiting room that ended in a game
+## would skip past the only screen where the two players find out they agree.
 func opponent_connected() -> void:
 	waited = true
 	status_label.text = "Opponent connected."
 	copy_button.visible = false
+	get_tree().change_scene_to_file("res://terms.tscn")
 
 
 ## Whoever left, so the host is back to handing a code to someone.
@@ -173,6 +169,13 @@ func opponent_left() -> void:
 	waited = false
 	status_label.text = "Waiting for opponent..."
 	copy_button.visible = true
+
+
+## Joins a table that is already set up, which is the other end of the same connection
+## the create screen makes. Shared so both routes land in one place rather than each
+## spelling out its own.
+func enter_table() -> void:
+	get_tree().change_scene_to_file("res://terms.tscn")
 
 
 ## Whether someone is already in the room.

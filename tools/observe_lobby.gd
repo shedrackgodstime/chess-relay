@@ -75,7 +75,30 @@ func _init() -> void:
 	root.add_child(p2p)
 	await process_frame
 	await process_frame
-	var p2p_column := p2p.find_child("Column", true, false) as Control
+	var p2p_column := p2p.find_child("Column", true, false) as Control	# The table, which is the last screen before the game and the only one both players
+	# are on at once. Measured on its own because it is a different shape: two rows of
+	# options rather than one act.
+	var table := (load("res://terms.tscn") as PackedScene).instantiate()
+	root.add_child(table)
+	await process_frame
+	await process_frame
+	var table_column := table.find_child("Column", true, false) as Control
+	print("\n-- Table --")
+	if table_column != null:
+		print("  content %.0f x %.0f  (%.0f%% of screen height)"
+			% [table_column.size.x, table_column.size.y,
+				table_column.size.y / screen.y * 100.0])
+		var rows := 0
+		for child in table_column.get_children():
+			# A second row with the same name gets a suffix, so this is a prefix test.
+			if child.name.begins_with("OptionsRow"):
+				rows += 1
+		print("  %d row(s) of options" % rows)
+		print("  top %.0f px, bottom %.0f px"
+			% [table_column.global_position.y - screen.y * 0.5,
+				(table_column.global_position.y + table_column.size.y)
+					- (screen.y * 0.5 + screen.y * 0.5)])
+
 	print("\n-- P2P screen --")
 	if p2p_column != null:
 		print("  content %.0f x %.0f  (%.0f%% of screen height)"

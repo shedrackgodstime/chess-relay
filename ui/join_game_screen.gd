@@ -168,6 +168,21 @@ func _update_join() -> void:
 		status_label.visible = not _notice_hidden
 
 
+## The code was accepted, which is the end of this screen's job.
+##
+## Two calls rather than one, so a real transport has somewhere to hook onto and this
+## screen never has to know what a transport is. Both routes to the table go through
+## here, so connection has one exit rather than one per screen that ends in it.
+func connected() -> void:
+	get_tree().change_scene_to_file("res://terms.tscn")
+
+
+## The code did not work. Kept separate from show_failed so the transport reads as a
+## pair of outcomes rather than as a screen telling itself it failed.
+func not_connected() -> void:
+	show_failed()
+
+
 ## What the field is replaced with once there is nothing to type.
 func _show_outcome() -> void:
 	show_connecting(typed_code())

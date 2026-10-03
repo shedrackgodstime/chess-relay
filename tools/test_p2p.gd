@@ -95,16 +95,11 @@ func _create() -> void:
 	# secondary question before it would answer the primary one.
 	_check("the code is on the screen before anything is pressed",
 		screen.find_child("Code", true, false) != null, "")
-	_check("and it is above the side choice",
-		screen.find_child("Code", true, false).get_index()
-			< _index_of_side(screen), "")
-	_check("the side is a preference on one line, not a second question",
-		screen.find_child("OptionsRow", true, false) != null, "")
-	_check("with no gate between the player and the code",
-		screen.find_child("Continue", true, false) == null, "")
-	screen.choose_side(BoardState.LIGHT)
-	_check("and choosing one is recorded",
-		screen.side == BoardState.LIGHT, "")
+	_check("with nothing above it asking for a decision first",
+		screen.find_child("OptionsRow", true, false) == null
+			and screen.find_child("Continue", true, false) == null, "")
+	_check("and no colour chosen before anyone is there to play it against",
+		not _mentions(screen, "PLAY AS"), "")
 
 	_check("it shows a code without anyone asking for one",
 		GameCode.is_well_formed(screen.game_code()),
@@ -178,6 +173,80 @@ func _join() -> void:
 	_check("showing a complaint does not resize the screen",
 		absf(column.size.x - before) < 1.0, "before=%.0f after=%.0f"
 			% [before, column.size.x])
+
+
+## The connection ends at the table, and the table is where the game gets decided.
+func _table() -> void:
+	print("Table")
+	_check("there is a table to land on",
+		ResourceLoader.exists("res://terms.tscn"), "")
+
+	## The waiting room is for the code and nothing else.
+	var create := await _spawn("res://create_game.tscn") as CreateGameScreen
+	_check("it asks for a colour nowhere near the connection",
+		create.get_node_or_null("Margin/Frame/Centre/Column") != null
+			and not _mentions(create, "PLAY AS"), "")
+	_check("and does not name a colour anywhere on it",
+		not _mentions(create, "PLAY AS"), "")
+
+	var terms := await _spawn("res://terms.tscn") as TermsScreen
+	if terms == null:
+		return
+	_check("the table says what colour is being played for",
+		terms.agreed_value("Play as") >= 0, "")
+	_check("and what kind of game",
+		terms.agreed_value("Time control") >= 0, "")
+
+	## Only the creator starts it. The joiner is told they are waiting rather than
+	## handed a button that would not do anything.
+	MatchConfig.seat = MatchConfig.Seat.CREATOR
+	var host := await _spawn("res://terms.tscn") as TermsScreen
+	_check("the creator is told which end of the table this is",
+		_notice_text(host).find("started") >= 0, "notice=%s" % _notice_text(host))
+	_check("and is the one who starts it", host.start_button != null, "")
+
+	MatchConfig.seat = MatchConfig.Seat.JOINER
+	var guest := await _spawn("res://terms.tscn") as TermsScreen
+	_check("the joiner is told as much",
+		_notice_text(guest).find("joined") >= 0, "notice=%s" % _notice_text(guest))
+	_check("and is not given a start button that would do nothing",
+		guest.start_button == null, "")
+	_check("but is told they are waiting, rather than left guessing",
+		_notice_text(guest).find("Waiting") >= 0, "notice=%s" % _notice_text(guest))
+
+	## A choice has to reach the game, not just the button that looks lit.
+	var began := {"count": 0}
+	guest.start_requested.connect(func() -> void: began["count"] += 1)
+	host.rows["Play as"].get_child(1).pressed.emit()
+	await process_frame
+	_check("a chosen colour lights the button that was chosen",
+		host.agreed_value("Play as") == BoardState.DARK,
+		"side=%d" % host.agreed_value("Play as"))
+	host.start()
+	_check("and starting writes it into the game",
+		MatchConfig.side == BoardState.DARK, "stored=%d" % MatchConfig.side)
+
+
+## Whether a screen says a particular word anywhere on it.
+func _mentions(screen: Node, word: String) -> bool:
+	return _notice_text(screen).contains(word)
+
+
+## Every bit of text on a screen, joined. Used to ask what a screen says rather than
+## what a particular label says, so a screen cannot pass by putting the wrong words in
+## a place the test did not look.
+func _notice_text(screen: Node) -> String:
+	var text: Array[String] = []
+	var stack: Array[Node] = [screen]
+	while not stack.is_empty():
+		var node: Node = stack.pop_back()
+		if node is Label:
+			text.append((node as Label).text)
+		if node is Button:
+			text.append((node as Button).text)
+		for child in node.get_children():
+			stack.append(child)
+	return "\n".join(text)
 
 
 ## The states of joining and of waiting, which is what makes the screens complete
@@ -307,13 +376,6 @@ func _spawn(path: String) -> Node:
 	await process_frame
 	return scene
 
-
-## Where the side choice sits in the column, or -1.
-func _index_of_side(screen: CreateGameScreen) -> int:
-	var row := screen.side_group
-	if row == null:
-		return -1
-	return row.get_index()
 
 
 func _find(node: Node, node_name: String) -> Node:

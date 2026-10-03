@@ -86,6 +86,35 @@ static func resolve_side(rng: RandomNumberGenerator = null) -> int:
 
 ## Puts both back to their defaults, so a second game cannot inherit the last one's
 ## choices by accident.
+## No clock, which is a value rather than the absence of one. Chess is not played on a
+## clock here, so it is the default and it is stated like anything else, rather than
+## leaving it to be worked out from what is missing.
+const NO_CLOCK := 0
+
+## Which end of the table you are.
+##
+## It exists now because the creator of a game is not simply the player who arrived
+## first: it is the one with a say over the terms and the one who starts the game.
+## Which end of the table you are has to be decided before the table is drawn, not
+## after, because it decides what the table is allowed to do.
+enum Seat { CREATOR, JOINER }
+
+## Set when the code is created, and read on the table.
+static var seat: int = Seat.CREATOR
+
+## Whether this player is the one whose terms are the ones that stand.
+static func is_creator() -> bool:
+	return seat == Seat.CREATOR
+
+
+## Resolves a seat to the side that player is asked to take, so Random is decided once
+## for the whole table rather than separately on each screen.
+static func side_for_seat(a_seat: int, rng: RandomNumberGenerator = null) -> int:
+	if side != Difficulty.RANDOM_SIDE:
+		return side
+	return resolve_side(rng)
+
+
 static func clear() -> void:
 	side = BoardState.LIGHT
 	difficulty = Difficulty.MEDIUM
