@@ -21,12 +21,21 @@ signal cancel_requested
 
 const TITLE := "JOIN GAME"
 
+## What the screen is doing. Not three screens: typing, waiting and failing are
+## steps through one act, and a player who mistypes a code should be able to get back
+## to the field without navigating away from it and losing what they typed.
+enum State { TYPING, CONNECTING, FAILED }
+
 var code_label: Label = null
 var status_label: Label = null
+var state: State = State.TYPING
+
 ## Set while a complaint is on screen, so the quiet line and the complaint are not
 ## two labels fighting over the same space.
 var _notice_hidden := true
 var join_button: Button = null
+var retry_button: Button = null
+var retry_caption: Label = null
 var cancel_button: Button = null
 
 
@@ -84,6 +93,17 @@ func _build_content() -> void:
 	code_label.add_theme_color_override("font_color", ScreenStyle.MUTED)
 	column.add_child(code_label)
 
+	retry_caption = Label.new()
+	retry_caption.name = "RetryCaption"
+	retry_caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	retry_caption.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	retry_caption.visible = false
+	retry_caption.add_theme_font_size_override("font_size", 22)
+	retry_caption.add_theme_color_override("font_color", ScreenStyle.TEXT)
+	retry_caption.add_theme_color_override("font_outline_color", ScreenStyle.OUTLINE)
+	retry_caption.add_theme_constant_override("outline_size", ScreenStyle.OUTLINE_SIZE)
+	column.add_child(retry_caption)
+
 	status_label = add_notice("")
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status_label.visible = false
@@ -91,6 +111,9 @@ func _build_content() -> void:
 	add_gap(8.0)
 	join_button = add_action("JOIN", 200.0, 52.0, 20, "Join")
 	join_button.pressed.connect(_on_join)
+	retry_button = add_action("RETRY", 200.0, 52.0, 20, "Retry")
+	retry_button.pressed.connect(_on_retry)
+	retry_button.visible = false
 	add_divider()
 	cancel_button = add_action("Cancel", 200.0, 46.0, 18, "Cancel")
 	cancel_button.pressed.connect(_on_cancel)
@@ -141,13 +164,84 @@ func _update_echo() -> void:
 func _update_join() -> void:
 	if join_button != null:
 		join_button.disabled = typed_code().length() < GameCode.GROUPS * GameCode.LENGTH
-	if status_label != null:
+	if status_label != null and state == State.TYPING:
 		status_label.visible = not _notice_hidden
+
+
+## What the field is replaced with once there is nothing to type.
+func _show_outcome() -> void:
+	show_connecting(typed_code())
+
+
+## The code is being tried. Not a screen of its own: the title and the code stay
+## where they were and only the things a player could press change, because the
+## thing being waited for is the same thing they were just looking at.
+func show_connecting(code: String) -> void:
+	state = State.CONNECTING
+	_notice_hidden = false
+	field.visible = false
+	join_button.visible = false
+	status_label.visible = true
+	status_label.text = "Connecting..."
+	_notice("Connecting to %s" % GameCode.readable_of(code))
+
+
+## The code did not work, said in words a player can act on.
+##
+## Not a reason code and not an error dump: a player who mistyped cannot do anything
+## with either, and the one thing they can do is check the code and try again. A
+## well-formed code that nobody is hosting reads the same as one mistyped, because
+## from here they are the same problem.
+func show_failed() -> void:
+	state = State.FAILED
+	_notice_hidden = false
+	field.visible = false
+	join_button.visible = false
+	retry_button.visible = true
+	status_label.visible = true
+	status_label.text = "Check the game code and try again."
+	_notice("Couldn't connect.")
+
+
+## Back to the field, with what was typed still in it, so retrying is one tap rather
+## than retyping a code somebody sent over a message.
+func retry() -> void:
+	_show_typing()
+
+
+## Says what is happening, above the field when there is one.
+func _notice(text: String) -> void:
+	if retry_caption != null:
+		retry_caption.visible = text != ""
+		retry_caption.text = text
+
+
+## Retrying puts the player back at the field with the code they typed still in it,
+## so trying again is one tap rather than retyping something a person sent them.
+func _on_retry() -> void:
+	retry()
 
 
 func _on_join() -> void:
 	join_requested.emit(typed_code())
-	get_tree().change_scene_to_file("res://home.tscn")
+	show_connecting(typed_code())
+
+
+## The screen as a player finds it: a field and something to do with it.
+##
+## Every path back into typing goes through here, so there is one place that knows
+## what the screen looks like when nothing has gone wrong.
+func _show_typing() -> void:
+	state = State.TYPING
+	_notice_hidden = true
+	field.visible = true
+	join_button.visible = true
+	retry_button.visible = false
+	retry_caption.visible = false
+	if status_label != null:
+		status_label.visible = false
+		status_label.text = ""
+	_update_join()
 
 
 func _on_cancel() -> void:

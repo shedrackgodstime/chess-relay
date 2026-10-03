@@ -28,6 +28,15 @@ static func generate(rng: RandomNumberGenerator = null) -> String:
 	return "-".join(parts)
 
 
+## A normalised code put back into the shape a player reads, so what is typed and
+## what is displayed are one value in two forms rather than two values.
+static func readable_of(code: String) -> String:
+	var clean := normalise(code)
+	if clean.length() <= LENGTH:
+		return clean
+	return "%s-%s" % [clean.substr(0, LENGTH), clean.substr(LENGTH, LENGTH)]
+
+
 ## Whether a typed code is the shape of a code, read forgivingly: spaces instead of a
 ## dash, any case, lower case in the message somebody pasted.
 static func normalise(typed: String) -> String:

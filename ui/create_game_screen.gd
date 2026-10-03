@@ -157,6 +157,28 @@ func choose_side(value: int) -> void:
 
 ## Choosing an option. The side is recorded as it is chosen rather than on Continue,
 ## so the button and the choice cannot drift apart.
+## Somebody arrived. The document would go straight to the board from here rather
+## than asking, which is right for chess: a confirmation step before a game that is
+## both players already in is only something to get wrong.
+##
+## The copy button goes away because the code has stopped being the thing to do.
+func opponent_connected() -> void:
+	waited = true
+	status_label.text = "Opponent connected."
+	copy_button.visible = false
+
+
+## Whoever left, so the host is back to handing a code to someone.
+func opponent_left() -> void:
+	waited = false
+	status_label.text = "Waiting for opponent..."
+	copy_button.visible = true
+
+
+## Whether someone is already in the room.
+var waited := false
+
+
 func _on_option_pressed(index: int) -> void:
 	var values := [BoardState.LIGHT, BoardState.DARK,
 		MatchConfig.Difficulty.RANDOM_SIDE]

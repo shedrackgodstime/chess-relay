@@ -180,6 +180,64 @@ func _join() -> void:
 			% [before, column.size.x])
 
 
+## The states of joining and of waiting, which is what makes the screens complete
+## rather than nearly complete.
+func _states() -> void:
+	print("States")
+	var join := await _spawn("res://join_game.tscn") as JoinGameScreen
+	if join != null:
+		_check("a fresh join screen is for typing",
+			join.state == JoinGameScreen.State.TYPING and join.field.visible
+				and join.join_button.visible, "")
+		for typed: String in "ABC123":
+			join.field.insert_text_at_caret(typed)
+		join._on_join()
+		await process_frame
+		_check("joining tries the code rather than leaving the screen",
+			join.state == JoinGameScreen.State.CONNECTING, "")
+		_check("and takes the field away, since there is nothing to change",
+			not join.field.visible and not join.join_button.visible, "")
+		_check("while saying what is being waited for",
+			join.status_label.text.find("Connecting") >= 0,
+			"status=%s" % join.status_label.text)
+		_check("and keeping the code on screen, because that is what is being tried",
+			join.retry_caption.text.find("ABC-123") >= 0,
+			"caption=%s" % join.retry_caption.text)
+		join.show_failed()
+		await process_frame
+		_check("a failure says what a player can do about it",
+			join.state == JoinGameScreen.State.FAILED
+				and join.status_label.text.find("Check the game code") >= 0,
+			"status=%s" % join.status_label.text)
+		_check("and offers to try again", join.retry_button.visible, "")
+		_check("with no technical error in it",
+			not join.status_label.text.contains("error")
+				and not join.status_label.text.contains("null"), "")
+		join.retry()
+		await process_frame
+		_check("retrying brings the field back", join.field.visible, "")
+		_check("with the code still in it, so it is one tap and not a retype",
+			join.typed_code() == "ABC123", "typed=%s" % join.typed_code())
+
+	var create := await _spawn("res://create_game.tscn") as CreateGameScreen
+	if create != null:
+		_check("the waiting room says it is waiting",
+			create.status_label.text.find("Waiting") >= 0,
+			"status=%s" % create.status_label.text)
+		create.opponent_connected()
+		await process_frame
+		_check("and says so when someone arrives",
+			create.status_label.text.find("Opponent") >= 0,
+			"status=%s" % create.status_label.text)
+		_check("with the code no longer the thing to do",
+			not create.copy_button.visible, "")
+		create.opponent_left()
+		await process_frame
+		_check("and back to handing a code out if they leave",
+			create.status_label.text.find("Waiting") >= 0
+				and create.copy_button.visible, "")
+
+
 ## The keyboard, which covers whatever is underneath it on a phone.
 func _keyboard() -> void:
 	print("Keyboard")
