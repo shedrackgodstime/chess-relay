@@ -31,7 +31,10 @@ func _init() -> void:
 	_game_over_checks()
 	_draw_checks()
 	if _failures == 0:
-		print("rules: all checks passed")
+		if failures > 0:
+			print("rules: %d check(s) failed" % failures)
+		else:
+			print("rules: all checks passed")
 	else:
 		printerr("rules: %d check(s) failed" % _failures)
 	quit(1 if _failures > 0 else 0)
@@ -75,10 +78,17 @@ func _permits(state: BoardState, from: Vector2i, to: Vector2i) -> bool:
 	return Rules.is_legal(state, ChessMove.new(from, to))
 
 
+## Failed checks, counted. The summary line is printed from this rather than
+## printed regardless, because a suite that says it passed while printing failures is
+## worse than no suite at all: it is believed.
+var failures := 0
+
+
 func _check(label: String, ok: bool, detail: String = "") -> void:
 	if ok:
 		print("  ok   %s%s" % [label, ("  " + detail) if detail != "" else ""])
 	else:
+		failures += 1
 		_failures += 1
 		printerr("  FAIL %s  %s" % [label, detail])
 

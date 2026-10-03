@@ -28,10 +28,19 @@ var _keyboard_height := 0.0
 
 
 ## Builds the frame, then lets the screen put whatever it is about into the column.
+## Whether this screen offers a way out of itself.
+##
+## On by default because a screen with no way back is a dead end, and because a frame
+## that had to be told about it would be a frame with an opinion. A screen that is
+## deliberately the whole of the flow, with nowhere else to be, turns it off.
+var offers_way_back := true
+
+
 func _ready() -> void:
 	_frame()
 	_build_content()
-	back_button.pressed.connect(_on_back)
+	if back_button != null:
+		back_button.pressed.connect(_on_back)
 	_show_defaults()
 
 
@@ -73,6 +82,9 @@ func _frame() -> void:
 	# its longest, so two screens of equal importance end up different sizes.
 	column.custom_minimum_size = Vector2(content_width(), 0.0)
 	centre.add_child(column)
+
+	if not offers_way_back:
+		return
 
 	# About leaving the screen, not about what is on it, so it is anchored to a corner
 	# and never laid out among the choices. A player who backs out of one screen finds

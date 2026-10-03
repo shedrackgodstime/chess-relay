@@ -96,7 +96,10 @@ func _init() -> void:
 	print("heights: " + ", ".join(summary))
 
 	if _failures == 0:
-		print("pieces: all checks passed")
+		if failures > 0:
+			print("pieces: %d check(s) failed" % failures)
+		else:
+			print("pieces: all checks passed")
 	else:
 		printerr("pieces: %d check(s) failed" % _failures)
 	quit(1 if _failures > 0 else 0)
@@ -143,9 +146,16 @@ func _degenerate_count(vertices: PackedVector3Array, indices: PackedInt32Array) 
 	return count
 
 
+## Failed checks, counted. The summary line is printed from this rather than
+## printed regardless, because a suite that says it passed while printing failures is
+## worse than no suite at all: it is believed.
+var failures := 0
+
+
 func _check(label: String, ok: bool, detail: String) -> void:
 	if ok:
 		print("  ok   %s  %s" % [label, detail])
 	else:
+		failures += 1
 		_failures += 1
 		printerr("  FAIL %s  %s" % [label, detail])

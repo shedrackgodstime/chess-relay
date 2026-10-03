@@ -20,7 +20,10 @@ func _init() -> void:
 	_winding_conformance()
 	_curve_checks()
 	if _failures == 0:
-		print("geometry: all checks passed")
+		if failures > 0:
+			print("geometry: %d check(s) failed" % failures)
+		else:
+			print("geometry: all checks passed")
 	else:
 		printerr("geometry: %d check(s) failed" % _failures)
 	quit(1 if _failures > 0 else 0)
@@ -63,10 +66,17 @@ func _worst_side_normal(data: MeshData) -> float:
 	return worst
 
 
+## Failed checks, counted. The summary line is printed from this rather than
+## printed regardless, because a suite that says it passed while printing failures is
+## worse than no suite at all: it is believed.
+var failures := 0
+
+
 func _check(label: String, ok: bool, detail: String) -> void:
 	if ok:
 		print("  ok   %s  %s" % [label, detail])
 	else:
+		failures += 1
 		_failures += 1
 		printerr("  FAIL %s  %s" % [label, detail])
 

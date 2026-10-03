@@ -60,7 +60,10 @@ func _init() -> void:
 	await _side_ownership_checks()
 
 	if _failures == 0:
-		print("movement: all checks passed")
+		if failures > 0:
+			print("movement: %d check(s) failed" % failures)
+		else:
+			print("movement: all checks passed")
 	else:
 		printerr("movement: %d check(s) failed" % _failures)
 	quit(1 if _failures > 0 else 0)
@@ -966,10 +969,17 @@ func _settle(piece: PieceView, target: Vector3) -> void:
 			return
 
 
+## Failed checks, counted. The summary line is printed from this rather than
+## printed regardless, because a suite that says it passed while printing failures is
+## worse than no suite at all: it is believed.
+var failures := 0
+
+
 func _check(label: String, ok: bool, detail: String) -> void:
 	if ok:
 		print("  ok   %s  %s" % [label, detail])
 	else:
+		failures += 1
 		_failures += 1
 		printerr("  FAIL %s  %s" % [label, detail])
 
