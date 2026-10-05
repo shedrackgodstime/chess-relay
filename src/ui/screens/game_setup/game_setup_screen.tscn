@@ -1,0 +1,254 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://src/ui/screens/game_setup/game_setup_screen.gd" id="1_setup"]
+[ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="2_header"]
+[ext_resource type="PackedScene" path="res://src/ui/components/participant_card/participant_card.tscn" id="3_participant"]
+[ext_resource type="PackedScene" path="res://src/ui/components/card/card.tscn" id="4_card"]
+[ext_resource type="PackedScene" path="res://src/ui/components/choice_group/choice_group.tscn" id="5_choice_group"]
+
+[node name="GameSetupScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_setup")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.04, 0.03, 1)
+
+[node name="GameHeader" parent="." instance=ExtResource("2_header")]
+layout_mode = 1
+show_voice_control = true
+center_text = "Game Setup"
+
+[node name="Workspace" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = 98.0
+offset_right = -18.0
+offset_bottom = -124.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"SetupWorkspace"
+
+[node name="Scroll" type="ScrollContainer" parent="Workspace"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Margins" type="MarginContainer" parent="Workspace/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="Content" type="VBoxContainer" parent="Workspace/Scroll/Margins"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 18
+
+[node name="Players" type="GridContainer" parent="Workspace/Scroll/Margins/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 24
+theme_override_constants/v_separation = 16
+columns = 2
+
+[node name="PlayerCard" parent="Workspace/Scroll/Margins/Content/Players" instance=ExtResource("3_participant")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+display_name = "You"
+player_type = "YOU"
+detail = "Player profile"
+side = "White"
+
+[node name="OpponentCard" parent="Workspace/Scroll/Margins/Content/Players" instance=ExtResource("3_participant")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+display_name = "Computer"
+player_type = "AI OPPONENT"
+detail = "Chess engine"
+side = "Black"
+is_opponent = true
+
+[node name="Settings" type="GridContainer" parent="Workspace/Scroll/Margins/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 20
+theme_override_constants/v_separation = 18
+columns = 3
+
+[node name="SideOptions" parent="Workspace/Scroll/Margins/Content/Settings" instance=ExtResource("4_card")]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 202)
+
+[node name="SideChoice" parent="Workspace/Scroll/Margins/Content/Settings/SideOptions/Content" instance=ExtResource("5_choice_group")]
+unique_name_in_owner = true
+layout_mode = 2
+title = "Choose Color"
+choices = PackedStringArray("White", "Black", "Random")
+columns = 3
+selected_index = 0
+
+[node name="TimeOptions" parent="Workspace/Scroll/Margins/Content/Settings" instance=ExtResource("4_card")]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 202)
+
+[node name="TimeChoice" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content" instance=ExtResource("5_choice_group")]
+unique_name_in_owner = true
+layout_mode = 2
+title = "Time Control"
+choices = PackedStringArray("1 | 0", "3 | 2", "5 | 3", "10 | 0", "15 | 10", "Custom")
+columns = 3
+selected_index = 2
+
+[node name="CustomTimeControls" type="HBoxContainer" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="MinutesLabel" type="Label" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content/CustomTimeControls"]
+layout_mode = 2
+theme_type_variation = &"Caption"
+text = "Minutes"
+
+[node name="CustomMinutes" type="SpinBox" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content/CustomTimeControls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(86, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 1.0
+max_value = 180.0
+value = 5.0
+
+[node name="IncrementLabel" type="Label" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content/CustomTimeControls"]
+layout_mode = 2
+theme_type_variation = &"Caption"
+text = "Inc."
+
+[node name="CustomIncrement" type="SpinBox" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content/CustomTimeControls"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(82, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+min_value = 0.0
+max_value = 60.0
+
+[node name="MatchOptions" parent="Workspace/Scroll/Margins/Content/Settings" instance=ExtResource("4_card")]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(0, 202)
+
+[node name="OptionsContent" type="VBoxContainer" parent="Workspace/Scroll/Margins/Content/Settings/MatchOptions/Content"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MatchOptionsTitle" type="Label" parent="Workspace/Scroll/Margins/Content/Settings/MatchOptions/Content/OptionsContent"]
+layout_mode = 2
+theme_type_variation = &"SetupSectionTitle"
+text = "Match Options"
+
+[node name="VariantChoice" parent="Workspace/Scroll/Margins/Content/Settings/MatchOptions/Content/OptionsContent" instance=ExtResource("5_choice_group")]
+unique_name_in_owner = true
+layout_mode = 2
+title = "Variant"
+choices = PackedStringArray("Standard", "Chess960")
+columns = 2
+selected_index = 0
+
+[node name="DifficultyChoice" parent="Workspace/Scroll/Margins/Content/Settings/MatchOptions/Content/OptionsContent" instance=ExtResource("5_choice_group")]
+unique_name_in_owner = true
+layout_mode = 2
+title = "Difficulty"
+choices = PackedStringArray("Easy", "Medium", "Hard")
+columns = 3
+selected_index = 1
+
+[node name="ReadyStatus" type="PanelContainer" parent="Workspace/Scroll/Margins/Content"]
+custom_minimum_size = Vector2(0, 54)
+layout_mode = 2
+theme_type_variation = &"SetupStatusBar"
+
+[node name="StatusContent" type="HBoxContainer" parent="Workspace/Scroll/Margins/Content/ReadyStatus"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ReadyDot" type="Panel" parent="Workspace/Scroll/Margins/Content/ReadyStatus/StatusContent"]
+custom_minimum_size = Vector2(10, 10)
+layout_mode = 2
+theme_type_variation = &"SetupReadyDot"
+
+[node name="ReadyLabel" type="Label" parent="Workspace/Scroll/Margins/Content/ReadyStatus/StatusContent"]
+layout_mode = 2
+theme_type_variation = &"SetupStatusText"
+text = "Ready to start"
+
+[node name="StatusSpacer" type="Control" parent="Workspace/Scroll/Margins/Content/ReadyStatus/StatusContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SettingsSummary" type="Label" parent="Workspace/Scroll/Margins/Content/ReadyStatus/StatusContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = "5 min + 3 sec  ·  Standard  ·  Medium"
+horizontal_alignment = 2
+
+[node name="Footer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -106.0
+offset_right = -18.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_type_variation = &"SetupFooter"
+
+[node name="FooterMargins" type="MarginContainer" parent="Footer"]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 14
+
+[node name="FooterContent" type="HBoxContainer" parent="Footer/FooterMargins"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="FooterSpacer" type="Control" parent="Footer/FooterMargins/FooterContent"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PlayButton" type="Button" parent="Footer/FooterMargins/FooterContent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(164, 52)
+layout_mode = 2
+tooltip_text = "Start this game"
+theme_type_variation = &"SetupPrimaryButton"
+text = "Play   →"

@@ -1,0 +1,21 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/choice_group/choice_group.gd" id="1_choice_group"]
+
+[node name="ChoiceGroup" type="VBoxContainer"]
+theme_override_constants/separation = 12
+script = ExtResource("1_choice_group")
+
+[node name="Title" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SetupSectionTitle"
+text = "Option"
+
+[node name="Options" type="GridContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 3

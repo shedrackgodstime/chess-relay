@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="Card" type="PanelContainer"]
+theme_type_variation = &"Card"
+
+[node name="Content" type="VBoxContainer" parent="."]
+theme_override_constants/separation = 10

@@ -1,0 +1,120 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/game_header/game_header.gd" id="1_header"]
+[ext_resource type="Script" path="res://src/ui/components/game_header/network_indicator.gd" id="2_network"]
+[ext_resource type="Texture2D" path="res://src/ui/components/game_header/icons/menu.svg" id="3_menu"]
+[ext_resource type="Texture2D" path="res://src/ui/components/game_header/icons/mic_off.svg" id="4_mic_off"]
+
+[node name="GameHeader" type="Control"]
+custom_minimum_size = Vector2(0, 80)
+layout_mode = 3
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+script = ExtResource("1_header")
+
+[node name="VoiceCluster" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 84.0
+offset_top = 16.0
+offset_right = 148.0
+offset_bottom = 80.0
+mouse_filter = 2
+
+[node name="MicLiveRing" type="Panel" parent="VoiceCluster"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_type_variation = &"MicLiveRing"
+
+[node name="MicButton" type="Button" parent="VoiceCluster"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+tooltip_text = "Voice chat off"
+theme_type_variation = &"QuietButton"
+flat = true
+
+[node name="MicGlyph" type="TextureRect" parent="VoiceCluster/MicButton"]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = -12.0
+mouse_filter = 2
+texture = ExtResource("4_mic_off")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RemoteSpeakingDot" type="Panel" parent="VoiceCluster"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 0
+offset_left = 50.0
+offset_top = 50.0
+offset_right = 61.0
+offset_bottom = 61.0
+mouse_filter = 2
+theme_type_variation = &"RemoteSpeakingDot"
+
+[node name="CenterLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -160.0
+offset_top = 12.0
+offset_right = 160.0
+offset_bottom = 52.0
+mouse_filter = 2
+theme_type_variation = &"HeaderCenterText"
+horizontal_alignment = 1
+
+[node name="MenuButton" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -84.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = 80.0
+tooltip_text = "Game menu"
+theme_type_variation = &"HeaderMenuButton"
+
+[node name="Glyph" type="TextureRect" parent="MenuButton"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = -12.0
+mouse_filter = 2
+texture = ExtResource("3_menu")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NetworkIndicator" type="Control" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(36, 36)
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -198.0
+offset_top = -18.0
+offset_right = -162.0
+offset_bottom = 18.0
+script = ExtResource("2_network")

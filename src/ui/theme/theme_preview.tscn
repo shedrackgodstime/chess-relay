@@ -1,0 +1,59 @@
+[gd_scene format=3]
+
+[node name="ThemePreview" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PreviewCard" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -170.0
+offset_right = 220.0
+offset_bottom = 170.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"Card"
+
+[node name="Content" type="VBoxContainer" parent="PreviewCard"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="PreviewCard/Content"]
+layout_mode = 2
+theme_type_variation = &"ScreenTitle"
+text = "Theme Preview"
+horizontal_alignment = 1
+
+[node name="Caption" type="Label" parent="PreviewCard/Content"]
+layout_mode = 2
+theme_type_variation = &"Caption"
+text = "Shared theme styles"
+horizontal_alignment = 1
+
+[node name="PrimaryButton" type="Button" parent="PreviewCard/Content"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Primary button"
+
+[node name="QuietButton" type="Button" parent="PreviewCard/Content"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_type_variation = &"QuietButton"
+text = "Quiet button"
+
+[node name="ChoiceButton" type="Button" parent="PreviewCard/Content"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+theme_type_variation = &"ChoiceButton"
+toggle_mode = true
+button_pressed = true
+text = "Selected option"

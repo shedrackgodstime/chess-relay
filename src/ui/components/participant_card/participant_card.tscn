@@ -1,0 +1,78 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/participant_card/participant_card.gd" id="1_participant_card"]
+[ext_resource type="Texture2D" path="res://assets/ui/icons/chess_knight.svg" id="2_knight"]
+
+[node name="ParticipantCard" type="PanelContainer"]
+custom_minimum_size = Vector2(0, 142)
+theme_type_variation = &"SetupParticipantCard"
+script = ExtResource("1_participant_card")
+
+[node name="Content" type="HBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 18
+
+[node name="Avatar" type="Panel" parent="Content"]
+custom_minimum_size = Vector2(80, 80)
+layout_mode = 2
+theme_type_variation = &"SetupAvatar"
+
+[node name="PieceIcon" type="TextureRect" parent="Content/Avatar"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_knight")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Info" type="VBoxContainer" parent="Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 5
+
+[node name="NameRow" type="HBoxContainer" parent="Content/Info"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Name" type="Label" parent="Content/Info/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SetupParticipantName"
+text = "Player"
+
+[node name="Type" type="Label" parent="Content/Info/NameRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SetupParticipantType"
+text = "PLAYER"
+
+[node name="Detail" type="Label" parent="Content/Info"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = ""
+
+[node name="SideRow" type="HBoxContainer" parent="Content/Info"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SideLabel" type="Label" parent="Content/Info/SideRow"]
+layout_mode = 2
+theme_type_variation = &"Caption"
+text = "Side"
+
+[node name="SideValue" type="Label" parent="Content/Info/SideRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SetupSideBadge"
+text = "White"
