@@ -27,6 +27,7 @@ func _ready() -> void:
 	_mock_multiplayer.connect(&"join_failed", notify_join_failed)
 	_mock_multiplayer.connect(&"player_invite_accepted", _on_player_invite_accepted)
 	_mock_multiplayer.connect(&"player_invite_declined", _on_player_invite_declined)
+	_mock_multiplayer.connect(&"incoming_invite_received", _on_incoming_invite_received)
 	_mock_multiplayer.connect(&"opponent_ready", _on_opponent_ready)
 	_show_home_screen()
 
@@ -51,8 +52,10 @@ func _on_p2p_requested() -> void:
 	hub.connect(&"join_cancelled", _on_join_cancelled)
 	hub.connect(&"player_invite_requested", _on_player_invite_requested)
 	hub.connect(&"player_invite_cancelled", _on_player_invite_cancelled)
+	hub.connect(&"incoming_invite_responded", _on_incoming_invite_responded)
 	hub.connect(&"game_setup_requested", _on_peer_setup_requested)
 	_show_screen(hub)
+	_mock_multiplayer.call("start_hub_session")
 
 
 func _on_invite_created(code: String) -> void:
@@ -81,6 +84,15 @@ func _on_player_invite_requested(player_name: String) -> void:
 
 func _on_player_invite_cancelled() -> void:
 	_mock_multiplayer.call("cancel_player_invite")
+
+
+func _on_incoming_invite_received(player_name: String) -> void:
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).receive_incoming_invite(player_name)
+
+
+func _on_incoming_invite_responded(player_name: String, accepted: bool) -> void:
+	_mock_multiplayer.call("answer_incoming_invite", player_name, accepted)
 
 
 func _on_peer_setup_requested(opponent_name: String, setup_kind: String) -> void:

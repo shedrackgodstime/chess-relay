@@ -8,6 +8,7 @@ signal join_requested(code: String)
 signal join_cancelled(code: String)
 signal player_invite_requested(player_name: String)
 signal player_invite_cancelled
+signal incoming_invite_responded(player_name: String, accepted: bool)
 signal game_setup_requested(opponent_name: String, setup_kind: String)
 
 const HEADER_SCENE: PackedScene = preload("res://src/ui/components/game_header/game_header.tscn")
@@ -37,6 +38,10 @@ var _join_is_connecting := false
 var _player_invite_buttons: Array[Button] = []
 var _active_invite_flow := ""
 var _current_player_invite := ""
+var _queued_incoming_invite := ""
+var _profile_status: Label
+var _discoverable_nearby := true
+var _discoverable_online := false
 
 
 func _ready() -> void:
@@ -121,7 +126,8 @@ func _build_profile_card() -> PanelContainer:
 	var identity := VBoxContainer.new()
 	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	identity.add_child(_label("Guest player", "SetupParticipantName"))
-	identity.add_child(_label("Player profile saved on this device", "QuietLabel"))
+	_profile_status = _label("Discoverable nearby", "QuietLabel")
+	identity.add_child(_profile_status)
 	row.add_child(identity)
 	var settings := Button.new()
 	settings.text = "Discovery settings"
@@ -278,24 +284,92 @@ func _cancel_player_invite() -> void:
 	player_invite_cancelled.emit()
 
 
+## An incoming request uses the same inline card. Queue it if another flow is active.
+func receive_incoming_invite(player_name: String) -> void:
+	if not _active_invite_flow.is_empty():
+		_queued_incoming_invite = player_name
+		return
+	_show_incoming_invite(player_name)
+
+
+func _show_incoming_invite(player_name: String) -> void:
+	_active_invite_flow = "incoming-invite"
+	_current_player_invite = player_name
+	_invite_grid.hide()
+	_invite_flow_card.show()
+	_set_player_invites_enabled(false)
+	_clear_invite_flow()
+	_invite_flow_content.add_child(_label("Game invitation", "SetupParticipantName"))
+	_invite_flow_content.add_child(_label("%s invited you to play." % player_name, "QuietLabel"))
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	_invite_flow_content.add_child(actions)
+	actions.add_child(_action_button("Accept", _accept_incoming_invite))
+	var decline := Button.new()
+	decline.text = "Decline"
+	decline.custom_minimum_size = Vector2(120, 42)
+	decline.theme_type_variation = &"QuietButton"
+	decline.pressed.connect(_decline_incoming_invite)
+	actions.add_child(decline)
+
+
+func _accept_incoming_invite() -> void:
+	if _active_invite_flow != "incoming-invite":
+		return
+	var player_name := _current_player_invite
+	incoming_invite_responded.emit(player_name, true)
+	game_setup_requested.emit(player_name, "incoming")
+
+
+func _decline_incoming_invite() -> void:
+	if _active_invite_flow != "incoming-invite":
+		return
+	var player_name := _current_player_invite
+	incoming_invite_responded.emit(player_name, false)
+	_clear_invite_flow()
+	_invite_flow_content.add_child(_label("Invitation declined.", "SetupStatusText"))
+	_invite_flow_content.add_child(_flow_cancel_button(_reset_invite_flow))
+
+
 func _show_discovery_settings() -> void:
 	var dialog := AcceptDialog.new()
 	dialog.title = "Discovery settings"
-	dialog.dialog_text = "Choose whether other players can discover you nearby or online."
+	dialog.dialog_text = "Choose where other players can discover you."
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 8)
 	var nearby := CheckButton.new()
 	nearby.text = "Discoverable on this local network"
-	nearby.button_pressed = true
+	nearby.button_pressed = _discoverable_nearby
+	nearby.toggled.connect(func(enabled: bool):
+		_discoverable_nearby = enabled
+		_update_profile_status()
+	)
 	content.add_child(nearby)
 	var online := CheckButton.new()
 	online.text = "Discoverable by online players"
+	online.button_pressed = _discoverable_online
+	online.toggled.connect(func(enabled: bool):
+		_discoverable_online = enabled
+		_update_profile_status()
+	)
 	content.add_child(online)
 	dialog.add_child(content)
 	add_child(dialog)
 	dialog.popup_centered(Vector2i(460, 240))
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.canceled.connect(dialog.queue_free)
+
+
+func _update_profile_status() -> void:
+	if _discoverable_nearby and _discoverable_online:
+		_profile_status.text = "Discoverable nearby and online"
+	elif _discoverable_nearby:
+		_profile_status.text = "Discoverable nearby"
+	elif _discoverable_online:
+		_profile_status.text = "Discoverable online"
+	else:
+		_profile_status.text = "Not discoverable"
 
 
 func _on_create_invite() -> void:
@@ -472,6 +546,10 @@ func _reset_invite_flow() -> void:
 	_invite_grid.show()
 	_clear_invite_flow()
 	_set_player_invites_enabled(true)
+	if not _queued_incoming_invite.is_empty():
+		var queued_player := _queued_incoming_invite
+		_queued_incoming_invite = ""
+		_show_incoming_invite(queued_player)
 
 
 func _clear_invite_flow() -> void:

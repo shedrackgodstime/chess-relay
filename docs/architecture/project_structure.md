@@ -52,3 +52,6 @@ and [themes](https://docs.godotengine.org/en/stable/tutorials/ui/gui_using_theme
 The available local docs checkout was current to 2026-09-29. The installed
 editor is Godot 4.7.2 stable; use the latest stable patch in the 4.7 series
 for project work and avoid development builds for this foundation.
+
+For the current multiplayer UI flow, screen/app event boundary, and discovery
+preference notes, see [multiplayer UI lifecycle](multiplayer_ui_lifecycle.md).
