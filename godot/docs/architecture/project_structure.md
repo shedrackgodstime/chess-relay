@@ -55,3 +55,6 @@ for project work and avoid development builds for this foundation.
 
 For the current multiplayer UI flow, screen/app event boundary, and discovery
 preference notes, see [multiplayer UI lifecycle](multiplayer_ui_lifecycle.md).
+
+For the boundary between this Godot client and the Rust application core, see
+the workspace-level [application core architecture](../../docs/architecture/application_core.md).
