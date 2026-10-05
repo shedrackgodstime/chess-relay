@@ -8,12 +8,30 @@ const PIECE_SCENE: PackedScene = preload("res://src/game/pieces/piece_view.tscn"
 @onready var _board: ChessBoardView = %Board
 @onready var _pieces: Node3D = %Pieces
 @onready var _header: GameHeader = %GameHeader
+@onready var _camera: Camera3D = %Camera
 
 
 func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
 	_board.square_pressed.connect(_on_square_pressed)
+	_update_camera_framing()
 	_build_demo_position()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_RESIZED and is_node_ready():
+		_update_camera_framing()
+
+
+func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
+	var viewport_size := get_viewport_rect().size
+	var viewport_width := viewport_size.x if width < 0.0 else width
+	var viewport_height := viewport_size.y if height < 0.0 else height
+	if viewport_height <= 0.0:
+		return
+	var aspect := viewport_width / viewport_height
+	var distance_scale := clampf(1.5 / maxf(aspect, 0.65), 1.0, 1.45)
+	_camera.position = Vector3(0.0, 10.8 * distance_scale, 10.8 * distance_scale)
 
 
 func _on_square_pressed(square: String) -> void:

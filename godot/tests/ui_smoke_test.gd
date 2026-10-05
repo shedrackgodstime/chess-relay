@@ -177,6 +177,14 @@ func _check_game_screen() -> void:
 		"game board builds 64 reusable squares")
 	_check(game._pieces.get_child_count() == 32,
 		"game screen renders a complete demo position")
+	game._update_camera_framing(1440.0, 900.0)
+	var wide_camera_height := game._camera.position.y
+	game._update_camera_framing(640.0, 900.0)
+	_check(game._camera.position.y > wide_camera_height,
+		"game camera pulls back for a narrow viewport")
+	game._update_camera_framing(1440.0, 900.0)
+	_check(is_equal_approx(game._camera.position.y, wide_camera_height),
+		"game camera restores framing for a wide viewport")
 	for square in ["a1", "e4", "h8"]:
 		_check(game._board.world_to_square(game._board.square_to_world(square)) == square,
 			"board coordinate round trip works for %s" % square)
