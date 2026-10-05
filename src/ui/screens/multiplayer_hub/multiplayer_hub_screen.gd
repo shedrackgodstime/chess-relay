@@ -139,6 +139,7 @@ func _build_join_card() -> PanelContainer:
 
 func _build_players_section() -> VBoxContainer:
 	var section := VBoxContainer.new()
+	section.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	section.add_theme_constant_override("separation", 10)
 	var heading := HBoxContainer.new()
 	heading.add_child(_label("Players", "SetupParticipantName"))
@@ -157,10 +158,14 @@ func _build_players_section() -> VBoxContainer:
 	_player_list.custom_minimum_size.y = 110
 	_player_list.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	section.add_child(_player_list)
+	var list_inset := MarginContainer.new()
+	list_inset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list_inset.add_theme_constant_override("margin_bottom", 10)
+	_player_list.add_child(list_inset)
 	var list := VBoxContainer.new()
 	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	list.add_theme_constant_override("separation", 4)
-	_player_list.add_child(list)
+	list_inset.add_child(list)
 	list.add_child(_build_mock_player_row("Ayo", "Nearby", false))
 	list.add_child(_build_mock_player_row("KnightOwl", "Online", false))
 	list.add_child(_build_mock_player_row("Kemi", "Nearby", true))
