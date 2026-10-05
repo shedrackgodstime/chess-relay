@@ -4,6 +4,7 @@ const APP_SCENE: PackedScene = preload("res://src/ui/app/app_root.tscn")
 const HOME_SCENE: PackedScene = preload("res://src/ui/screens/home/home_screen.tscn")
 const SETUP_SCENE: PackedScene = preload("res://src/ui/screens/game_setup/game_setup_screen.tscn")
 const HUB_SCENE: PackedScene = preload("res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.tscn")
+const GAME_SCENE: PackedScene = preload("res://src/ui/screens/game/game_screen.tscn")
 const HEADER_SCENE: PackedScene = preload("res://src/ui/components/game_header/game_header.tscn")
 const CHOICE_SCENE: PackedScene = preload("res://src/ui/components/choice_group/choice_group.tscn")
 const PARTICIPANT_SCENE: PackedScene = preload("res://src/ui/components/participant_card/participant_card.tscn")
@@ -23,6 +24,7 @@ func _run() -> void:
 	await _check_participant_and_setup_states()
 	await _check_hub_interactions()
 	await _check_responsive_layouts()
+	await _check_game_screen()
 	_check_theme_contracts()
 	await _check_app_lifecycle()
 	if _failures == 0:
@@ -37,6 +39,7 @@ func _check_scene_contracts() -> void:
 	_check(HOME_SCENE != null, "home scene loads")
 	_check(SETUP_SCENE != null, "game setup scene loads")
 	_check(HUB_SCENE != null, "multiplayer hub scene loads")
+	_check(GAME_SCENE != null, "game scene loads")
 	_check(HEADER_SCENE != null, "game header scene loads")
 	_check(CHOICE_SCENE != null, "choice group scene loads")
 
@@ -166,6 +169,27 @@ func _check_responsive_layouts() -> void:
 	setup.queue_free()
 
 
+func _check_game_screen() -> void:
+	var game := GAME_SCENE.instantiate() as GameScreen
+	root.add_child(game)
+	await process_frame
+	_check(game._board.get_node("Squares").get_child_count() == 64,
+		"game board builds 64 reusable squares")
+	_check(game._pieces.get_child_count() == 32,
+		"game screen renders a complete demo position")
+	for square in ["a1", "e4", "h8"]:
+		_check(game._board.world_to_square(game._board.square_to_world(square)) == square,
+			"board coordinate round trip works for %s" % square)
+	game._board.set_highlight("e4")
+	_check(game._board.get_highlighted_square() == "e4",
+		"board exposes selected square state")
+	_check(game._board.get_node("Highlights").get_child_count() == 1,
+		"board renders selected square highlight")
+	game._on_square_pressed("e4")
+	_check("E4" in game._header.center_text, "header responds to square selection")
+	game.queue_free()
+
+
 func _check_theme_contracts() -> void:
 	_check(THEME.has_stylebox("focus", &"Button"), "theme defines shared button focus style")
 	_check(THEME.has_stylebox("normal", &"SetupSideBadge"), "theme defines white side badge style")
@@ -182,6 +206,12 @@ func _check_app_lifecycle() -> void:
 	app._on_play_computer_requested()
 	await process_frame
 	_check(app._current_screen is GameSetupScreen, "home enters game setup")
+	(app._current_screen as GameSetupScreen)._play_button.pressed.emit()
+	await process_frame
+	_check(app._current_screen is GameScreen, "setup enters main game")
+	(app._current_screen as GameScreen).leave_requested.emit()
+	await process_frame
+	_check(app._current_screen is HomeScreen, "game leave returns home")
 	app._on_p2p_requested()
 	await process_frame
 	_check(app._current_screen is MultiplayerHubScreen, "home enters multiplayer hub")

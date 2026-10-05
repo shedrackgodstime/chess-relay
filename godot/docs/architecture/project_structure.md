@@ -18,6 +18,9 @@ ported as part of initialization.
 - `src/ui/theme/` contains shared Godot Theme resources and theme-related
   design tokens. A project-wide theme should be applied at the UI root; local
   exceptions should be deliberate.
+- `src/game/` contains reusable 3D presentation scenes for the board and
+  pieces. These scenes render and emit presentation events; screen navigation
+  remains in `src/ui/app/`.
 - `assets/ui/` holds UI assets. Keep assets near a component or screen when
   they are exclusive to it; shared assets belong in this common directory.
 - `docs/architecture/` records decisions that affect structure or long-term
@@ -55,6 +58,3 @@ for project work and avoid development builds for this foundation.
 
 For the current multiplayer UI flow, screen/app event boundary, and discovery
 preference notes, see [multiplayer UI lifecycle](multiplayer_ui_lifecycle.md).
-
-For the boundary between this Godot client and the Rust application core, see
-the workspace-level [application core architecture](../../docs/architecture/application_core.md).

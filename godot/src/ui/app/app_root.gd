@@ -13,6 +13,7 @@ const GAME_SETUP_SCREEN: PackedScene = preload(
 	"res://src/ui/screens/game_setup/game_setup_screen.tscn")
 const MULTIPLAYER_HUB_SCREEN: PackedScene = preload(
 	"res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.tscn")
+const GAME_SCREEN: PackedScene = preload("res://src/ui/screens/game/game_screen.tscn")
 const MOCK_MULTIPLAYER_SERVICE_SCRIPT: Script = preload(
 	"res://src/ui/multiplayer/mock_multiplayer_service.gd")
 
@@ -48,6 +49,7 @@ func _on_play_computer_requested() -> void:
 	var setup := GAME_SETUP_SCREEN.instantiate() as GameSetupScreen
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
+	setup.play_requested.connect(_show_game_screen)
 	_show_screen(setup)
 
 
@@ -108,8 +110,14 @@ func _on_peer_setup_requested(opponent_name: String, setup_kind: String) -> void
 	setup.configure_peer(opponent_name, setup_kind)
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
-	setup.play_requested.connect(_mock_multiplayer.request_player_ready)
+	setup.play_requested.connect(_show_game_screen)
 	_show_screen(setup)
+
+
+func _show_game_screen() -> void:
+	var game := GAME_SCREEN.instantiate() as GameScreen
+	game.leave_requested.connect(_show_home_screen)
+	_show_screen(game)
 
 
 func _on_game_setup_leave_requested(is_peer_setup: bool) -> void:

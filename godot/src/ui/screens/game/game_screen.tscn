@@ -1,0 +1,67 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://src/ui/screens/game/game_screen.gd" id="1_game"]
+[ext_resource type="PackedScene" path="res://src/game/board/board_view.tscn" id="2_board"]
+[ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="3_header"]
+
+[sub_resource type="Environment" id="Environment_game"]
+background_mode = 1
+background_color = Color(0.035, 0.026, 0.02, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.62, 0.53, 0.42, 1)
+ambient_light_energy = 0.7
+tonemap_mode = 2
+
+[node name="GameScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_game")
+accessibility_name = "Chess game"
+
+[node name="World" type="Node3D" parent="."]
+
+[node name="Environment" type="WorldEnvironment" parent="World"]
+environment = SubResource("Environment_game")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="World"]
+rotation_degrees = Vector3(-52, -28, 0)
+light_color = Color(1, 0.91, 0.75, 1)
+light_energy = 1.35
+shadow_enabled = true
+
+[node name="Camera" type="Camera3D" parent="World"]
+position = Vector3(0, 10.8, 10.8)
+rotation_degrees = Vector3(-43, 0, 0)
+current = true
+fov = 38.0
+
+[node name="Board" parent="World" instance=ExtResource("2_board")]
+unique_name_in_owner = true
+
+[node name="Pieces" type="Node3D" parent="World"]
+unique_name_in_owner = true
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="HUDRoot" type="Control" parent="HUD"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="GameHeader" parent="HUD/HUDRoot" instance=ExtResource("3_header")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+grow_horizontal = 2
+show_network_indicator = false
+show_voice_control = false
+center_text = "Your turn · Move 1"
