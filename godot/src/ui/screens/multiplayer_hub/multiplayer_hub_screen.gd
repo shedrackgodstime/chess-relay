@@ -199,8 +199,12 @@ func _decline_incoming_invite() -> void:
 
 func _show_discovery_settings() -> void:
 	var dialog := AcceptDialog.new()
+	dialog.theme_type_variation = &"ModalDialog"
 	dialog.title = "Discovery settings"
 	dialog.dialog_text = "Choose where other players can discover you."
+	dialog.dialog_autowrap = true
+	dialog.get_label().horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	dialog.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 8)
 	var nearby := CheckButton.new()
@@ -336,7 +340,12 @@ func _begin_join_flow() -> void:
 	_join_cancel_button.theme_type_variation = &"QuietButton"
 	_join_cancel_button.pressed.connect(_cancel_join)
 	actions.add_child(_join_cancel_button)
-	_join_field.grab_focus.call_deferred()
+	call_deferred("_focus_join_field")
+
+
+func _focus_join_field() -> void:
+	if is_instance_valid(_join_field) and _join_field.is_inside_tree():
+		_join_field.grab_focus()
 
 
 func _on_join_code_changed(value: String) -> void:
@@ -475,9 +484,10 @@ func _is_valid_invite_code(value: String) -> bool:
 	return true
 
 
-func _update_responsive_layout() -> void:
+func _update_responsive_layout(width: float = -1.0) -> void:
 	if _invite_grid != null and is_instance_valid(_invite_grid):
-		_invite_grid.columns = 1 if get_viewport_rect().size.x < 900.0 else 2
+		var screen_width := get_viewport_rect().size.x if width < 0.0 else width
+		_invite_grid.columns = 1 if screen_width < 900.0 else 2
 
 
 func _action_button(title: String, action: Callable) -> Button:

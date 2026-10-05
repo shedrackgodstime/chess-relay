@@ -50,6 +50,10 @@ default theme. The theme does not add new palette colors or font assets.
 - `ScreenTitle`, `HomeTitle`, and `CodeDisplay` are label variations for the
   title sizes already used by the prototype.
 - `Caption` and `QuietLabel` centralize the corresponding label styles.
+- `ModalDialog`, `ModalSecondaryButton`, and `ModalDangerButton` provide the
+  shared confirmation/settings dialog surface and action hierarchy. Dialog
+  button dimensions come from `AcceptDialog` theme constants, as required by
+  Godot; individual dialogs should not force button minimum sizes.
 
 Use a theme variation for a repeated appearance and local theme overrides for
 layout-specific values or true one-off exceptions. Keep layout margins and

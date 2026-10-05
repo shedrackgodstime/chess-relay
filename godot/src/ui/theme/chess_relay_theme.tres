@@ -173,6 +173,94 @@ corner_radius_top_right = 6
 corner_radius_bottom_right = 6
 corner_radius_bottom_left = 6
 
+[sub_resource type="StyleBoxFlat" id="modal_panel"]
+content_margin_left = 24.0
+content_margin_top = 22.0
+content_margin_right = 24.0
+content_margin_bottom = 20.0
+bg_color = Color(0.16, 0.13, 0.11, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.45, 0.34, 0.24, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="modal_secondary_normal"]
+bg_color = Color(0.11, 0.09, 0.08, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.42, 0.36, 0.29, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_secondary_hover"]
+bg_color = Color(0.22, 0.18, 0.15, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.58, 0.46, 0.34, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_secondary_pressed"]
+bg_color = Color(0.3, 0.24, 0.18, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.58, 0.46, 0.34, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_danger_normal"]
+bg_color = Color(0.38, 0.13, 0.1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.78, 0.33, 0.25, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_danger_hover"]
+bg_color = Color(0.52, 0.18, 0.13, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.94, 0.48, 0.36, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_danger_pressed"]
+bg_color = Color(0.29, 0.08, 0.07, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.94, 0.48, 0.36, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 [sub_resource type="StyleBoxFlat" id="setup_workspace"]
 bg_color = Color(0.11, 0.09, 0.08, 1)
 border_width_left = 2
@@ -367,6 +455,30 @@ MicLiveRing/styles/panel = SubResource("mic_live_ring")
 
 RemoteSpeakingDot/base_type = &"Panel"
 RemoteSpeakingDot/styles/panel = SubResource("remote_speaking_dot")
+
+ModalDialog/base_type = &"ConfirmationDialog"
+ModalDialog/constants/buttons_min_width = 144
+ModalDialog/constants/buttons_min_height = 48
+ModalDialog/constants/buttons_separation = 12
+ModalDialog/styles/panel = SubResource("modal_panel")
+
+ModalSecondaryButton/base_type = &"Button"
+ModalSecondaryButton/colors/font_color = Color(1, 0.9, 0.72, 1)
+ModalSecondaryButton/colors/font_hover_color = Color(1, 1, 1, 1)
+ModalSecondaryButton/font_sizes/font_size = 18
+ModalSecondaryButton/styles/normal = SubResource("modal_secondary_normal")
+ModalSecondaryButton/styles/hover = SubResource("modal_secondary_hover")
+ModalSecondaryButton/styles/pressed = SubResource("modal_secondary_pressed")
+ModalSecondaryButton/styles/focus = SubResource("button_focus")
+
+ModalDangerButton/base_type = &"Button"
+ModalDangerButton/colors/font_color = Color(1, 0.94, 0.9, 1)
+ModalDangerButton/colors/font_hover_color = Color(1, 1, 1, 1)
+ModalDangerButton/font_sizes/font_size = 18
+ModalDangerButton/styles/normal = SubResource("modal_danger_normal")
+ModalDangerButton/styles/hover = SubResource("modal_danger_hover")
+ModalDangerButton/styles/pressed = SubResource("modal_danger_pressed")
+ModalDangerButton/styles/focus = SubResource("button_focus")
 
 SetupWorkspace/base_type = &"PanelContainer"
 SetupWorkspace/styles/panel = SubResource("setup_workspace")

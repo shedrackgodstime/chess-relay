@@ -26,6 +26,7 @@ uses Godot 4.7.2; the configuration targets the 4.7 feature set.
 | Multiplayer UI/backend seam | Pass for UI prototype | The hub emits user intent and the app root routes mock outcomes. `MockMultiplayerService` is explicitly local-only; its fixture names and outcomes are not product behavior. Keep transport and identity outside screen controls. |
 | Documentation | Pass | Architecture notes explain the current theme, header, setup, multiplayer lifecycle, and this complete pre-board audit. |
 | Asset/license traceability | Pass | Component icons stay with the header; `icons/LICENSE.txt` records the Lucide and Feather-derived licenses. The shared chess knight is under `assets/ui/icons/`. |
+| Automated UI checks | Pass | `tests/ui_smoke_test.gd` loads every runtime screen/component contract, checks reusable header, choice-group, and participant-card behavior, exercises setup/menu/modal and create/join invite states, checks responsive breakpoints and theme invariants, and verifies Home → Game Setup/Multiplayer Hub lifecycle transitions. It exits non-zero on failure. |
 
 ## Changes made during this audit
 
@@ -66,4 +67,12 @@ screen is added.
 - `ref/godot-demo-projects-master/gui/accessibility/` — official accessibility
   control examples for a future full-screen audit.
 
-No tests were added or run as part of this audit.
+The current UI smoke suite can be run from the workspace root with:
+
+```sh
+godot --headless --log-file /tmp/chess-relay-ui-smoke.log \
+  --path godot --script res://tests/ui_smoke_test.gd
+```
+
+Chess legality and move-generation checks will be added with the future game
+model; they do not belong in UI scene tests.

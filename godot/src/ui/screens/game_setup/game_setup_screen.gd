@@ -1,8 +1,6 @@
 class_name GameSetupScreen
 extends Control
 
-const DIALOG_ACTION_SIZE := Vector2(144.0, 48.0)
-
 signal play_requested
 signal settings_requested
 signal leave_requested(is_peer_setup: bool)
@@ -81,8 +79,8 @@ func _notification(what: int) -> void:
 		_update_screen_columns()
 
 
-func _update_screen_columns() -> void:
-	var screen_width := size.x
+func _update_screen_columns(width: float = -1.0) -> void:
+	var screen_width := size.x if width < 0.0 else width
 	_players_grid.columns = 2 if screen_width >= 760.0 else 1
 	if screen_width >= 1080.0:
 		_settings_grid.columns = 3
@@ -215,25 +213,27 @@ func _on_leave_setup_pressed() -> void:
 		leave_requested.emit(false)
 		return
 	var confirmation := ConfirmationDialog.new()
+	confirmation.theme_type_variation = &"ModalDialog"
 	confirmation.title = "Leave game?"
 	confirmation.dialog_text = "You’ll disconnect from %s and return to Multiplayer." % _peer_name
+	confirmation.dialog_autowrap = true
 	confirmation.ok_button_text = "Leave game"
 	confirmation.cancel_button_text = "Stay"
+	confirmation.get_label().horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	confirmation.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var leave_button := confirmation.get_ok_button()
 	leave_button.accessibility_name = "Leave the game"
-	leave_button.custom_minimum_size = DIALOG_ACTION_SIZE
-	leave_button.theme_type_variation = &"SetupPrimaryButton"
+	leave_button.theme_type_variation = &"ModalDangerButton"
 	var stay_button := confirmation.get_cancel_button()
 	stay_button.accessibility_name = "Stay in the game"
-	stay_button.custom_minimum_size = DIALOG_ACTION_SIZE
-	stay_button.theme_type_variation = &"QuietButton"
+	stay_button.theme_type_variation = &"ModalSecondaryButton"
 	confirmation.confirmed.connect(func():
 		leave_requested.emit(true)
 		confirmation.queue_free()
 	)
 	confirmation.canceled.connect(confirmation.queue_free)
 	add_child(confirmation)
-	confirmation.popup_centered(Vector2i(420, 180))
+	confirmation.popup_centered(Vector2i(460, 220))
 
 
 func _update_side_cards() -> void:
