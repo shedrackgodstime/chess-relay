@@ -1,6 +1,8 @@
 # Godot-generated caches and export state
 .godot/
+/godot/.godot/
 /android/
+/godot/android/
 .import/
 export.cfg
 export_presets.cfg
@@ -20,3 +22,6 @@ Thumbs.db
 
 # Local-only reference material (prototype, docs, and demo projects)
 ref/
+
+# Rust build output (Rust source and manifests remain tracked normally)
+/rust/target/

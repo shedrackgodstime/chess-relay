@@ -22,8 +22,8 @@ ported as part of initialization.
   they are exclusive to it; shared assets belong in this common directory.
 - `docs/architecture/` records decisions that affect structure or long-term
   maintenance.
-- `ref/` is source material only. It must not be referenced by `res://` runtime
-  paths.
+- The repository-level `ref/` directory is source material only. It must not be
+  referenced by `res://` runtime paths.
 
 ## Conventions
 
@@ -42,8 +42,8 @@ ported as part of initialization.
 
 ## Local reference material
 
-The `ref/` directory contains a checkout of the Godot documentation and demo
-projects. The project setup follows the official guidance on [project
+The repository-level `ref/` directory contains a checkout of the Godot
+documentation and demo projects. The project setup follows the official guidance on [project
 organization](https://docs.godotengine.org/en/stable/tutorials/best_practices/project_organization.html),
 [version control](https://docs.godotengine.org/en/stable/tutorials/best_practices/version_control_systems.html),
 [scene organization](https://docs.godotengine.org/en/stable/tutorials/best_practices/scene_organization.html),

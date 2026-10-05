@@ -10,6 +10,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_home")
+accessibility_name = "Chess Relay home"
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -48,16 +49,19 @@ vertical_alignment = 1
 custom_minimum_size = Vector2(460, 56)
 layout_mode = 2
 text = "Vs computer"
+accessibility_name = "Start a game against the computer"
 
 [node name="P2PButton" type="Button" parent="Center/Content"]
 custom_minimum_size = Vector2(460, 56)
 layout_mode = 2
 text = "P2P game"
+accessibility_name = "Play with another person"
 
 [node name="SettingsButton" type="Button" parent="Center/Content"]
 custom_minimum_size = Vector2(460, 56)
 layout_mode = 2
 text = "Settings"
+accessibility_name = "Open settings"
 
 [node name="SettingsNotice" type="Label" parent="Center/Content"]
 custom_minimum_size = Vector2(460, 40)

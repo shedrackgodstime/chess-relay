@@ -38,6 +38,7 @@ func _build_options() -> void:
 	for index in range(choices.size()):
 		var option_button := Button.new()
 		option_button.text = choices[index]
+		option_button.accessibility_name = choices[index]
 		option_button.custom_minimum_size = Vector2(0, 46)
 		option_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		option_button.toggle_mode = true

@@ -1,0 +1,232 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.gd" id="1_hub"]
+[ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="2_header"]
+
+[node name="MultiplayerHubScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_hub")
+accessibility_name = "Play with people"
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.05, 0.04, 0.03, 1)
+
+[node name="GameHeader" parent="." instance=ExtResource("2_header")]
+layout_mode = 1
+show_network_indicator = false
+show_voice_control = false
+show_menu_button = false
+center_text = "Play with People"
+
+[node name="BackButton" type="Button" parent="."]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(112, 44)
+layout_mode = 0
+offset_left = 24.0
+offset_top = 18.0
+offset_right = 136.0
+offset_bottom = 62.0
+text = "‹   Back"
+theme_type_variation = &"QuietButton"
+accessibility_name = "Back to home"
+
+[node name="Workspace" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = 98.0
+offset_right = -18.0
+offset_bottom = -22.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_type_variation = &"SetupWorkspace"
+
+[node name="Margins" type="MarginContainer" parent="Workspace"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 22
+
+[node name="Content" type="VBoxContainer" parent="Workspace/Margins"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 18
+
+[node name="ProfileCard" type="PanelContainer" parent="Workspace/Margins/Content"]
+custom_minimum_size = Vector2(0, 84)
+layout_mode = 2
+theme_type_variation = &"Card"
+
+[node name="ProfileRow" type="HBoxContainer" parent="Workspace/Margins/Content/ProfileCard"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="ProfileIdentity" type="VBoxContainer" parent="Workspace/Margins/Content/ProfileCard/ProfileRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ProfileName" type="Label" parent="Workspace/Margins/Content/ProfileCard/ProfileRow/ProfileIdentity"]
+layout_mode = 2
+theme_type_variation = &"SetupParticipantName"
+text = "Guest player"
+
+[node name="ProfileStatus" type="Label" parent="Workspace/Margins/Content/ProfileCard/ProfileRow/ProfileIdentity"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = "Discoverable nearby"
+
+[node name="DiscoverySettingsButton" type="Button" parent="Workspace/Margins/Content/ProfileCard/ProfileRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Discovery settings"
+theme_type_variation = &"QuietButton"
+accessibility_name = "Open discovery settings"
+
+[node name="InviteSection" type="VBoxContainer" parent="Workspace/Margins/Content"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="InviteTitle" type="Label" parent="Workspace/Margins/Content/InviteSection"]
+layout_mode = 2
+theme_type_variation = &"SetupSectionTitle"
+text = "Invite"
+
+[node name="InviteGrid" type="GridContainer" parent="Workspace/Margins/Content/InviteSection"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 18
+theme_override_constants/v_separation = 18
+columns = 2
+
+[node name="CreateCard" type="PanelContainer" parent="Workspace/Margins/Content/InviteSection/InviteGrid"]
+custom_minimum_size = Vector2(0, 144)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Card"
+
+[node name="CreateContent" type="VBoxContainer" parent="Workspace/Margins/Content/InviteSection/InviteGrid/CreateCard"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CreateTitle" type="Label" parent="Workspace/Margins/Content/InviteSection/InviteGrid/CreateCard/CreateContent"]
+layout_mode = 2
+theme_type_variation = &"SetupParticipantName"
+text = "Create an invite"
+
+[node name="CreateDescription" type="Label" parent="Workspace/Margins/Content/InviteSection/InviteGrid/CreateCard/CreateContent"]
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = "Generate a code to share."
+
+[node name="CreateInviteButton" type="Button" parent="Workspace/Margins/Content/InviteSection/InviteGrid/CreateCard/CreateContent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Create invite"
+theme_type_variation = &"SetupPrimaryButton"
+accessibility_name = "Create a multiplayer invite"
+
+[node name="JoinCard" type="PanelContainer" parent="Workspace/Margins/Content/InviteSection/InviteGrid"]
+custom_minimum_size = Vector2(0, 144)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Card"
+
+[node name="JoinContent" type="VBoxContainer" parent="Workspace/Margins/Content/InviteSection/InviteGrid/JoinCard"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="JoinTitle" type="Label" parent="Workspace/Margins/Content/InviteSection/InviteGrid/JoinCard/JoinContent"]
+layout_mode = 2
+theme_type_variation = &"SetupParticipantName"
+text = "Join with a code"
+
+[node name="JoinDescription" type="Label" parent="Workspace/Margins/Content/InviteSection/InviteGrid/JoinCard/JoinContent"]
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = "Enter the invite code you received."
+
+[node name="JoinGameButton" type="Button" parent="Workspace/Margins/Content/InviteSection/InviteGrid/JoinCard/JoinContent"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "Join game"
+theme_type_variation = &"SetupPrimaryButton"
+accessibility_name = "Join a multiplayer game with a code"
+
+[node name="InviteFlowCard" type="PanelContainer" parent="Workspace/Margins/Content/InviteSection"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"Card"
+
+[node name="InviteFlowContent" type="VBoxContainer" parent="Workspace/Margins/Content/InviteSection/InviteFlowCard"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PlayersSection" type="VBoxContainer" parent="Workspace/Margins/Content"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="PlayersHeading" type="HBoxContainer" parent="Workspace/Margins/Content/PlayersSection"]
+layout_mode = 2
+
+[node name="PlayersTitle" type="Label" parent="Workspace/Margins/Content/PlayersSection/PlayersHeading"]
+layout_mode = 2
+theme_type_variation = &"SetupParticipantName"
+text = "Players"
+
+[node name="HeadingSpacer" type="Control" parent="Workspace/Margins/Content/PlayersSection/PlayersHeading"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PresenceLegend" type="Label" parent="Workspace/Margins/Content/PlayersSection/PlayersHeading"]
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = "Nearby  ·  Online"
+
+[node name="PlayersDescription" type="Label" parent="Workspace/Margins/Content/PlayersSection"]
+layout_mode = 2
+theme_type_variation = &"QuietLabel"
+text = "Nearby and online players appear here automatically. Recent players appear in this list when they’re online."
+autowrap_mode = 2
+
+[node name="PlayerList" type="ScrollContainer" parent="Workspace/Margins/Content/PlayersSection"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ListInset" type="MarginContainer" parent="Workspace/Margins/Content/PlayersSection/PlayerList"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_bottom = 10
+
+[node name="PlayerRows" type="VBoxContainer" parent="Workspace/Margins/Content/PlayersSection/PlayerList/ListInset"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4

@@ -10,6 +10,10 @@ func _on_play_computer_pressed() -> void:
 	play_computer_requested.emit()
 
 
+func _ready() -> void:
+	$Center/Content/PlayComputerButton.grab_focus.call_deferred()
+
+
 func _on_p2p_pressed() -> void:
 	p2p_requested.emit()
 

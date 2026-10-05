@@ -1,7 +1,11 @@
 class_name GameSetupScreen
 extends Control
 
+const DIALOG_ACTION_SIZE := Vector2(144.0, 48.0)
+
 signal play_requested
+signal settings_requested
+signal leave_requested(is_peer_setup: bool)
 
 @onready var _players_grid: GridContainer = %Players
 @onready var _settings_grid: GridContainer = %Settings
@@ -17,12 +21,14 @@ signal play_requested
 @onready var _settings_summary: Label = %SettingsSummary
 @onready var _ready_label: Label = %ReadyLabel
 @onready var _play_button: Button = %PlayButton
+@onready var _header: GameHeader = $GameHeader
 
 var _peer_setup := false
 var _peer_name := "Opponent"
 var _peer_kind := "peer"
 var _local_ready := false
 var _opponent_is_ready := false
+var _header_menu_layer: Control
 
 
 func _ready() -> void:
@@ -33,6 +39,8 @@ func _ready() -> void:
 	_custom_minutes.value_changed.connect(_on_custom_time_changed)
 	_custom_increment.value_changed.connect(_on_custom_time_changed)
 	_play_button.pressed.connect(_on_play_pressed)
+	_header.menu_requested.connect(_toggle_header_menu)
+	_update_header_visibility()
 	_update_screen_columns()
 	call_deferred("_update_screen_columns")
 	_update_side_cards()
@@ -48,6 +56,7 @@ func configure_peer(opponent_name: String, setup_kind: String) -> void:
 	_peer_name = opponent_name
 	_peer_kind = setup_kind
 	if is_node_ready():
+		_update_header_visibility()
 		_apply_peer_setup()
 
 
@@ -61,6 +70,10 @@ func _apply_peer_setup() -> void:
 		detail = "Connected via invite code"
 	_opponent_card.configure(_peer_name, "PLAYER", detail)
 	_update_summary()
+
+
+func _update_header_visibility() -> void:
+	_header.set_visibility(_peer_setup, _peer_setup, true, true)
 
 
 func _notification(what: int) -> void:
@@ -117,6 +130,110 @@ func opponent_ready() -> void:
 		_ready_label.text = "Both players ready · UI preview complete"
 	else:
 		_ready_label.text = "Opponent is ready · choose settings and mark yourself ready"
+
+
+func _toggle_header_menu() -> void:
+	if _header_menu_layer != null:
+		_close_header_menu()
+		return
+	_open_header_menu()
+
+
+func _open_header_menu() -> void:
+	_header_menu_layer = Control.new()
+	_header_menu_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_header_menu_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_header_menu_layer)
+
+	var backdrop := ColorRect.new()
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.color = Color(0.05, 0.04, 0.03, 0.72)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	backdrop.gui_input.connect(_on_header_menu_backdrop_input)
+	_header_menu_layer.add_child(backdrop)
+
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_header_menu_layer.add_child(center)
+
+	var menu_card := PanelContainer.new()
+	menu_card.custom_minimum_size = Vector2(300.0, 0.0)
+	menu_card.theme_type_variation = &"Card"
+	menu_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(menu_card)
+	var actions := VBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	menu_card.add_child(actions)
+	actions.add_child(_header_menu_item("Settings", _on_header_settings_pressed))
+	var leave_label := "Leave game" if _peer_setup else "Return to Home"
+	actions.add_child(_header_menu_item(leave_label, _on_leave_setup_pressed))
+
+
+func _header_menu_item(label: String, action: Callable) -> Button:
+	var button := Button.new()
+	button.text = label
+	button.accessibility_name = label
+	button.custom_minimum_size.y = 48.0
+	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	button.theme_type_variation = &"QuietButton"
+	button.pressed.connect(action)
+	return button
+
+
+func _on_header_menu_backdrop_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		_close_header_menu()
+		get_viewport().set_input_as_handled()
+	elif event is InputEventScreenTouch and event.pressed:
+		_close_header_menu()
+		get_viewport().set_input_as_handled()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE \
+		and _header_menu_layer != null:
+		_close_header_menu()
+		get_viewport().set_input_as_handled()
+
+
+func _close_header_menu() -> void:
+	if _header_menu_layer == null:
+		return
+	_header_menu_layer.queue_free()
+	_header_menu_layer = null
+
+
+func _on_header_settings_pressed() -> void:
+	_close_header_menu()
+	settings_requested.emit()
+
+
+func _on_leave_setup_pressed() -> void:
+	_close_header_menu()
+	if not _peer_setup:
+		leave_requested.emit(false)
+		return
+	var confirmation := ConfirmationDialog.new()
+	confirmation.title = "Leave game?"
+	confirmation.dialog_text = "You’ll disconnect from %s and return to Multiplayer." % _peer_name
+	confirmation.ok_button_text = "Leave game"
+	confirmation.cancel_button_text = "Stay"
+	var leave_button := confirmation.get_ok_button()
+	leave_button.accessibility_name = "Leave the game"
+	leave_button.custom_minimum_size = DIALOG_ACTION_SIZE
+	leave_button.theme_type_variation = &"SetupPrimaryButton"
+	var stay_button := confirmation.get_cancel_button()
+	stay_button.accessibility_name = "Stay in the game"
+	stay_button.custom_minimum_size = DIALOG_ACTION_SIZE
+	stay_button.theme_type_variation = &"QuietButton"
+	confirmation.confirmed.connect(func():
+		leave_requested.emit(true)
+		confirmation.queue_free()
+	)
+	confirmation.canceled.connect(confirmation.queue_free)
+	add_child(confirmation)
+	confirmation.popup_centered(Vector2i(420, 180))
 
 
 func _update_side_cards() -> void:

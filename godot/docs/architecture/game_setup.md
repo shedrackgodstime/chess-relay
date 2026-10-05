@@ -5,6 +5,17 @@ update the participant side labels, custom clock fields, and configuration
 summary, while Play emits `play_requested`. It does not start a match or own
 chess/network state.
 
+## Header menu
+
+The shared header emits `menu_requested`; the screen supplies the available
+actions. On Game Setup, the button opens a centered action card over a dimmed,
+input-blocking backdrop. Tapping outside or pressing Escape closes it. The
+menu offers Settings and a contextual exit: Return to Home for VS Computer,
+Leave game for P2P. Leaving P2P asks for confirmation before returning to
+Multiplayer. The same header is used for both setup modes. The eventual in-game
+menu can use the same centered presentation with game-specific actions, without
+putting those actions into the reusable header itself.
+
 ## Screen structure
 
 1. The participant row summarizes the local player and computer opponent.

@@ -57,6 +57,18 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
+[sub_resource type="StyleBoxFlat" id="button_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.88, 0.62, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
 [sub_resource type="StyleBoxFlat" id="surface_panel"]
 bg_color = Color(0.11, 0.09, 0.08, 1)
 border_width_left = 2
@@ -224,6 +236,38 @@ corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
+[sub_resource type="StyleBoxFlat" id="setup_dark_side_badge"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.11, 0.09, 0.08, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.42, 0.36, 0.29, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="setup_neutral_side_badge"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(0.26, 0.2, 0.15, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.42, 0.36, 0.29, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
 [sub_resource type="StyleBoxFlat" id="setup_status_bar"]
 content_margin_left = 18.0
 content_margin_top = 12.0
@@ -255,6 +299,7 @@ Button/font_sizes/font_size = 22
 Button/styles/normal = SubResource("button_normal")
 Button/styles/hover = SubResource("button_hover")
 Button/styles/pressed = SubResource("button_pressed")
+Button/styles/focus = SubResource("button_focus")
 Label/colors/font_color = Color(1, 0.9, 0.72, 1)
 PanelContainer/styles/panel = SubResource("surface_panel")
 
@@ -263,6 +308,10 @@ Card/styles/panel = SubResource("card_panel")
 
 PlayerListRow/base_type = &"PanelContainer"
 PlayerListRow/styles/panel = SubResource("player_list_row")
+
+PlayerRowAvatar/base_type = &"Label"
+PlayerRowAvatar/colors/font_color = Color(1, 0.9, 0.72, 1)
+PlayerRowAvatar/font_sizes/font_size = 18
 
 QuietButton/base_type = &"Button"
 QuietButton/colors/font_color = Color(0.72, 0.66, 0.58, 1)
@@ -368,11 +417,12 @@ SetupSideBadge/styles/normal = SubResource("setup_side_badge")
 SetupDarkSideBadge/base_type = &"Label"
 SetupDarkSideBadge/colors/font_color = Color(1, 0.9, 0.72, 1)
 SetupDarkSideBadge/font_sizes/font_size = 13
-SetupDarkSideBadge/styles/normal = SubResource("button_normal")
+SetupDarkSideBadge/styles/normal = SubResource("setup_dark_side_badge")
 
 SetupNeutralSideBadge/base_type = &"Label"
 SetupNeutralSideBadge/colors/font_color = Color(1, 0.9, 0.72, 1)
 SetupNeutralSideBadge/font_sizes/font_size = 13
+SetupNeutralSideBadge/styles/normal = SubResource("setup_neutral_side_badge")
 
 SetupStatusBar/base_type = &"PanelContainer"
 SetupStatusBar/styles/panel = SubResource("setup_status_bar")

@@ -14,6 +14,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_setup")
+accessibility_name = "Game setup"
 
 [node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
@@ -27,7 +28,8 @@ color = Color(0.05, 0.04, 0.03, 1)
 
 [node name="GameHeader" parent="." instance=ExtResource("2_header")]
 layout_mode = 1
-show_voice_control = true
+show_network_indicator = false
+show_voice_control = false
 center_text = "Game Setup"
 
 [node name="Workspace" type="PanelContainer" parent="."]
@@ -135,7 +137,7 @@ text = "Minutes"
 
 [node name="CustomMinutes" type="SpinBox" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content/CustomTimeControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(86, 40)
+custom_minimum_size = Vector2(86, 46)
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 1.0
@@ -149,7 +151,7 @@ text = "Inc."
 
 [node name="CustomIncrement" type="SpinBox" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content/CustomTimeControls"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(82, 40)
+custom_minimum_size = Vector2(86, 46)
 layout_mode = 2
 size_flags_horizontal = 3
 min_value = 0.0
@@ -252,3 +254,4 @@ layout_mode = 2
 tooltip_text = "Start this game"
 theme_type_variation = &"SetupPrimaryButton"
 text = "Play   →"
+accessibility_name = "Start this game"
