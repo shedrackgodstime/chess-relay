@@ -85,6 +85,22 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
+[sub_resource type="StyleBoxFlat" id="player_list_row"]
+content_margin_left = 12.0
+content_margin_top = 6.0
+content_margin_right = 12.0
+content_margin_bottom = 6.0
+bg_color = Color(0.11, 0.09, 0.08, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.24, 0.18, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
 [sub_resource type="StyleBoxFlat" id="header_menu_normal"]
 bg_color = Color(0.09, 0.08, 0.07, 0.72)
 border_width_left = 1
@@ -244,6 +260,9 @@ PanelContainer/styles/panel = SubResource("surface_panel")
 
 Card/base_type = &"PanelContainer"
 Card/styles/panel = SubResource("card_panel")
+
+PlayerListRow/base_type = &"PanelContainer"
+PlayerListRow/styles/panel = SubResource("player_list_row")
 
 QuietButton/base_type = &"Button"
 QuietButton/colors/font_color = Color(0.72, 0.66, 0.58, 1)
