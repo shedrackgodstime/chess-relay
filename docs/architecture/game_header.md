@@ -26,6 +26,26 @@ connection meter is a passive `Control`, while menu and microphone controls
 are buttons. Hiding voice resets its presentation to `OFF` and clears the
 remote-speaker marker.
 
+## Menu button sizing
+
+Godot does not prescribe a universal button size; `Button` exposes minimum
+size and theme properties for the project to set. The header's microphone and
+menu controls use 48-by-48 logical-unit targets with smaller 32-by-32 icon
+areas. This reduces visual weight while preserving a comfortably large target
+for touch. Apple recommends a 44-by-44-point minimum hit region for buttons,
+and Android recommends 48-by-48-dp touch targets. Those platform units are not
+interchangeable with Godot logical units, so treat them as accessibility
+guidance, then check the actual UI at target window sizes and display scales.
+
+The microphone, title, connection indicator, and menu share one vertical
+centerline. The microphone sits at the left inset; the connection indicator
+and menu form a compact group on the right. The title remains centered on wide
+windows and contracts into the available center space on narrow windows.
+
+References: [Godot `Button`](https://docs.godotengine.org/en/latest/classes/class_button.html),
+[Apple button guidance](https://developer.apple.com/design/human-interface-guidelines/buttons),
+[Android touch targets](https://developer.android.com/design/ui/mobile/guides/foundations/accessibility).
+
 ## Visual source
 
 The small menu and microphone SVGs are copied from the prototype's UI icon
