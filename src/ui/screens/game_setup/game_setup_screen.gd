@@ -15,11 +15,14 @@ signal play_requested
 @onready var _player_card: ParticipantCard = %PlayerCard
 @onready var _opponent_card: ParticipantCard = %OpponentCard
 @onready var _settings_summary: Label = %SettingsSummary
+@onready var _ready_label: Label = %ReadyLabel
 @onready var _play_button: Button = %PlayButton
 
 var _peer_setup := false
 var _peer_name := "Opponent"
 var _peer_kind := "peer"
+var _local_ready := false
+var _opponent_is_ready := false
 
 
 func _ready() -> void:
@@ -50,6 +53,9 @@ func configure_peer(opponent_name: String, setup_kind: String) -> void:
 
 func _apply_peer_setup() -> void:
 	_difficulty_choice.hide()
+	_play_button.text = "Ready   ✓"
+	_play_button.tooltip_text = "Mark yourself ready for this match"
+	_ready_label.text = "Choose your settings, then mark yourself ready"
 	var detail := "Connected player"
 	if _peer_kind == "create" or _peer_kind == "join":
 		detail = "Connected via invite code"
@@ -92,7 +98,25 @@ func _on_custom_time_changed(_value: float) -> void:
 
 
 func _on_play_pressed() -> void:
+	if _peer_setup:
+		_local_ready = true
+		_play_button.disabled = true
+		_ready_label.text = (
+			"Both players ready · UI preview complete"
+			if _opponent_is_ready else "You’re ready · waiting for opponent"
+		)
 	play_requested.emit()
+
+
+## Mock or backend response for the other player's ready state.
+func opponent_ready() -> void:
+	if not _peer_setup:
+		return
+	_opponent_is_ready = true
+	if _local_ready:
+		_ready_label.text = "Both players ready · UI preview complete"
+	else:
+		_ready_label.text = "Opponent is ready · choose settings and mark yourself ready"
 
 
 func _update_side_cards() -> void:

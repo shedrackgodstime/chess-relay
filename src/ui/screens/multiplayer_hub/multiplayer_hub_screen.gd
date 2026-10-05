@@ -6,6 +6,8 @@ signal create_requested(code: String)
 signal create_cancelled
 signal join_requested(code: String)
 signal join_cancelled(code: String)
+signal player_invite_requested(player_name: String)
+signal player_invite_cancelled
 signal game_setup_requested(opponent_name: String, setup_kind: String)
 
 const HEADER_SCENE: PackedScene = preload("res://src/ui/components/game_header/game_header.tscn")
@@ -34,6 +36,7 @@ var _create_waiting := false
 var _join_is_connecting := false
 var _player_invite_buttons: Array[Button] = []
 var _active_invite_flow := ""
+var _current_player_invite := ""
 
 
 func _ready() -> void:
@@ -227,7 +230,52 @@ func _build_mock_player_row(player_name: String, presence: String, is_recent: bo
 
 
 func _show_mock_invite(player_name: String) -> void:
+	_active_invite_flow = "player-invite"
+	_current_player_invite = player_name
+	_invite_grid.hide()
+	_invite_flow_card.show()
+	_set_player_invites_enabled(false)
+	_clear_invite_flow()
+	_invite_flow_content.add_child(_label("Invite %s" % player_name, "SetupParticipantName"))
+	_invite_flow_content.add_child(_label("Invitation sent · waiting for response...", "SetupStatusText"))
+	_invite_flow_content.add_child(_flow_cancel_button(_cancel_player_invite))
+	player_invite_requested.emit(player_name)
+
+
+## Mock or backend response: the invited player accepted.
+func player_invite_accepted(player_name: String) -> void:
+	if _active_invite_flow != "player-invite":
+		return
 	game_setup_requested.emit(player_name, "player")
+
+
+## Mock or backend response: keep the flow inline and let the user retry or leave.
+func player_invite_declined(player_name: String) -> void:
+	if _active_invite_flow != "player-invite":
+		return
+	_clear_invite_flow()
+	_invite_flow_content.add_child(_label("Invite %s" % player_name, "SetupParticipantName"))
+	_invite_flow_content.add_child(_label("Invitation declined.", "SetupStatusText"))
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	_invite_flow_content.add_child(actions)
+	actions.add_child(_action_button("Invite again", _retry_player_invite))
+	var done := Button.new()
+	done.text = "Done"
+	done.theme_type_variation = &"QuietButton"
+	done.custom_minimum_size = Vector2(120, 42)
+	done.pressed.connect(_cancel_player_invite)
+	actions.add_child(done)
+
+
+func _retry_player_invite() -> void:
+	_show_mock_invite(_current_player_invite)
+
+
+func _cancel_player_invite() -> void:
+	_reset_invite_flow()
+	player_invite_cancelled.emit()
 
 
 func _show_discovery_settings() -> void:
@@ -419,6 +467,7 @@ func _reset_invite_flow() -> void:
 	_active_invite_flow = ""
 	_create_waiting = false
 	_join_is_connecting = false
+	_current_player_invite = ""
 	_invite_flow_card.hide()
 	_invite_grid.show()
 	_clear_invite_flow()
