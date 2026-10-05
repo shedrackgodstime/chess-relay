@@ -17,6 +17,10 @@ signal play_requested
 @onready var _settings_summary: Label = %SettingsSummary
 @onready var _play_button: Button = %PlayButton
 
+var _peer_setup := false
+var _peer_name := "Opponent"
+var _peer_kind := "peer"
+
 
 func _ready() -> void:
 	_side_choice.selection_changed.connect(_on_side_changed)
@@ -30,6 +34,26 @@ func _ready() -> void:
 	call_deferred("_update_screen_columns")
 	_update_side_cards()
 	_update_custom_time_visibility()
+	_update_summary()
+	if _peer_setup:
+		_apply_peer_setup()
+
+
+## Configures this shared screen after a peer has joined or accepted an invite.
+func configure_peer(opponent_name: String, setup_kind: String) -> void:
+	_peer_setup = true
+	_peer_name = opponent_name
+	_peer_kind = setup_kind
+	if is_node_ready():
+		_apply_peer_setup()
+
+
+func _apply_peer_setup() -> void:
+	_difficulty_choice.hide()
+	var detail := "Connected player"
+	if _peer_kind == "create" or _peer_kind == "join":
+		detail = "Connected via invite code"
+	_opponent_card.configure(_peer_name, "PLAYER", detail)
 	_update_summary()
 
 
@@ -91,6 +115,9 @@ func _update_custom_time_visibility() -> void:
 func _update_summary() -> void:
 	var time_summary := _format_time_summary()
 	var variant := _variant_choice.get_selected_choice()
+	if _peer_setup:
+		_settings_summary.text = "%s  ·  %s" % [time_summary, variant]
+		return
 	var difficulty := _difficulty_choice.get_selected_choice()
 	_settings_summary.text = "%s  ·  %s  ·  %s" % [time_summary, variant, difficulty]
 

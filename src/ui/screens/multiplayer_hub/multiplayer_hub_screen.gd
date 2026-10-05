@@ -2,18 +2,38 @@ class_name MultiplayerHubScreen
 extends Control
 
 signal back_requested
+signal create_requested(code: String)
+signal create_cancelled
+signal join_requested(code: String)
+signal join_cancelled(code: String)
+signal game_setup_requested(opponent_name: String, setup_kind: String)
 
 const HEADER_SCENE: PackedScene = preload("res://src/ui/components/game_header/game_header.tscn")
 
 const BG := Color(0.05, 0.04, 0.03, 1.0)
 const TEXT := Color(1.0, 0.9, 0.72, 1.0)
-const MUTED := Color(0.72, 0.66, 0.58, 1.0)
+const CODE_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+const CODE_LENGTH := 6
 
 var _content: VBoxContainer
 var _invite_grid: GridContainer
-var _join_code: LineEdit
-var _join_feedback: Label
+var _invite_flow_card: PanelContainer
+var _invite_flow_content: VBoxContainer
 var _player_list: ScrollContainer
+var _create_code_label: Label
+var _create_status: Label
+var _copy_button: Button
+var _join_field: LineEdit
+var _join_echo: Label
+var _join_status: Label
+var _join_button: Button
+var _join_retry_button: Button
+var _join_cancel_button: Button
+var _current_join_code := ""
+var _create_waiting := false
+var _join_is_connecting := false
+var _player_invite_buttons: Array[Button] = []
+var _active_invite_flow := ""
 
 
 func _ready() -> void:
@@ -68,14 +88,23 @@ func _build_screen() -> void:
 	margins.add_child(_content)
 
 	_content.add_child(_build_profile_card())
-	_content.add_child(_label("Invite", "SetupSectionTitle"))
+	var invite_section := VBoxContainer.new()
+	invite_section.add_theme_constant_override("separation", 10)
+	_content.add_child(invite_section)
+	invite_section.add_child(_label("Invite", "SetupSectionTitle"))
 	_invite_grid = GridContainer.new()
 	_invite_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_invite_grid.add_theme_constant_override("h_separation", 18)
 	_invite_grid.add_theme_constant_override("v_separation", 18)
-	_content.add_child(_invite_grid)
+	invite_section.add_child(_invite_grid)
 	_invite_grid.add_child(_build_create_card())
 	_invite_grid.add_child(_build_join_card())
+	_invite_flow_card = _card()
+	_invite_flow_card.visible = false
+	invite_section.add_child(_invite_flow_card)
+	_invite_flow_content = VBoxContainer.new()
+	_invite_flow_content.add_theme_constant_override("separation", 8)
+	_invite_flow_card.add_child(_invite_flow_content)
 
 	_content.add_child(_build_players_section())
 
@@ -101,39 +130,25 @@ func _build_profile_card() -> PanelContainer:
 
 func _build_create_card() -> PanelContainer:
 	var card := _card()
-	card.custom_minimum_size.y = 184
+	card.custom_minimum_size.y = 144
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 8)
 	card.add_child(column)
 	column.add_child(_label("Create an invite", "SetupParticipantName"))
-	column.add_child(_label("Make a code to share with someone.", "QuietLabel"))
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	column.add_child(spacer)
+	column.add_child(_label("Generate a code to share.", "QuietLabel"))
 	column.add_child(_action_button("Create invite", _on_create_invite))
 	return card
 
 
 func _build_join_card() -> PanelContainer:
 	var card := _card()
-	card.custom_minimum_size.y = 184
+	card.custom_minimum_size.y = 144
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 8)
 	card.add_child(column)
 	column.add_child(_label("Join with a code", "SetupParticipantName"))
-	column.add_child(_label("Enter a code someone shared with you.", "QuietLabel"))
-	_join_code = LineEdit.new()
-	_join_code.placeholder_text = "Invite code"
-	_join_code.custom_minimum_size.y = 46
-	_join_code.max_length = 20
-	column.add_child(_join_code)
-	var action_row := HBoxContainer.new()
-	action_row.add_theme_constant_override("separation", 10)
-	_join_feedback = _label("", "QuietLabel")
-	_join_feedback.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	action_row.add_child(_join_feedback)
-	action_row.add_child(_action_button("Join", _on_join_preview))
-	column.add_child(action_row)
+	column.add_child(_label("Enter the invite code you received.", "QuietLabel"))
+	column.add_child(_action_button("Join game", _begin_join_flow))
 	return card
 
 
@@ -207,17 +222,12 @@ func _build_mock_player_row(player_name: String, presence: String, is_recent: bo
 	invite.theme_type_variation = &"SetupOptionButton"
 	invite.pressed.connect(_show_mock_invite.bind(player_name))
 	layout.add_child(invite)
+	_player_invite_buttons.append(invite)
 	return row
 
 
 func _show_mock_invite(player_name: String) -> void:
-	var dialog := AcceptDialog.new()
-	dialog.title = "Invite preview"
-	dialog.dialog_text = "Invite %s to play.\n\nUI preview only." % player_name
-	add_child(dialog)
-	dialog.popup_centered(Vector2i(380, 180))
-	dialog.confirmed.connect(dialog.queue_free)
-	dialog.canceled.connect(dialog.queue_free)
+	game_setup_requested.emit(player_name, "player")
 
 
 func _show_discovery_settings() -> void:
@@ -241,20 +251,236 @@ func _show_discovery_settings() -> void:
 
 
 func _on_create_invite() -> void:
-	var dialog := AcceptDialog.new()
-	dialog.title = "Invite preview"
-	dialog.dialog_text = "RELAY-482\n\nUI preview only — no invite is active."
-	add_child(dialog)
-	dialog.popup_centered(Vector2i(420, 190))
-	dialog.confirmed.connect(dialog.queue_free)
-	dialog.canceled.connect(dialog.queue_free)
+	_active_invite_flow = "create"
+	_create_waiting = true
+	_invite_grid.hide()
+	_invite_flow_card.show()
+	_set_player_invites_enabled(false)
+	_clear_invite_flow()
+	_invite_flow_content.add_child(_label("YOUR GAME CODE", "Caption"))
+	_create_code_label = _label(_generate_invite_code(), "CodeDisplay")
+	_create_code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_invite_flow_content.add_child(_create_code_label)
+	var copy_row := HBoxContainer.new()
+	copy_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_invite_flow_content.add_child(copy_row)
+	_copy_button = _action_button("Copy code", _on_copy_code)
+	_copy_button.custom_minimum_size = Vector2(170, 42)
+	copy_row.add_child(_copy_button)
+	_create_status = _label("Waiting for opponent...", "SetupStatusText")
+	_create_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_invite_flow_content.add_child(_create_status)
+	_invite_flow_content.add_child(_flow_cancel_button(_cancel_create_wait))
+	create_requested.emit(_create_code_label.text)
 
 
-func _on_join_preview() -> void:
-	if _join_code.text.strip_edges().is_empty():
-		_join_feedback.text = "Enter an invite code."
+## Backend calls this when the room reports that an opponent has joined.
+func opponent_connected(opponent_name: String = "Opponent") -> void:
+	if not _create_waiting or _active_invite_flow != "create":
 		return
-	_join_feedback.text = "UI preview only — joining isn’t active."
+	_create_status.text = "Opponent connected."
+	_copy_button.hide()
+	_create_waiting = false
+	game_setup_requested.emit(opponent_name, "create")
+
+
+## Backend calls this if the opponent leaves before setup begins.
+func opponent_left() -> void:
+	if not _create_waiting or _active_invite_flow != "create":
+		return
+	_create_status.text = "Waiting for opponent..."
+	_copy_button.show()
+
+
+func _on_copy_code() -> void:
+	DisplayServer.clipboard_set(_create_code_label.text)
+	_copy_button.text = "Copied"
+	_create_status.text = "Waiting for opponent..."
+	get_tree().create_timer(1.6).timeout.connect(func():
+		if is_instance_valid(_copy_button):
+			_copy_button.text = "Copy code"
+	)
+
+
+func _cancel_create_wait() -> void:
+	_reset_invite_flow()
+	create_cancelled.emit()
+
+
+func _begin_join_flow() -> void:
+	_active_invite_flow = "join-entry"
+	_current_join_code = ""
+	_join_is_connecting = false
+	_invite_grid.hide()
+	_invite_flow_card.show()
+	_set_player_invites_enabled(false)
+	_clear_invite_flow()
+	_invite_flow_content.add_child(_label("Join with a code", "SetupParticipantName"))
+	_invite_flow_content.add_child(_label("Enter the code someone shared with you.", "QuietLabel"))
+	_join_field = LineEdit.new()
+	_join_field.placeholder_text = "ABC-123"
+	_join_field.max_length = 9
+	_join_field.custom_minimum_size.y = 48
+	_join_field.text_changed.connect(_on_join_code_changed)
+	_invite_flow_content.add_child(_join_field)
+	_join_echo = _label("", "Caption")
+	_join_echo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_join_echo.hide()
+	_invite_flow_content.add_child(_join_echo)
+	_join_status = _label("", "SetupStatusText")
+	_join_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_join_status.hide()
+	_invite_flow_content.add_child(_join_status)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 12)
+	_invite_flow_content.add_child(actions)
+	_join_button = _action_button("Join game", _on_join_pressed)
+	_join_button.disabled = true
+	_join_button.custom_minimum_size = Vector2(150, 42)
+	actions.add_child(_join_button)
+	_join_retry_button = _action_button("Retry", _retry_join)
+	_join_retry_button.custom_minimum_size = Vector2(120, 42)
+	_join_retry_button.hide()
+	actions.add_child(_join_retry_button)
+	_join_cancel_button = Button.new()
+	_join_cancel_button.text = "Cancel"
+	_join_cancel_button.custom_minimum_size = Vector2(120, 42)
+	_join_cancel_button.theme_type_variation = &"QuietButton"
+	_join_cancel_button.pressed.connect(_cancel_join)
+	actions.add_child(_join_cancel_button)
+	_join_field.grab_focus.call_deferred()
+
+
+func _on_join_code_changed(value: String) -> void:
+	_current_join_code = _normalize_invite_code(value)
+	var readable := _format_invite_code(_current_join_code)
+	_join_echo.text = readable
+	_join_echo.visible = not readable.is_empty()
+	_join_button.disabled = not _is_valid_invite_code(_current_join_code)
+
+
+func _on_join_pressed() -> void:
+	if not _is_valid_invite_code(_current_join_code):
+		return
+	_join_field.hide()
+	_join_button.hide()
+	_join_echo.show()
+	_join_status.text = "Connecting to %s..." % _format_invite_code(_current_join_code)
+	_join_status.show()
+	_join_retry_button.hide()
+	_join_cancel_button.show()
+	_join_is_connecting = true
+	_active_invite_flow = "join-connecting"
+	join_requested.emit(_current_join_code)
+
+
+## Backend calls this when the entered code cannot be reached.
+func join_failed() -> void:
+	if not _join_is_connecting or _active_invite_flow != "join-connecting":
+		return
+	_join_is_connecting = false
+	_active_invite_flow = "join-failed"
+	_join_status.text = "Check the game code and try again."
+	_join_echo.text = "Couldn't connect."
+	_join_retry_button.show()
+	_join_cancel_button.show()
+
+
+## Backend calls this when the invite code has connected successfully.
+func join_connected(opponent_name: String = "Opponent") -> void:
+	if not _join_is_connecting or _active_invite_flow != "join-connecting":
+		return
+	_join_is_connecting = false
+	game_setup_requested.emit(opponent_name, "join")
+
+
+func _retry_join() -> void:
+	_active_invite_flow = "join-entry"
+	_join_status.hide()
+	_join_echo.text = _format_invite_code(_current_join_code)
+	_join_field.show()
+	_join_button.show()
+	_join_button.disabled = not _is_valid_invite_code(_current_join_code)
+	_join_retry_button.hide()
+	_join_cancel_button.show()
+
+
+func _cancel_join() -> void:
+	var attempted_code := _current_join_code
+	var cancel_pending_attempt := _join_is_connecting
+	_join_is_connecting = false
+	_reset_invite_flow()
+	if cancel_pending_attempt:
+		join_cancelled.emit(attempted_code)
+
+
+func _reset_invite_flow() -> void:
+	_active_invite_flow = ""
+	_create_waiting = false
+	_join_is_connecting = false
+	_invite_flow_card.hide()
+	_invite_grid.show()
+	_clear_invite_flow()
+	_set_player_invites_enabled(true)
+
+
+func _clear_invite_flow() -> void:
+	for child in _invite_flow_content.get_children():
+		_invite_flow_content.remove_child(child)
+		child.queue_free()
+
+
+func _set_player_invites_enabled(enabled: bool) -> void:
+	for button in _player_invite_buttons:
+		if is_instance_valid(button):
+			button.disabled = not enabled
+
+
+func _flow_cancel_button(action: Callable) -> Button:
+	var button := Button.new()
+	button.text = "Cancel"
+	button.custom_minimum_size = Vector2(170, 38)
+	button.theme_type_variation = &"QuietButton"
+	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	button.pressed.connect(action)
+	return button
+
+
+func _generate_invite_code() -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var result := ""
+	for index in CODE_LENGTH:
+		if index == 3:
+			result += "-"
+		result += CODE_ALPHABET[rng.randi_range(0, CODE_ALPHABET.length() - 1)]
+	return result
+
+
+func _normalize_invite_code(value: String) -> String:
+	var result := ""
+	for index in value.length():
+		var character := value[index]
+		if character == "-" or character == " " or character == "\t":
+			continue
+		result += character.to_upper()
+	return result
+
+
+func _format_invite_code(value: String) -> String:
+	if value.length() <= 3:
+		return value
+	return "%s-%s" % [value.substr(0, 3), value.substr(3)]
+
+
+func _is_valid_invite_code(value: String) -> bool:
+	if value.length() != CODE_LENGTH:
+		return false
+	for index in value.length():
+		if not CODE_ALPHABET.contains(value[index]):
+			return false
+	return true
 
 
 func _update_responsive_layout() -> void:
