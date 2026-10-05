@@ -9,6 +9,10 @@ workspace for future native/networking work.
 - [`ref/`](ref/) — local Godot documentation, official demo projects, and the
   prototype used as reference material. It is not part of either runtime.
 
+The cross-runtime boundary is documented in
+[application core architecture](docs/architecture/application_core.md).
+Godot-specific architecture remains under [`godot/docs/`](godot/docs/).
+
 Open `godot/project.godot` in Godot. The current development scope is the UI
 lifecycle; the board and game behavior will be added after that foundation is
 complete.
