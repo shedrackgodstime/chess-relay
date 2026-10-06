@@ -80,9 +80,6 @@ script = ExtResource("4_camera")
 [node name="Board" parent="World" instance=ExtResource("2_board")]
 unique_name_in_owner = true
 
-[node name="Pieces" type="Node3D" parent="World"]
-unique_name_in_owner = true
-
 [node name="HUD" type="CanvasLayer" parent="."]
 
 [node name="HUDRoot" type="Control" parent="HUD"]

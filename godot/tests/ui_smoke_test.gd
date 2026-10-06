@@ -318,44 +318,6 @@ func _check_game_screen() -> void:
 	# The piece seam exists before any piece does. It is keyed by the identities that
 	# arrive over the application boundary rather than by an enum declared here, so
 	# there is one list of piece types and this project is not it.
-	# Two candidate sets, so they can be on the board at once and compared, and both
-	# are here because proportion cannot be judged from numbers.
-	_check(PieceMeshes.SETS.size() == 2,
-		"two candidate sets to compare, got %d" % PieceMeshes.SETS.size())
-	for set_name: StringName in PieceMeshes.SETS.keys():
-		var paths: Dictionary = PieceMeshes.SETS[set_name]
-		_check(paths.size() == 6, "%s has six identities" % set_name)
-		for identity: StringName in paths.keys():
-			_check(FileAccess.file_exists(paths[identity]),
-				"%s %s is committed" % [set_name, identity])
-		_check(PieceMeshes.SET_SCALE.has(set_name),
-			"%s has its own sizing" % set_name)
-	# The mesh is a shared resource carrying only geometry. Colour and size belong to
-	# the node, which is why thirty-two pieces do not cost thirty-two copies of a mesh.
-	# Read at run time through GLTFDocument, because a .glb is only loadable once it has
-	# been imported and the import step does not run headlessly on every build. Without
-	# this the board was empty with a warning per piece.
-	_check(PieceMeshes.mesh_for(&"pawn") != null, "the pawn model is readable")
-	_check(PieceMeshes.mesh_for(&"pawn") == PieceMeshes.mesh_for(&"pawn"),
-		"and is shared rather than copied per piece")
-	# A model's own root transform is part of it. These files are authored large and
-	# scaled down by their root node, and taking only the mesh resource would make a
-	# piece fifty times too large.
-	var sample := PieceMeshes.mesh_for(&"pawn").get_aabb().size
-	_check(sample.x < 0.2 and sample.y < 0.2,
-		"and its own scale is baked in, pawn %.3f x %.3f" % [sample.x, sample.y])
-
-	# The active set is one constant, so comparing the two is flipping it.
-	_check(PieceMeshes.SET_SCALE.has(PieceMeshes.ACTIVE_SET),
-		"the active set is one with a scale, got %s" % PieceMeshes.ACTIVE_SET)
-	# A consistent set is scaled by one number; an inconsistent one cannot be, which is
-	# why saber carries a factor per piece and oga does not.
-	_check(PieceMeshes.SET_SCALE[PieceMeshes.ACTIVE_SET] is float,
-		"and the active set is scaled as one set, which only a consistent set can be")
-
-	_check(PieceMeshes.mesh_for(&"dragon") == null,
-		"an identity that is not a piece gives nothing")
-
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
 	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
@@ -368,8 +330,6 @@ func _check_game_screen() -> void:
 		"rank labels are pinned to the frame midpoint")
 	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.y, 0.029),
 		"coordinate markings sit on the frame top surface")
-	_check(game._pieces.get_child_count() == 32,
-		"game screen renders a complete demo position")
 	var key_light := game.get_node("World/KeyLight") as DirectionalLight3D
 	_check(is_equal_approx(key_light.rotation_degrees.x, -90.0),
 		"game key light is directly above the board")
@@ -383,66 +343,6 @@ func _check_game_screen() -> void:
 		"game has a left-side fill light")
 	_check(game.get_node("World/RightFillLight") is OmniLight3D,
 		"game has a right-side fill light")
-	# Every piece should have found a model. Without the import pipeline a .glb cannot
-	# be loaded here, so this cannot be asserted in this suite; what it can assert is
-	# that a piece knows which identity it is and which square it is on, and that it
-	# turned to face the other side.
-	var black_piece := game._pieces.get_child(2) as ChessPieceView
-	_check(is_equal_approx(black_piece.rotation.y, PI),
-		"black pieces face the opposing side")
-	var light_piece := game._pieces.get_child(0) as ChessPieceView
-	_check(is_equal_approx(light_piece.rotation.y, 0.0),
-		"and light pieces face the near side")
-	_check(not light_piece.square.is_empty(),
-		"a piece knows the square it stands on, got '%s'" % light_piece.square)
-	# The demo position is the real one, not a row of pawns. Checked a rank at a time
-	# because that is the thing worth knowing: a1 is a rook.
-	var back_rank := ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"]
-	for file in 8:
-		var name := "abcdefgh"[file]
-		# Four pieces per file, in the order the demo position builds them: white back
-		# rank, white pawn, black pawn, black back rank.
-		var near_rook := game._pieces.get_child(file * 4) as ChessPieceView
-		var near_pawn := game._pieces.get_child(file * 4 + 1) as ChessPieceView
-		_check(near_rook.piece_type == back_rank[file]
-				and near_rook.square == name + "1"
-				and near_rook.side == "white",
-			"%s1 is a %s for white, got %s on %s"
-				% [name, back_rank[file], near_rook.piece_type, near_rook.square])
-		_check(near_pawn.piece_type == "pawn" and near_pawn.square == name + "2",
-			"%s2 is a white pawn, got %s on %s"
-				% [name, near_pawn.piece_type, near_pawn.square])
-		var far_pawn := game._pieces.get_child(file * 4 + 2) as ChessPieceView
-		var far_rook := game._pieces.get_child(file * 4 + 3) as ChessPieceView
-		_check(far_pawn.side == "black" and far_pawn.square == name + "7",
-			"%s7 is a black pawn, got %s on %s"
-				% [name, far_pawn.piece_type, far_pawn.square])
-		_check(far_rook.piece_type == back_rank[file] and far_rook.side == "black"
-				and far_rook.square == name + "8",
-			"%s8 is a black %s, got %s on %s"
-				% [name, back_rank[file], far_rook.piece_type, far_rook.square])
-	_check(light_piece.missing_shape.is_empty()
-			or light_piece.mesh == null,
-		"a piece either has a model or says which one it is missing")
-
-	# Every piece on the board must have a real mesh, and the set must be in tournament
-	# proportion. Counting children cannot tell an empty board from a full one, which is
-	# the whole reason the board was silently empty.
-	var drawn := 0
-	var tallest := 0.0
-	for child in game._pieces.get_children():
-		var piece := child as ChessPieceView
-		if piece.mesh != null:
-			drawn += 1
-			tallest = maxf(tallest, piece.mesh.get_aabb().size.y * piece.scale.x)
-	_check(drawn == 32, "every piece has a mesh, got %d of 32" % drawn)
-	for child in game._pieces.get_children():
-		var piece := child as ChessPieceView
-		if piece.mesh == null:
-			continue
-		var ratio := (piece.mesh.get_aabb().size.y * piece.scale.x) / tallest
-		_check(ratio > 0.45 and ratio <= 1.0,
-			"%s is a sensible fraction of the king, %.2f" % [piece.piece_type, ratio])
 	game._update_camera_framing(1440.0, 900.0)
 	var wide_camera_height := game._camera.position.y
 	game._update_camera_framing(640.0, 900.0)

@@ -157,9 +157,16 @@ an optimisation pass to get right. That is a decision to make with a knight on s
 not in advance: author the knight with the generator, look at it, and if it does not
 read as a knight, import that one mesh and keep the generator for the other five.
 
-## Stage 3: the pieces — outcome
+## Stage 3: the pieces — removed
 
-**The imported models do not look good enough.** Both sets render correctly and both
+**The piece work has been taken out of the project.** Everything to do with pieces is
+gone: the models, the generator seam, the piece node and the demo position. The board
+and the camera stay, because they are not pieces.
+
+What is kept is the finding, because it is the most useful thing this stage produced and
+it is not specific to pieces.
+
+**Neither imported model set looked good enough.** Both sets render correctly and both
 are technically superior on paper, and both look worse than the reference prototype's
 hand-written pieces.
 
@@ -183,28 +190,23 @@ twice in this project and is restated because it was ignored three times:
 Both imported sets stay in the repository, switchable by `PieceMeshes.ACTIVE_SET`, so
 the comparison can be repeated on any machine rather than argued from memory.
 
-### The port that is not finished
+### The route that was going to be taken next
 
-The generator is the route: the reference prototype's `geometry/` library plus
-`PieceProfiles`, `PieceMesh` and `PieceMaterials`, which build every piece but the
-knight from one revolved profile and add geometry for the rook's merlons, the queen's
-crown and the king's cross.
+The reference prototype's generator: its `geometry/` library plus `PieceProfiles`,
+`PieceMesh` and `PieceMaterials`, which build every piece but the knight from one
+revolved profile and add geometry for the rook's merlons, the queen's crown and the
+king's cross. It is in `ref/chess-relay` and it was judged to look better than both
+imported sets, which is the whole reason this was hard to reverse.
 
-**It is a dependency chain rather than nine files.** Copied so far and known to be
-required: the six `geometry/` modules, the three piece modules, and `settings/quality.gd`,
-which `PieceMesh` calls for its segment count. Still outstanding at the point of
-handover: `TextureKit`, which `PieceMaterials` depends on, and whatever that in turn
-requires. Each module was written against the prototype's own tree rather than in
-isolation, so this is expected to be a few more rounds than it looks.
+Two things about it are worth keeping whatever happens next:
 
-Two adaptations are already decided and are the part worth getting right:
-
-- **`PieceProfiles.Type` stays inside the generator.** It must not become this
-  project's list of piece types; `PieceMeshes.GENERATED` translates an arriving
-  identity into a profile instead, and that list belongs to Rust's `chess_core`.
-- **Colour and scale stay on the node.** The generated profiles are already in board
-  units — a square is 1.0 and the king stands 1.29 including its cross — so the
-  generator path needs no scale at all.
+- **Porting it is a dependency chain and not nine files.** Six `geometry/` modules and
+  three piece modules need `settings/quality.gd` for its segment count and `TextureKit`
+  for its materials, and each was written against the prototype's own tree rather than
+  in isolation.
+- **`PieceProfiles.Type` must not become this project's list of piece types.**
+  `application_core.md` puts that in Rust's `chess_core`, so an arriving identity has to
+  be translated into a profile rather than the generator declaring what pieces exist.
 
 ## Stage 1: the board shell
 

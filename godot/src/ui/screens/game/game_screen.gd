@@ -3,10 +3,8 @@ extends Control
 
 signal leave_requested
 
-const PIECE_SCENE: PackedScene = preload("res://src/game/pieces/piece_view.tscn")
 
 @onready var _board: ChessBoardView = %Board
-@onready var _pieces: Node3D = %Pieces
 @onready var _header: GameHeader = %GameHeader
 @onready var _camera: Camera3D = %Camera
 @onready var _board_view_button: Button = %BoardViewButton
@@ -21,7 +19,6 @@ func _ready() -> void:
 	_board.square_pressed.connect(_on_square_pressed)
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
-	_build_demo_position()
 
 
 func _notification(what: int) -> void:
@@ -95,27 +92,6 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 
 func _on_square_pressed(square: String) -> void:
 	_header.set_center_text("Selected %s" % square.to_upper())
-
-
-func _build_demo_position() -> void:
-	var back_rank := ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"]
-	for file in 8:
-		_add_piece(back_rank[file], "white", "%s1" % char("a".unicode_at(0) + file))
-		_add_piece("pawn", "white", "%s2" % char("a".unicode_at(0) + file))
-		_add_piece("pawn", "black", "%s7" % char("a".unicode_at(0) + file))
-		_add_piece(back_rank[file], "black", "%s8" % char("a".unicode_at(0) + file))
-
-
-## Places one piece.
-##
-## `type` arrives as a plain identity string rather than an index into a list this
-## project holds, because the list of piece types belongs to the application core and
-## this is only the demo position standing in for it until that arrives.
-func _add_piece(type: String, piece_side: String, square: String) -> void:
-	var piece := PIECE_SCENE.instantiate() as ChessPieceView
-	_pieces.add_child(piece)
-	piece.configure(type, piece_side)
-	piece.place_on(square, _board.square_to_world(square, 0.0))
 
 
 func _open_game_menu() -> void:
