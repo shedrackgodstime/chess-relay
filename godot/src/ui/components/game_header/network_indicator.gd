@@ -2,37 +2,44 @@ extends Control
 
 enum State { IDLE, CONNECTING, DEGRADED, GOOD, LOST }
 
-const BAR_COLOR_IDLE := Color(0.62, 0.60, 0.58, 1.0)
-const BAR_COLOR_CONNECTING := Color(1.0, 0.85, 0.25, 1.0)
-const BAR_COLOR_GOOD := Color(0.42, 0.92, 0.52, 1.0)
-const BAR_COLOR_LOST := Color(1.0, 0.27, 0.20, 1.0)
-const BAR_GHOST := Color(1.0, 1.0, 1.0, 0.26)
+## The meter's colours live in the theme under the NetworkBars type, and are read
+## here rather than held as constants. The control draws its own bars, so it cannot
+## take them from a built-in type the way a themed Label would.
+const BARS := &"NetworkBars"
 const BAR_TOPS := [24.0, 18.0, 12.0, 6.0]
 const BAR_CENTERS := [10.5, 18.0, 25.5, 33.0]
 const BAR_BASELINE := 30.0
 const BAR_WIDTH := 3.9
 
 var _active_bars := 0
-var _active_color := BAR_COLOR_IDLE
+var _active_color := Color.WHITE
+var _ghost_color := Color.WHITE
 
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_ghost_color = _color("bar_ghost")
 	set_state(State.IDLE)
+
+
+## One of this control's own theme colours. A custom theme type has to be read from a
+## script; nothing applies it automatically.
+func _color(item: String) -> Color:
+	return get_theme_color(item, BARS)
 
 
 func set_state(state: int) -> void:
 	match state:
 		State.CONNECTING:
-			_set_visual_state(1, BAR_COLOR_CONNECTING, "Connection: connecting")
+			_set_visual_state(1, _color("bar_connecting"), "Connection: connecting")
 		State.DEGRADED:
-			_set_visual_state(2, BAR_COLOR_CONNECTING, "Connection: degraded")
+			_set_visual_state(2, _color("bar_connecting"), "Connection: degraded")
 		State.GOOD:
-			_set_visual_state(3, BAR_COLOR_GOOD, "Connection: good")
+			_set_visual_state(3, _color("bar_good"), "Connection: good")
 		State.LOST:
-			_set_visual_state(1, BAR_COLOR_LOST, "Connection: lost")
+			_set_visual_state(1, _color("bar_lost"), "Connection: lost")
 		_:
-			_set_visual_state(0, BAR_COLOR_IDLE, "Connection: idle")
+			_set_visual_state(0, _color("bar_idle"), "Connection: idle")
 
 
 func _set_visual_state(count: int, color: Color, description: String) -> void:
@@ -47,7 +54,7 @@ func _draw() -> void:
 	var origin := Vector2((size.x - 36.0 * scale_factor) * 0.5,
 		(size.y - 36.0 * scale_factor) * 0.5)
 	draw_circle(origin + Vector2(3.0, BAR_BASELINE) * scale_factor,
-		1.5 * scale_factor, BAR_GHOST)
+		1.5 * scale_factor, _ghost_color)
 	for index in range(BAR_TOPS.size()):
 		var top: float = BAR_TOPS[index] * scale_factor
 		var rect := Rect2(
@@ -55,6 +62,6 @@ func _draw() -> void:
 			Vector2(BAR_WIDTH * scale_factor,
 				(BAR_BASELINE - BAR_TOPS[index]) * scale_factor)
 		)
-		draw_rect(rect, BAR_GHOST)
+		draw_rect(rect, _ghost_color)
 		if index < _active_bars:
 			draw_rect(rect, _active_color)

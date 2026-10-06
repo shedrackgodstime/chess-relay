@@ -19,8 +19,11 @@ func _ready() -> void:
 	_type_label.text = player_type
 	_detail_label.text = detail
 	_apply_side_style()
+	# The opponent's piece is dimmed so it does not read as another white piece. It is a
+	# theme variation rather than a modulate assignment, so the dimming travels with the
+	# theme and is inspectable rather than only visible here.
 	if is_opponent:
-		_piece_icon.modulate = Color(0.72, 0.66, 0.58, 1.0)
+		_piece_icon.theme_type_variation = &"MutedPieceIcon"
 
 
 func set_side(value: String) -> void:

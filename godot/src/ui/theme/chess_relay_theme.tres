@@ -81,6 +81,9 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
+[sub_resource type="StyleBoxFlat" id="modal_backdrop_panel"]
+bg_color = Color(0.05, 0.04, 0.03, 0.72)
+
 [sub_resource type="StyleBoxFlat" id="card_panel"]
 content_margin_left = 18.0
 content_margin_top = 18.0
@@ -548,3 +551,19 @@ SetupStatusText/font_sizes/font_size = 15
 
 SetupFooter/base_type = &"PanelContainer"
 SetupFooter/styles/panel = SubResource("surface_panel")
+
+ModalBackdrop/base_type = &"Panel"
+ModalBackdrop/styles/panel = SubResource("modal_backdrop_panel")
+
+MutedPieceIcon/base_type = &"TextureRect"
+MutedPieceIcon/colors/modulate = Color(0.72, 0.66, 0.58, 1)
+
+; The connection meter draws its own bars, so it cannot take these from a built-in
+; type. A custom theme type read by the script is the documented route for a custom
+; control: "Because built-in controls have no knowledge of your custom theme types, you
+; must utilize scripts to access those items."
+NetworkBars/colors/bar_idle = Color(0.62, 0.6, 0.58, 1)
+NetworkBars/colors/bar_connecting = Color(1.0, 0.85, 0.25, 1)
+NetworkBars/colors/bar_good = Color(0.42, 0.92, 0.52, 1)
+NetworkBars/colors/bar_lost = Color(1.0, 0.27, 0.2, 1)
+NetworkBars/colors/bar_ghost = Color(1.0, 1.0, 1.0, 0.26)

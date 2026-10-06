@@ -78,6 +78,44 @@ func _check_participant_and_setup_states() -> void:
 	participant.set_side("Random")
 	_check(participant.get_node("Content/Info/SideRow/SideValue").theme_type_variation == &"SetupNeutralSideBadge",
 		"participant card applies neutral badge style")
+
+	# A theme item name the engine does not know is ignored without complaint, so a
+	# variation can be misspelled and everything still runs. Reading the resolved value
+	# back is the only way to know the theme item is real. See
+	# foundation_tightening item 3.
+	var muted := Color(0.72, 0.66, 0.58, 1.0)
+	var rival := PARTICIPANT_SCENE.instantiate() as ParticipantCard
+	rival.is_opponent = true
+	root.add_child(rival)
+	await process_frame
+	var icon := rival.get_node("Content/Avatar/PieceIcon") as TextureRect
+	_check(icon.theme_type_variation == &"MutedPieceIcon",
+		"opponent piece uses the muted variation")
+	_check(icon.get_theme_color("modulate", "TextureRect") == muted,
+		"and the theme really supplies that colour, got %s"
+			% icon.get_theme_color("modulate", "TextureRect"))
+	rival.queue_free()
+
+	var backdrop := Panel.new()
+	backdrop.theme_type_variation = &"ModalBackdrop"
+	root.add_child(backdrop)
+	await process_frame
+	var wash := backdrop.get_theme_stylebox("panel") as StyleBoxFlat
+	_check(wash != null and wash.bg_color == Color(0.05, 0.04, 0.03, 0.72),
+		"modal backdrop wash comes from the theme, got %s"
+			% ("null" if wash == null else wash.bg_color))
+	backdrop.queue_free()
+
+	# The meter draws its own bars, so its colours come from a custom theme type read by
+	# the script. Checked here because a custom type that nothing reads would look
+	# perfectly correct in the theme file.
+	var bars := Control.new()
+	root.add_child(bars)
+	await process_frame
+	_check(bars.get_theme_color("bar_good", &"NetworkBars") == Color(0.42, 0.92, 0.52, 1),
+		"connection meter colours come from the theme, got %s"
+			% bars.get_theme_color("bar_good", &"NetworkBars"))
+	bars.queue_free()
 	participant.queue_free()
 
 	var setup := SETUP_SCENE.instantiate() as GameSetupScreen

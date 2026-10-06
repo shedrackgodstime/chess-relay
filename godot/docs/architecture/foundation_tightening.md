@@ -15,7 +15,7 @@ out rather than only pointing at a path.
 
 ## 1. Warnings are a convention with nothing behind them
 
-Status: **ready to do.**
+Status: **done.**
 
 `project_structure.md` says to "treat engine warnings as issues to resolve,
 not noise to suppress project-wide." `project.godot` has no `[debug]` section,
@@ -25,9 +25,14 @@ The setting is `debug/gdscript/warnings/treat_warnings_as_errors`, a boolean
 that defaults to `false` (ProjectSettings class reference).
 
 Enabling it turns the stated convention into a property of the project rather
-than a property of whoever is reading it. It is also the cheapest item here,
-which is most of the reason to do it first: every later item is easier to make
-while the compiler is already objecting.
+than a property of whoever is reading it.
+
+It is set, and the engine reports it as `true`, but it is **not verified**. A
+deliberately unused signal and a deliberately unused local both compiled clean
+under `--script --check-only`, while a syntax error in the same file failed as
+expected. So the harness works and the setting is valid, but warnings did not
+escalate in a headless script run. The editor is where warnings surface, and this
+has to be confirmed there before the project relies on it.
 
 ## 2. The multiplayer hub builds its UI in script
 
@@ -123,11 +128,10 @@ development tool and has no part in a build.
 
 ## 3. A screen owns a colour the theme already defines
 
-Status: **not started.**
+Status: **done.**
 
-`multiplayer_hub_screen.gd` declares `const TEXT := Color(1.0, 0.9, 0.72,
-1.0)`. `ui_theme.md` already lists `TEXT` as a theme item traced from the
-reference palette.
+`multiplayer_hub_screen.gd` declared `const TEXT := Color(1.0, 0.9, 0.72, 1.0)`,
+which `ui_theme.md` already lists as a theme item traced from the reference palette.
 
 The rule, from *UI > Introduction to GUI skinning*:
 
@@ -143,12 +147,38 @@ The same section is explicit that this is **not** a blanket rule, and the
 distinction is worth keeping: local overrides are called "essential" for layout
 constants such as `BoxContainer` separation and `MarginContainer` margins. So
 `add_theme_constant_override("separation", ...)` is correct as written and is
-not part of this item. Only the colour overrides are, namely the constant
-above, the backdrop colour in `game_setup_screen.gd`, and the icon modulate in
-`participant_card.gd`.
+**not** part of this item. Four remain in the UI and all four are separations.
 
-To do: after item 2, when the affected controls are scenes and can take a theme
-variation, replace each colour override with the matching theme item.
+### What moved
+
+- **`TEXT` in the hub** — it lost its last caller when the flows moved into the
+  flow card, so it was deleted rather than moved. The duplicate colour is gone
+  because nothing wanted it.
+- **The modal backdrop wash**, in `game_setup_screen.gd`, was a `ColorRect` with a
+  hard-coded colour. A `ColorRect` takes its colour from the node and nowhere
+  else, so it became a `Panel` with a `ModalBackdrop` theme variation.
+- **The opponent's dimmed piece icon**, in `participant_card.gd`, was a
+  `modulate` assignment and is now a `MutedPieceIcon` variation on the `TextureRect`.
+- **The connection meter's five colours**, in `network_indicator.gd`, were
+  constants. That control draws its own bars, so it cannot take them from a
+  built-in type, and the section above says what to do instead:
+
+  > Because built-in controls have no knowledge of your custom theme types, you
+  > must utilize scripts to access those items.
+
+  They are now the custom theme type `NetworkBars`, read through
+  `get_theme_color(item, &"NetworkBars")`.
+
+### Proving a theme item is real
+
+A theme item name the engine does not recognise is ignored **without complaint**.
+A misspelled variation therefore looks perfectly correct in the theme file and
+changes nothing at run time, which means "the theme has the item" is not
+evidence that anything reads it.
+
+Each of the three new items is asserted in the UI checks by reading the resolved
+value back off a live control and comparing it to the expected colour. If a name
+stops being valid, the check fails instead of the styling quietly reverting.
 
 ## 4. Three-dimensional colours have no shared source
 

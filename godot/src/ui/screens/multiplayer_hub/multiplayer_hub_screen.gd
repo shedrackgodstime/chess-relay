@@ -21,7 +21,6 @@ const PLAYER_ROW_SCENE: PackedScene = preload(
 
 const CODE_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 6
-const TEXT := Color(1.0, 0.9, 0.72, 1.0)
 
 @onready var _invite_grid: GridContainer = %InviteGrid
 ## The card the running flow fills. A component rather than a panel built here,

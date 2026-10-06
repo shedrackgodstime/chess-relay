@@ -143,9 +143,12 @@ func _open_header_menu() -> void:
 	_header_menu_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_header_menu_layer)
 
-	var backdrop := ColorRect.new()
+	# A Panel rather than a ColorRect so the wash is a theme item. A ColorRect takes
+	# its colour from the node and nowhere else, which would put one more value in this
+	# script that a re-theme could not reach.
+	var backdrop := Panel.new()
+	backdrop.theme_type_variation = &"ModalBackdrop"
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backdrop.color = Color(0.05, 0.04, 0.03, 0.72)
 	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
 	backdrop.gui_input.connect(_on_header_menu_backdrop_input)
 	_header_menu_layer.add_child(backdrop)
