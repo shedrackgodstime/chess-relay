@@ -157,6 +157,55 @@ an optimisation pass to get right. That is a decision to make with a knight on s
 not in advance: author the knight with the generator, look at it, and if it does not
 read as a knight, import that one mesh and keep the generator for the other five.
 
+## Stage 3: the pieces — outcome
+
+**The imported models do not look good enough.** Both sets render correctly and both
+are technically superior on paper, and both look worse than the reference prototype's
+hand-written pieces.
+
+Measured, the OpenGameArt set won every axis there is to measure:
+
+| | oga | saber |
+| --- | --- | --- |
+| Licence | CC0, nothing owed | BSD-3, notice must travel |
+| Verts | 7,218 | 15,539 |
+| Size | 254 KB | 622 KB |
+| Base footprint | 0.045 for all six | 0.536 to 0.948 |
+| Proportion | tournament, and independently corroborated | knight is 0.35 of king |
+
+And it lost on the only axis that matters, which is the one that cannot be measured:
+**how it looks.** This is the fourth time that has happened here — camera pitch, the
+occlusion behind a piece, and now proportion. The rule that follows is already written
+twice in this project and is restated because it was ignored three times:
+
+> **A number is not a judgement.** Measure to narrow the field, then look.
+
+Both imported sets stay in the repository, switchable by `PieceMeshes.ACTIVE_SET`, so
+the comparison can be repeated on any machine rather than argued from memory.
+
+### The port that is not finished
+
+The generator is the route: the reference prototype's `geometry/` library plus
+`PieceProfiles`, `PieceMesh` and `PieceMaterials`, which build every piece but the
+knight from one revolved profile and add geometry for the rook's merlons, the queen's
+crown and the king's cross.
+
+**It is a dependency chain rather than nine files.** Copied so far and known to be
+required: the six `geometry/` modules, the three piece modules, and `settings/quality.gd`,
+which `PieceMesh` calls for its segment count. Still outstanding at the point of
+handover: `TextureKit`, which `PieceMaterials` depends on, and whatever that in turn
+requires. Each module was written against the prototype's own tree rather than in
+isolation, so this is expected to be a few more rounds than it looks.
+
+Two adaptations are already decided and are the part worth getting right:
+
+- **`PieceProfiles.Type` stays inside the generator.** It must not become this
+  project's list of piece types; `PieceMeshes.GENERATED` translates an arriving
+  identity into a profile instead, and that list belongs to Rust's `chess_core`.
+- **Colour and scale stay on the node.** The generated profiles are already in board
+  units — a square is 1.0 and the king stands 1.29 including its cross — so the
+  generator path needs no scale at all.
+
 ## Stage 1: the board shell
 
 Status: **not started. Attempted and reverted.**
