@@ -68,6 +68,17 @@ and ambient light, a `DirectionalLight3D` key, three fill lights, and a
 `Camera3D` carrying the orbit script. What was missing was the camera actually
 receiving anything.
 
+- **The camera reads `_input`, not `_unhandled_input`.** `_unhandled_input` only
+  runs for events the GUI let through, so it sits behind every Control on screen; the
+  game screen's root is a full-rect Control, and a Control that stops input ends the
+  event before the camera sees it. That is why the buttons, which call `orbit_by`
+  directly, rotated the board while a drag did not. `_input` runs first and cannot be
+  blocked by the GUI at all.
+
+  The cost of reading first is that the camera also sees presses meant for buttons, so
+  a drag only begins when the press did not land on something that handles input.
+  That test is `_dragged_by_gui`, and it is checked from both sides: a press on open
+  board drags, a press on the header or on the board-view button does not.
 - **The screen root now passes input through.** `Control.mouse_filter` defaults to
   `MOUSE_FILTER_STOP`, so the full-rect root was consuming every mouse event before
   it reached `_unhandled_input`, where the camera does all its input. `IGNORE`, not

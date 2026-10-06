@@ -246,6 +246,27 @@ func _check_game_screen() -> void:
 	var game := GAME_SCENE.instantiate() as GameScreen
 	root.add_child(game)
 	await process_frame
+	# The screen root is a full-rect Control and Control.mouse_filter defaults to
+	# MOUSE_FILTER_STOP, which is why it is set to IGNORE. Without this, no mouse
+	# event reaches the camera at all.
+	_check(game.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"the game screen root lets input through, got %d" % game.mouse_filter)
+	_check(game.get_node("HUD/HUDRoot").mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"and so does the HUD root")
+
+	# The camera reads input before the GUI, so it must refuse a drag that began on
+	# something interactive, or the board would rotate while a button was pressed.
+	# The earlier checks could not catch this: they drove orbit_by directly.
+	var free_press := Vector2(400.0, 520.0)
+	_check(not game._camera._dragged_by_gui(free_press),
+		"a press on empty board space is free to drag")
+	var header_pos: Vector2 = game.get_node("HUD/HUDRoot/GameHeader").get_global_rect().get_center()
+	_check(game._camera._dragged_by_gui(header_pos),
+		"a press on the header is not, so the header keeps its clicks")
+	var view_button := game.get_node("HUD/HUDRoot/BoardViewButton") as Button
+	_check(game._camera._dragged_by_gui(view_button.get_global_rect().get_center()),
+		"and neither is one on the board view button")
+
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
 	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
@@ -292,14 +313,18 @@ func _check_game_screen() -> void:
 	var drag_start := InputEventMouseButton.new()
 	drag_start.button_index = MOUSE_BUTTON_LEFT
 	drag_start.pressed = true
-	game._camera._unhandled_input(drag_start)
+	# On the board, not at (0,0). A press in the corner lands on the header and the
+	# camera now refuses to drag from there, so a drag test that does not say where it
+	# presses was testing the refusal rather than the rotation.
+	drag_start.position = Vector2(400.0, 520.0)
+	game._camera._input(drag_start)
 	var drag_motion := InputEventMouseMotion.new()
 	drag_motion.relative = Vector2(40.0, 0.0)
-	game._camera._unhandled_input(drag_motion)
+	game._camera._input(drag_motion)
 	var drag_end := InputEventMouseButton.new()
 	drag_end.button_index = MOUSE_BUTTON_LEFT
 	drag_end.pressed = false
-	game._camera._unhandled_input(drag_end)
+	game._camera._input(drag_end)
 	_check(not is_equal_approx(game._camera.yaw_degrees, drag_yaw),
 		"camera drag input changes orbit yaw")
 	var camera_distance: float = game._camera.distance
