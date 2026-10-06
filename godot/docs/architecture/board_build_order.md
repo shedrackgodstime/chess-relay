@@ -107,6 +107,56 @@ lie.
 The prototype is checked out at `ref/chess-relay` for comparison and `ref/` is
 git-ignored, so it cannot become a runtime dependency.
 
+## Stage 3: the pieces
+
+Status: **route chosen, not started.**
+
+### Why not CSG
+
+CSG was tried first and dropped. It works — a pawn was authored as a revolved
+`CSGPolygon3D` profile and baked to a mesh through `CSGShape3D.bake_static_mesh`, and
+the bake is reproducible headlessly. But a solid of revolution cannot express a rook's
+merlons, a queen's crown points or a king's cross, and those details are exactly what
+makes each piece read as itself. The prototype's own code says as much:
+
+> The lathed body carries most of the silhouette, but three pieces need extra
+> geometry that a solid of revolution cannot express: the rook's merlons, the queen's
+> crown points, and the king's cross. The knight instead replaces its top with an
+> extruded head.
+
+### The route: the prototype's generator
+
+Six hundred and twenty-four lines of geometry code — `lathe`, `primitives`,
+`mesh_builder`, `mesh_data`, `profile_curve`, `extrude` — plus `PieceProfiles`,
+`PieceMesh` and `PieceMaterials`. Every piece except the knight is one
+`Vector2(radius, height)` profile revolved into a body; four pieces add detail and the
+knight swaps its top for an extruded head. Everything merges into **one surface**, so a
+piece stays a single `MeshInstance3D` with a single material.
+
+This was measured working on a device, which is the reason for choosing it over
+anything that could be reasoned about but not tried.
+
+### What carries over from this attempt
+
+The seam, which is route-agnostic and is the part that was expensive to get right:
+
+- **Identity is a `StringName` that arrives over the boundary.** `PieceProfiles` in
+  the prototype has an `enum Type`, and that must **not** become this project's source
+  of piece identity — `application_core.md` puts that in Rust's `chess_core`. The
+  generator maps an arriving identity to a profile; it does not declare the list.
+- **Colour is the second axis.** Six shapes, two materials, rather than twelve things.
+- **A missing shape returns null**, not a placeholder.
+- **The check reads resolved values**, because a wrong name in a lookup is silent.
+
+### On GLB or FBX
+
+Worth keeping on the table, and the honest reason is that the prototype's generator is
+code this project would own. The counter is that it is 624 lines written to serve a
+board it is no longer sized against, and imported meshes bring licensing to track and
+an optimisation pass to get right. That is a decision to make with a knight on screen,
+not in advance: author the knight with the generator, look at it, and if it does not
+read as a knight, import that one mesh and keep the generator for the other five.
+
 ## Stage 1: the board shell
 
 Status: **not started. Attempted and reverted.**

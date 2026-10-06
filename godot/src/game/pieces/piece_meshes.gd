@@ -19,22 +19,17 @@ extends RefCounted
 const LIGHT := &"light"
 const DARK := &"dark"
 
-## Where each baked shape is.
+## Where each shape comes from.
 ##
-## A mesh resource, not the CSG scene beside it. The CSG is how a silhouette is
-## authored — a revolved or lofted profile is far easier to shape than a mesh — but
-## the docs are explicit that CSG "is mainly intended for prototyping", and the same
-## page's way out is to convert it, because "the CSG mesh no longer needs to be
-## rebuilt when the scene loads". `tools/bake_piece_shapes.gd` does that conversion
-## and the result is committed, so nothing in the game evaluates CSG at all.
-const SHAPE_MESHES := {
-	&"pawn": "res://src/game/pieces/shapes/pawn.tres",
-	&"knight": "res://src/game/pieces/shapes/knight.tres",
-	&"rook": "res://src/game/pieces/shapes/rook.tres",
-	&"bishop": "res://src/game/pieces/shapes/bishop.tres",
-	&"queen": "res://src/game/pieces/shapes/queen.tres",
-	&"king": "res://src/game/pieces/shapes/king.tres",
-}
+## Empty until the shape generator lands, and deliberately so. CSG was tried first and
+## dropped: a solid of revolution cannot express a rook's merlons, a queen's crown or
+## a king's cross, and the prototype solves those with added geometry rather than by
+## fighting the primitive. See docs/architecture/board_build_order.md, stage 3.
+##
+## The identities here are the point. They are names that arrive over the application
+## boundary, not an enum declared in this project, so there is one list of piece types
+## and it is not this one.
+const SHAPE_MESHES := {}
 
 ## Loaded once. A dictionary of paths read per instance would be a disk read per piece.
 static var _loaded: Dictionary = {}

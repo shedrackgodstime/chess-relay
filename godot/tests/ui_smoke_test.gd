@@ -315,31 +315,19 @@ func _check_game_screen() -> void:
 	cam.pitch_degrees = saved_pitch
 	cam._dragging_mouse = false
 
-	# One shape per identity, and a material per side. Six shapes and two materials is
-	# a full set; twelve pieces would mean the colour had been baked into the shape.
-	var light := PieceMeshes.mesh_for(&"pawn", PieceMeshes.LIGHT)
-	var dark := PieceMeshes.mesh_for(&"pawn", PieceMeshes.DARK)
-	_check(light != null and dark != null, "the pawn has a shape in both sides")
-	if light != null and dark != null:
-		_check(light.get_aabb() == dark.get_aabb(),
-			"both sides are the same shape, light %s dark %s"
-				% [light.get_aabb(), dark.get_aabb()])
-		_check(light.surface_get_material(0).albedo_color
-				!= dark.surface_get_material(0).albedo_color,
-			"and differ only in colour")
-		_check(light != dark, "as separate meshes, so one side cannot repaint the other")
-		# A pawn has to be inside its own square, or it reads as too big for the board.
-		var size := light.get_aabb().size
-		_check(size.x < 1.0 and size.z < 1.0 and size.y < 1.0,
-			"and it stands inside one square, %.2f x %.2f x %.2f"
-				% [size.x, size.y, size.z])
-
-	# An identity with no shape is a missing mesh, not a wrong one. A pawn standing in
-	# for a missing king would look like a bug somewhere else entirely.
-	_check(PieceMeshes.mesh_for(&"knight", PieceMeshes.LIGHT) == null,
-		"an identity with no shape yet gives nothing")
-	_check(PieceMeshes.mesh_for(&"dragon", PieceMeshes.LIGHT) == null,
-		"and so does one that does not exist")
+	# The piece seam exists before any piece does. It is keyed by the identities that
+	# arrive over the application boundary rather than by an enum declared here, so
+	# there is one list of piece types and this project is not it.
+	_check(PieceMeshes.SHAPE_MESHES.is_empty(),
+		"no shapes authored yet, so nothing can be drawn by accident")
+	_check(PieceMeshes.mesh_for(&"pawn", PieceMeshes.LIGHT) == null,
+		"an identity with no shape gives nothing")
+	_check(PieceMeshes.material_for(PieceMeshes.LIGHT) != null
+			and PieceMeshes.material_for(PieceMeshes.DARK) != null,
+		"but a material per side does, so colour is ready")
+	_check(PieceMeshes.material_for(PieceMeshes.LIGHT).albedo_color
+			!= PieceMeshes.material_for(PieceMeshes.DARK).albedo_color,
+		"and the two sides are different colours")
 
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
