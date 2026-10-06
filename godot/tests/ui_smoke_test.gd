@@ -126,7 +126,15 @@ func _check_hub_interactions() -> void:
 	var hub := HUB_SCENE.instantiate() as MultiplayerHubScreen
 	root.add_child(hub)
 	await process_frame
-	_check(hub._player_invite_buttons.size() == 4, "hub populates mock player rows")
+	# Counted by scene type rather than by reaching into a list the screen keeps for
+	# its own bookkeeping. The assertion is about what the player can see: four rows.
+	var rows := 0
+	for child in hub._player_rows.get_children():
+		if child is PlayerRow:
+			rows += 1
+	_check(rows == 4, "hub populates mock player rows, got %d" % rows)
+	_check(hub._player_rows_added.size() == 4,
+		"and tracks one invite control per row, got %d" % hub._player_rows_added.size())
 	hub._create_invite_button.pressed.emit()
 	_check(hub._active_invite_flow == "create", "hub enters create invite flow")
 	_check(not hub._invite_grid.visible and hub._invite_flow_card.visible,

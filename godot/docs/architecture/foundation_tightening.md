@@ -31,7 +31,7 @@ while the compiler is already objecting.
 
 ## 2. The multiplayer hub builds its UI in script
 
-Status: **not started.**
+Status: **in progress. The player row is done.**
 
 `src/ui/screens/multiplayer_hub/multiplayer_hub_screen.gd` is 511 lines and
 constructs its own controls with `PanelContainer.new()`, `HBoxContainer.new()`,
@@ -63,9 +63,38 @@ in more than one place, on the board and in the trays. That is exactly the case
 the rule above is written for, and it will be built in whichever style the
 project is currently in. Closing this first means the piece is a scene.
 
-To do: extract an authored `.tscn` per repeated piece of hub UI, starting with
-the player row that the audit already names, then the invite card and the join
-field. Keep the hub script for behaviour and intent.
+### The player row
+
+Done. `src/ui/components/player_row/player_row.tscn` plus its script, configured
+with `configure(name, presence, is_recent)` and reporting through one
+`invite_pressed` signal. The hub now instantiates it instead of building seven
+nodes per person, and keeps a list of rows rather than a list of their Invite
+buttons so the row stays the thing that knows how.
+
+All six theme variations the row uses already existed in the shared theme, so the
+extraction changed how the row is made and not how it looks. Worth checking that
+in the editor, since a headless run cannot compare pixels.
+
+Still to extract from the same script: the invite card and the join field.
+
+### The headless class cache
+
+The cache is worth writing down here, because it cost an hour and will cost it
+again. Godot writes `.godot/global_script_class_cache.cfg` when the editor opens
+or on `--import`, by scanning for `class_name`. Both of those abort on this
+build with `free(): invalid size`, which is a fault in the headless binary rather
+than in the project: it reproduces on a pristine checkout with no changes.
+
+The consequence is that deleting the cache by hand cannot be undone from the
+command line, and without it every script that names another script's
+`class_name` fails to parse. `tools/build_class_cache.py` regenerates it from the
+same declarations the editor would read. Run it after adding a `class_name`:
+
+    python3 godot/tools/build_class_cache.py
+
+The editor will rewrite the same file with the same contents on its own. This
+exists so that adding one class does not require opening the editor. It is a
+development tool and has no part in a build.
 
 ## 3. A screen owns a colour the theme already defines
 

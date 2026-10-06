@@ -13,6 +13,12 @@ signal player_invite_cancelled
 signal incoming_invite_responded(player_name: String, accepted: bool)
 signal game_setup_requested(opponent_name: String, setup_kind: String)
 
+## The list row, loaded here rather than referred to by path at runtime so that a
+## scene which has gone missing is a load error at startup instead of a null in the
+## middle of filling the list.
+const PLAYER_ROW_SCENE: PackedScene = preload(
+	"res://src/ui/components/player_row/player_row.tscn")
+
 const CODE_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 6
 const TEXT := Color(1.0, 0.9, 0.72, 1.0)
@@ -38,7 +44,9 @@ var _join_cancel_button: Button
 var _current_join_code := ""
 var _create_waiting := false
 var _join_is_connecting := false
-var _player_invite_buttons: Array[Button] = []
+## Kept as rows rather than as the rows' Invite buttons, so turning the list off
+## asks each row to do it and the row stays the thing that knows how.
+var _player_rows_added: Array[PlayerRow] = []
 var _active_invite_flow := ""
 var _current_player_invite := ""
 var _queued_incoming_invite := ""
@@ -63,40 +71,16 @@ func _populate_mock_players() -> void:
 	_player_rows.add_child(_build_mock_player_row("RookRunner", "Online", true))
 
 
-func _build_mock_player_row(player_name: String, presence: String, is_recent: bool) -> PanelContainer:
-	var row := PanelContainer.new()
-	row.theme_type_variation = &"PlayerListRow"
-	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.custom_minimum_size.y = 56
-	var layout := HBoxContainer.new()
-	layout.add_theme_constant_override("separation", 14)
-	row.add_child(layout)
-	var avatar := Label.new()
-	avatar.text = player_name.substr(0, 1).to_upper()
-	avatar.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	avatar.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	avatar.custom_minimum_size = Vector2(34, 34)
-	avatar.theme_type_variation = &"PlayerRowAvatar"
-	layout.add_child(avatar)
-	var identity := VBoxContainer.new()
-	identity.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	identity.alignment = BoxContainer.ALIGNMENT_CENTER
-	identity.add_child(_label(player_name, "SetupParticipantName"))
-	var details := HBoxContainer.new()
-	details.add_theme_constant_override("separation", 10)
-	details.add_child(_label("●  " + presence, "QuietLabel"))
-	if is_recent:
-		var recent := _label("Recent", "Caption")
-		details.add_child(recent)
-	identity.add_child(details)
-	layout.add_child(identity)
-	var invite := Button.new()
-	invite.text = "Invite"
-	invite.custom_minimum_size = Vector2(88, 44)
-	invite.theme_type_variation = &"SetupOptionButton"
-	invite.pressed.connect(_show_mock_invite.bind(player_name))
-	layout.add_child(invite)
-	_player_invite_buttons.append(invite)
+## A person in the list. The row is a scene and this only says who it is.
+##
+## The row used to be built here, out of seven nodes, in a loop over mock names.
+## That put a reusable piece of interface inside one screen's script, where it
+## could not be seen or edited in the editor and could not be used anywhere else.
+func _build_mock_player_row(player_name: String, presence: String, is_recent: bool) -> PlayerRow:
+	var row := PLAYER_ROW_SCENE.instantiate() as PlayerRow
+	row.invite_pressed.connect(_show_mock_invite.bind(player_name))
+	row.configure(player_name, presence, is_recent)
+	_player_rows_added.append(row)
 	return row
 
 
@@ -433,9 +417,9 @@ func _clear_invite_flow() -> void:
 
 
 func _set_player_invites_enabled(enabled: bool) -> void:
-	for button in _player_invite_buttons:
-		if is_instance_valid(button):
-			button.disabled = not enabled
+	for row in _player_rows_added:
+		if is_instance_valid(row):
+			row.set_invite_enabled(enabled)
 
 
 func _flow_cancel_button(action: Callable) -> Button:
