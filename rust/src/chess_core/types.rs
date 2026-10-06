@@ -21,7 +21,7 @@
 //! ```
 
 use std::backtrace::Backtrace;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Display, Formatter, Write as _};
 use std::str::FromStr;
 
 /// Side to move or piece colour.
@@ -467,8 +467,6 @@ impl Display for IllegalMove {
 }
 
 impl std::error::Error for IllegalMove {}
-
-use std::fmt::Write as _;
 
 #[cfg(test)]
 mod tests {
