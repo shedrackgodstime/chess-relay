@@ -369,9 +369,47 @@ func _check_game_screen() -> void:
 		"game has a left-side fill light")
 	_check(game.get_node("World/RightFillLight") is OmniLight3D,
 		"game has a right-side fill light")
+	# Every piece should have found a model. Without the import pipeline a .glb cannot
+	# be loaded here, so this cannot be asserted in this suite; what it can assert is
+	# that a piece knows which identity it is and which square it is on, and that it
+	# turned to face the other side.
 	var black_piece := game._pieces.get_child(2) as ChessPieceView
 	_check(is_equal_approx(black_piece.rotation.y, PI),
 		"black pieces face the opposing side")
+	var light_piece := game._pieces.get_child(0) as ChessPieceView
+	_check(is_equal_approx(light_piece.rotation.y, 0.0),
+		"and light pieces face the near side")
+	_check(not light_piece.square.is_empty(),
+		"a piece knows the square it stands on, got '%s'" % light_piece.square)
+	# The demo position is the real one, not a row of pawns. Checked a rank at a time
+	# because that is the thing worth knowing: a1 is a rook.
+	var back_rank := ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"]
+	for file in 8:
+		var name := "abcdefgh"[file]
+		# Four pieces per file, in the order the demo position builds them: white back
+		# rank, white pawn, black pawn, black back rank.
+		var near_rook := game._pieces.get_child(file * 4) as ChessPieceView
+		var near_pawn := game._pieces.get_child(file * 4 + 1) as ChessPieceView
+		_check(near_rook.piece_type == back_rank[file]
+				and near_rook.square == name + "1"
+				and near_rook.side == "white",
+			"%s1 is a %s for white, got %s on %s"
+				% [name, back_rank[file], near_rook.piece_type, near_rook.square])
+		_check(near_pawn.piece_type == "pawn" and near_pawn.square == name + "2",
+			"%s2 is a white pawn, got %s on %s"
+				% [name, near_pawn.piece_type, near_pawn.square])
+		var far_pawn := game._pieces.get_child(file * 4 + 2) as ChessPieceView
+		var far_rook := game._pieces.get_child(file * 4 + 3) as ChessPieceView
+		_check(far_pawn.side == "black" and far_pawn.square == name + "7",
+			"%s7 is a black pawn, got %s on %s"
+				% [name, far_pawn.piece_type, far_pawn.square])
+		_check(far_rook.piece_type == back_rank[file] and far_rook.side == "black"
+				and far_rook.square == name + "8",
+			"%s8 is a black %s, got %s on %s"
+				% [name, back_rank[file], far_rook.piece_type, far_rook.square])
+	_check(light_piece.missing_shape.is_empty()
+			or light_piece.mesh == null,
+		"a piece either has a model or says which one it is missing")
 	game._update_camera_framing(1440.0, 900.0)
 	var wide_camera_height := game._camera.position.y
 	game._update_camera_framing(640.0, 900.0)

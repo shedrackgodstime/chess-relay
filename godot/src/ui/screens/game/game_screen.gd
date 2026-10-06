@@ -106,11 +106,16 @@ func _build_demo_position() -> void:
 		_add_piece(back_rank[file], "black", "%s8" % char("a".unicode_at(0) + file))
 
 
+## Places one piece.
+##
+## `type` arrives as a plain identity string rather than an index into a list this
+## project holds, because the list of piece types belongs to the application core and
+## this is only the demo position standing in for it until that arrives.
 func _add_piece(type: String, piece_side: String, square: String) -> void:
 	var piece := PIECE_SCENE.instantiate() as ChessPieceView
-	piece.configure(type, piece_side)
-	piece.position = _board.square_to_world(square, 0.0)
 	_pieces.add_child(piece)
+	piece.configure(type, piece_side)
+	piece.place_on(square, _board.square_to_world(square, 0.0))
 
 
 func _open_game_menu() -> void:
