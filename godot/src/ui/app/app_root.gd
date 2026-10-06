@@ -49,7 +49,7 @@ func _on_play_computer_requested() -> void:
 	var setup := GAME_SETUP_SCREEN.instantiate() as GameSetupScreen
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
-	setup.play_requested.connect(_show_game_screen)
+	setup.play_requested.connect(_show_game_screen.bind(false))
 	_show_screen(setup)
 
 
@@ -110,12 +110,14 @@ func _on_peer_setup_requested(opponent_name: String, setup_kind: String) -> void
 	setup.configure_peer(opponent_name, setup_kind)
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
-	setup.play_requested.connect(_show_game_screen)
+	setup.play_requested.connect(_show_game_screen.bind(true))
 	_show_screen(setup)
 
 
-func _show_game_screen() -> void:
+func _show_game_screen(is_multiplayer: bool = false) -> void:
 	var game := GAME_SCREEN.instantiate() as GameScreen
+	if is_multiplayer:
+		game.configure_peer()
 	game.leave_requested.connect(_show_home_screen)
 	_show_screen(game)
 

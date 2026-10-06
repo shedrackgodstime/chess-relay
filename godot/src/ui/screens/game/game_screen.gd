@@ -12,15 +12,27 @@ signal leave_requested
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
 var _camera_scale := 1.0
+var _is_multiplayer := false
+
+
+func configure_peer() -> void:
+	_is_multiplayer = true
+	if is_node_ready():
+		_update_header_visibility()
 
 
 func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
+	_update_header_visibility()
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
 	_build_demo_position()
+
+
+func _update_header_visibility() -> void:
+	_header.set_visibility(_is_multiplayer, _is_multiplayer, true, true)
 
 
 func _build_demo_position() -> void:

@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://src/ui/screens/game/game_screen.gd" id="1_game"]
 [ext_resource type="PackedScene" path="res://src/game/board/board_view.tscn" id="2_board"]
@@ -7,11 +7,19 @@
 
 [sub_resource type="Environment" id="Environment_game"]
 background_mode = 1
-background_color = Color(0.035, 0.026, 0.02, 1)
+background_color = Color(0.045, 0.035, 0.028, 1)
 ambient_light_source = 3
-ambient_light_color = Color(0.62, 0.53, 0.42, 1)
-ambient_light_energy = 0.7
+ambient_light_color = Color(0.72, 0.64, 0.54, 1)
+ambient_light_energy = 1.05
 tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="GroundMaterial"]
+albedo_color = Color(0.055, 0.043, 0.035, 1)
+roughness = 0.92
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+material = SubResource("GroundMaterial")
+size = Vector2(36, 36)
 
 [node name="GameScreen" type="Control"]
 layout_mode = 3
@@ -41,32 +49,36 @@ environment = SubResource("Environment_game")
 [node name="KeyLight" type="DirectionalLight3D" parent="World"]
 rotation_degrees = Vector3(-90, 0, 0)
 light_color = Color(1, 0.91, 0.75, 1)
-light_energy = 1.35
+light_energy = 1.55
 shadow_enabled = true
 
 [node name="OpponentFillLight" type="OmniLight3D" parent="World"]
 position = Vector3(0, 6, -7)
 light_color = Color(0.82, 0.88, 1, 1)
-light_energy = 0.55
+light_energy = 0.9
 omni_range = 18.0
 
 [node name="PlayerFillLight" type="OmniLight3D" parent="World"]
 position = Vector3(0, 6, 7)
 light_color = Color(1, 0.9, 0.76, 1)
-light_energy = 0.55
+light_energy = 0.85
 omni_range = 18.0
 
 [node name="LeftFillLight" type="OmniLight3D" parent="World"]
 position = Vector3(-7, 5, 0)
 light_color = Color(0.84, 0.9, 1, 1)
-light_energy = 0.35
+light_energy = 0.58
 omni_range = 18.0
 
 [node name="RightFillLight" type="OmniLight3D" parent="World"]
 position = Vector3(7, 5, 0)
 light_color = Color(1, 0.86, 0.72, 1)
-light_energy = 0.35
+light_energy = 0.58
 omni_range = 18.0
+
+[node name="Ground" type="MeshInstance3D" parent="World"]
+position = Vector3(0, -0.32, 0)
+mesh = SubResource("GroundMesh")
 
 [node name="Camera" type="Camera3D" parent="World"]
 unique_name_in_owner = true
@@ -116,3 +128,41 @@ theme_type_variation = &"QuietButton"
 text = "Board view"
 tooltip_text = "Change board orientation"
 accessibility_name = "Change board orientation"
+
+[node name="ClockStrip" type="PanelContainer" parent="HUD/HUDRoot"]
+layout_mode = 0
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -64.0
+offset_right = 276.0
+offset_bottom = -32.0
+theme_type_variation = &"Card"
+mouse_filter = 2
+
+[node name="Content" type="HBoxContainer" parent="HUD/HUDRoot/ClockStrip"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="OpponentClock" type="Label" parent="HUD/HUDRoot/ClockStrip/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Caption"
+text = "MORGAN  09:58"
+horizontal_alignment = 2
+vertical_alignment = 1
+
+[node name="Divider" type="Label" parent="HUD/HUDRoot/ClockStrip/Content"]
+layout_mode = 2
+theme_type_variation = &"Caption"
+text = "·"
+vertical_alignment = 1
+
+[node name="PlayerClock" type="Label" parent="HUD/HUDRoot/ClockStrip/Content"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_type_variation = &"Caption"
+text = "10:00  YOU"
+vertical_alignment = 1

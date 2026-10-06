@@ -246,6 +246,23 @@ func _check_game_screen() -> void:
 	var game := GAME_SCENE.instantiate() as GameScreen
 	root.add_child(game)
 	await process_frame
+	var clock_strip := game.get_node("HUD/HUDRoot/ClockStrip") as PanelContainer
+	_check(clock_strip != null, "game screen has a compact clock strip")
+	_check(clock_strip.get_node("Content/OpponentClock").text == "MORGAN  09:58",
+		"clock strip shows the opponent clock")
+	_check(clock_strip.get_node("Content/PlayerClock").text == "10:00  YOU",
+		"clock strip shows the local clock")
+	_check(not game.get_node("HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
+		"computer game keeps network status hidden")
+	var peer_game := GAME_SCENE.instantiate() as GameScreen
+	peer_game.configure_peer()
+	root.add_child(peer_game)
+	await process_frame
+	_check(peer_game.get_node("HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
+		"peer game restores network status in the header")
+	_check(peer_game.get_node("HUD/HUDRoot/GameHeader/VoiceCluster").visible,
+		"peer game restores voice control in the header")
+	peer_game.queue_free()
 	# The screen root is a full-rect Control and Control.mouse_filter defaults to
 	# MOUSE_FILTER_STOP, which is why it is set to IGNORE. Without this, no mouse
 	# event reaches the camera at all.
@@ -375,6 +392,13 @@ func _check_game_screen() -> void:
 		"game has a left-side fill light")
 	_check(game.get_node("World/RightFillLight") is OmniLight3D,
 		"game has a right-side fill light")
+	var ground := game.get_node("World/Ground") as MeshInstance3D
+	_check(ground != null and ground.mesh is PlaneMesh,
+		"game grounds the board with a quiet surface")
+	_check(key_light.light_energy >= 1.5,
+		"game key light is bright enough for the dark pieces")
+	_check((game.get_node("World/OpponentFillLight") as OmniLight3D).light_energy >= 0.8,
+		"opponent-side fill light lifts the dark pieces")
 	game._update_camera_framing(1440.0, 900.0)
 	var wide_camera_height := game._camera.position.y
 	game._update_camera_framing(640.0, 900.0)
