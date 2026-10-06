@@ -16,6 +16,10 @@ signal game_setup_requested(opponent_name: String, setup_kind: String)
 ## The list row, loaded here rather than referred to by path at runtime so that a
 ## scene which has gone missing is a load error at startup instead of a null in the
 ## middle of filling the list.
+## The discovery dialog, built once and reused.
+const DISCOVERY_DIALOG_SCENE: PackedScene = preload(
+	"res://src/ui/components/discovery_dialog/discovery_dialog.tscn")
+
 const PLAYER_ROW_SCENE: PackedScene = preload(
 	"res://src/ui/components/player_row/player_row.tscn")
 
@@ -53,6 +57,7 @@ var _current_player_invite := ""
 var _queued_incoming_invite := ""
 var _discoverable_nearby := true
 var _discoverable_online := false
+var _discovery_dialog: DiscoverySettingsDialog = null
 
 
 func _ready() -> void:
@@ -60,6 +65,7 @@ func _ready() -> void:
 	_create_invite_button.pressed.connect(_on_create_invite)
 	_join_game_button.pressed.connect(_begin_join_flow)
 	%DiscoverySettingsButton.pressed.connect(_show_discovery_settings)
+	_build_discovery_dialog()
 	_populate_mock_players()
 	get_viewport().size_changed.connect(_update_responsive_layout)
 	_update_responsive_layout()
@@ -160,37 +166,28 @@ func _decline_incoming_invite() -> void:
 	_flow_cancel_button(_reset_invite_flow)
 
 
+## Opens the dialog, with the answers that are currently in force.
+##
+## One dialog for the life of the screen rather than one per opening. It used to be
+## built here each time and freed on close, which meant the two answers had to be
+## copied in each time and could drift from the profile line beside the button.
 func _show_discovery_settings() -> void:
-	var dialog := AcceptDialog.new()
-	dialog.theme_type_variation = &"ModalDialog"
-	dialog.title = "Discovery settings"
-	dialog.dialog_text = "Choose where other players can discover you."
-	dialog.dialog_autowrap = true
-	dialog.get_label().horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	dialog.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var content := VBoxContainer.new()
-	content.add_theme_constant_override("separation", 8)
-	var nearby := CheckButton.new()
-	nearby.text = "Discoverable on this local network"
-	nearby.button_pressed = _discoverable_nearby
-	nearby.toggled.connect(func(enabled: bool):
-		_discoverable_nearby = enabled
-		_update_profile_status()
-	)
-	content.add_child(nearby)
-	var online := CheckButton.new()
-	online.text = "Discoverable by online players"
-	online.button_pressed = _discoverable_online
-	online.toggled.connect(func(enabled: bool):
-		_discoverable_online = enabled
-		_update_profile_status()
-	)
-	content.add_child(online)
-	dialog.add_child(content)
-	add_child(dialog)
-	dialog.popup_centered(Vector2i(460, 240))
-	dialog.confirmed.connect(dialog.queue_free)
-	dialog.canceled.connect(dialog.queue_free)
+	_discovery_dialog.discoverable_nearby = _discoverable_nearby
+	_discovery_dialog.discoverable_online = _discoverable_online
+	_discovery_dialog.show_dialog()
+
+
+## One dialog, made once.
+func _build_discovery_dialog() -> void:
+	_discovery_dialog = DISCOVERY_DIALOG_SCENE.instantiate() as DiscoverySettingsDialog
+	add_child(_discovery_dialog)
+	_discovery_dialog.discovery_changed.connect(_on_discovery_changed)
+
+
+func _on_discovery_changed(nearby: bool, online: bool) -> void:
+	_discoverable_nearby = nearby
+	_discoverable_online = online
+	_update_profile_status()
 
 
 func _update_profile_status() -> void:

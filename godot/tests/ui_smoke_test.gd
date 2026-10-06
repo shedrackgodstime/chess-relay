@@ -202,6 +202,28 @@ func _check_responsive_layouts() -> void:
 	var hub := HUB_SCENE.instantiate() as MultiplayerHubScreen
 	root.add_child(hub)
 	await process_frame
+	# The discovery dialog has to be a scene and has to keep the hub's answers, because
+	# the alternative was copying two booleans in on every opening.
+	var dialog := hub._discovery_dialog
+	_check(dialog != null, "hub holds a discovery dialog")
+	_check(dialog.get_script().resource_path
+			== "res://src/ui/components/discovery_dialog/discovery_dialog.gd",
+		"and it is the shared component scene")
+	hub._discoverable_nearby = false
+	hub._show_discovery_settings()
+	await process_frame
+	_check(dialog.visible, "opening the dialog shows it")
+	_check(dialog.discoverable_nearby == false,
+		"and it opens on the answers in force, not its own defaults")
+	_check(not dialog.get_node("Options/Nearby").button_pressed,
+		"with the control showing that answer")
+	var changes := {"count": 0}
+	dialog.discovery_changed.connect(
+		func(_nearby: bool, _online: bool) -> void: changes["count"] += 1)
+	dialog.get_node("Options/Online").button_pressed = true
+	await process_frame
+	_check(int(changes["count"]) == 1, "the dialog reports a change")
+	_check(hub._discoverable_online, "and the hub takes it")
 	hub._update_responsive_layout(800.0)
 	_check(hub._invite_grid.columns == 1, "hub stacks invite cards at narrow width")
 	hub._update_responsive_layout(1200.0)

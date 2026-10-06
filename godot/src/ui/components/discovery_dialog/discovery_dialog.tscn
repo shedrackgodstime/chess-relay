@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/discovery_dialog/discovery_dialog.gd" id="1_discovery_dialog"]
+
+[node name="DiscoverySettingsDialog" type="AcceptDialog"]
+title = "Discovery settings"
+theme_type_variation = &"ModalDialog"
+dialog_text = "Choose where other players can discover you."
+script = ExtResource("1_discovery_dialog")
+
+[node name="Options" type="VBoxContainer" parent="."]
+theme_override_constants/separation = 8
+
+[node name="Nearby" type="CheckButton" parent="Options"]
+unique_name_in_owner = true
+text = "Discoverable on this local network"
+
+[node name="Online" type="CheckButton" parent="Options"]
+unique_name_in_owner = true
+text = "Discoverable by online players"

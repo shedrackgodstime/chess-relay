@@ -36,7 +36,7 @@ has to be confirmed there before the project relies on it.
 
 ## 2. The multiplayer hub builds its UI in script
 
-Status: **in progress. The player row and the flow card are done.**
+Status: **done.**
 
 `src/ui/screens/multiplayer_hub/multiplayer_hub_screen.gd` is 511 lines and
 constructs its own controls with `PanelContainer.new()`, `HBoxContainer.new()`,
@@ -97,15 +97,28 @@ content box by queueing its children for deletion and then immediately adding th
 next flow's, so for a frame the card held both. The card now removes and frees in
 one step.
 
-### Still in the hub script
+### The discovery settings dialog
 
-- **The discovery settings dialog.** Built with `AcceptDialog.new()` and two
-  `CheckButton.new()`, in `_show_discovery_settings`. It is the last multi-node
-  block left and should become a scene when the piece work starts needing dialogs
-  elsewhere, so that it is not a one-off.
-- **The join code field.** Deliberately still a method, not a component. Only the
-  join flow needs one, and a control with a single caller is not yet reusable. The
-  note above it says so, so it is a decision rather than an oversight.
+Done. `src/ui/components/discovery_dialog/`, an `AcceptDialog` scene holding its
+title, its message and its two answers. The hub builds one and keeps it, rather than
+building a fresh dialog on each opening and copying two booleans in — which is how
+those two answers could drift from the profile line beside the button that opens it.
+
+The dialog reports `discovery_changed(nearby, online)` and decides nothing about what
+that means; the hub still owns the profile line.
+
+### What is left in the hub, and why
+
+The hub script is 511 lines down to **434**. Two `new()` calls remain and both are
+correct:
+
+- `RandomNumberGenerator.new()` for the invite code. A generator is not interface.
+- `LineEdit.new()` in `_code_field`. Deliberately still a method: only the join flow
+  needs one, and a control with a single caller is not yet reusable. The note above
+  it says so, so it reads as a decision rather than an oversight. It becomes a scene
+  when a second caller appears.
+
+Everything with layout in it is now a scene.
 
 ### The headless class cache
 
