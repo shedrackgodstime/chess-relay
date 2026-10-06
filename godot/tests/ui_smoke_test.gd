@@ -175,17 +175,17 @@ func _check_game_screen() -> void:
 	await process_frame
 	_check(game._board.get_node("Squares").get_child_count() == 64,
 		"game board builds 64 reusable squares")
-	_check(game._board.get_node("Coordinates").get_child_count() == 16,
-		"game board builds reusable file and rank labels")
-	_check(game._board.get_node("Coordinates/File_a").mesh.text == "a",
+	_check(game._board.get_node("Coordinates").get_child_count() == 32,
+		"game board builds reusable labels on all four frame sides")
+	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
 		"board exposes file coordinate labels")
-	_check(game._board.get_node("Coordinates/Rank_1").mesh.text == "1",
+	_check(game._board.get_node("Coordinates/RankLeft_1").mesh.text == "1",
 		"board exposes rank coordinate labels")
-	_check(is_equal_approx(game._board.get_node("Coordinates/File_a").position.z, 4.21),
+	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.z, 4.21),
 		"file labels are pinned to the frame midpoint")
-	_check(is_equal_approx(game._board.get_node("Coordinates/Rank_1").position.x, -4.21),
+	_check(is_equal_approx(game._board.get_node("Coordinates/RankLeft_1").position.x, -4.21),
 		"rank labels are pinned to the frame midpoint")
-	_check(is_equal_approx(game._board.get_node("Coordinates/File_a").position.y, 0.054),
+	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.y, 0.054),
 		"coordinate markings sit on the frame top surface")
 	_check(game._pieces.get_child_count() == 32,
 		"game screen renders a complete demo position")
@@ -197,6 +197,17 @@ func _check_game_screen() -> void:
 	game._update_camera_framing(1440.0, 900.0)
 	_check(is_equal_approx(game._camera.position.y, wide_camera_height),
 		"game camera restores framing for a wide viewport")
+	var initial_camera_position := game._camera.position
+	game._camera_yaw = 90.0
+	game._apply_camera_orbit()
+	_check(not game._camera.position.is_equal_approx(initial_camera_position),
+		"game camera orbits around the board")
+	game._board_view_button.pressed.emit()
+	_check(game.get_node_or_null("HUD/BoardViewMenu") != null,
+		"game opens board view controls")
+	game.get_node("HUD/BoardViewMenu").get_child(0).get_child(2).pressed.emit()
+	_check(is_equal_approx(game._camera_yaw, 270.0),
+		"board view controls flip the board")
 	for square in ["a1", "e4", "h8"]:
 		_check(game._board.world_to_square(game._board.square_to_world(square)) == square,
 			"board coordinate round trip works for %s" % square)

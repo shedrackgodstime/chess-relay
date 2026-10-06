@@ -66,3 +66,19 @@ grow_horizontal = 2
 show_network_indicator = false
 show_voice_control = false
 center_text = "Your turn · Move 1"
+
+[node name="BoardViewButton" type="Button" parent="HUD/HUDRoot"]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -118.0
+offset_top = -68.0
+offset_right = -24.0
+offset_bottom = -24.0
+theme_type_variation = &"QuietButton"
+text = "Board view"
+tooltip_text = "Change board orientation"
+accessibility_name = "Change board orientation"

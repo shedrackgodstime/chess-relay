@@ -71,9 +71,15 @@ the calculated frame midpoint with viewport offsets or screen-space labels.
 - Use simple procedural meshes for the first shell so geometry can be tested
   without external art.
 - Keep materials in the board/piece scenes until a shared art resource exists.
-- Use one camera and deliberate lighting before adding orbit controls or room
-  decoration.
+- Use one camera and deliberate lighting before adding room decoration.
 - Keep the HUD in the project theme and use the existing header component.
+
+The game camera supports a left-button drag on the board area. Dragging orbits
+the camera around the board target while preserving the framing scale. The
+header remains UI-owned and does not begin an orbit drag.
+
+The **Board view** control provides deterministic rotate-left, rotate-right,
+flip, and reset actions for users who do not want to drag the camera.
 
 ## Verification plan
 

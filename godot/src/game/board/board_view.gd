@@ -144,18 +144,18 @@ func _build_coordinates() -> void:
 	var label_height := frame_top + 0.004
 	for file in BOARD_SIZE:
 		var file_name := char("a".unicode_at(0) + file)
-		_add_coordinate(
-			file_name,
-			Vector3((file - 3.5) * SQUARE_SIZE, label_height, frame_label_offset),
-			"File_%s" % file_name
-		)
+		var file_position := (file - 3.5) * SQUARE_SIZE
+		_add_coordinate(file_name, Vector3(file_position, label_height, frame_label_offset),
+			"FileFront_%s" % file_name)
+		_add_coordinate(file_name, Vector3(file_position, label_height, -frame_label_offset),
+			"FileBack_%s" % file_name)
 	for rank in BOARD_SIZE:
 		var rank_name := str(rank + 1)
-		_add_coordinate(
-			rank_name,
-			Vector3(-frame_label_offset, label_height, (3.5 - rank) * SQUARE_SIZE),
-			"Rank_%s" % rank_name
-		)
+		var rank_position := (3.5 - rank) * SQUARE_SIZE
+		_add_coordinate(rank_name, Vector3(-frame_label_offset, label_height, rank_position),
+			"RankLeft_%s" % rank_name)
+		_add_coordinate(rank_name, Vector3(frame_label_offset, label_height, rank_position),
+			"RankRight_%s" % rank_name)
 
 
 func _add_coordinate(text: String, position: Vector3, node_name: String) -> void:
@@ -165,12 +165,12 @@ func _add_coordinate(text: String, position: Vector3, node_name: String) -> void
 	marking.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
 	var text_mesh := TextMesh.new()
 	text_mesh.text = text
-	text_mesh.font_size = 32
-	text_mesh.depth = 0.008
+	text_mesh.font_size = 16
+	text_mesh.depth = 0.002
 	text_mesh.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	text_mesh.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	marking.mesh = text_mesh
-	marking.material_override = _material(Color(0.78, 0.7, 0.58, 0.95))
+	marking.material_override = _material(Color(0.68, 0.6, 0.49, 0.9))
 	_coordinates_root.add_child(marking)
 
 
