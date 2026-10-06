@@ -1,0 +1,7 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "ChessPieceBlack"
+albedo_color = Color(0.09, 0.07, 0.06, 1)
+metallic = 0.18
+roughness = 0.28
