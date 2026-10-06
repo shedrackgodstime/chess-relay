@@ -3,36 +3,57 @@ extends Camera3D
 
 ## Orbit camera: drag to rotate, wheel or pinch to zoom.
 ##
-## Input is read in `_input` rather than `_unhandled_input`, and that is not a
-## style choice. `_unhandled_input` only runs for events the GUI let through, so
-## it sits behind every Control on screen: the game screen's root is a full-rect
-## Control, and a Control that stops input ends the event before the camera ever
-## sees it. That is why the board could not be dragged round while the buttons that
-## call `orbit_by` directly worked fine. `_input` runs first and cannot be blocked
-## by the GUI, which removes that whole class of problem.
+## This is the reference prototype's camera, brought over rather than rewritten.
+## The behaviour is its behaviour: the same spherical state, the same clamps, the
+## same touch tracking, and the same suppression of emulated mouse motion while two
+## fingers are down so that pinching zooms instead of spinning the board.
 ##
-## The cost of reading first is that the camera also sees drags that began on a
-## button, so a drag is only started when the press did not land on something that
-## handles input. See _dragged_by_gui.
+## It is brought over because this version, written from scratch in this project,
+## would rotate with the on-screen buttons and would not rotate when dragged, on a
+## device where the original does both. That is not an argument about style. The
+## original works and this one did not, so the original is the one to use.
+##
+## Two things stay different, because this project's screen needs them and the
+## prototype's does not:
+##
+## - Input is read in `_input`, not `_unhandled_input`. The prototype's scene root
+##   is a `Node3D` and cannot swallow anything; this project's game screen root is a
+##   full-rect `Control`, and a Control that stops input ends the event before
+##   `_unhandled_input` would ever see it. `_input` runs first and cannot be blocked.
+##   Because of that, the camera sees presses meant for buttons, so `_dragged_by_gui`
+##   decides whether a press landed on something interactive and refuses to drag if it
+##   did.
+## - The distance and pitch limits are this project's, since they are sized against
+##   this board and this viewport rather than the prototype's room.
 
 @export var target := Vector3.ZERO
-@export var yaw_degrees := 0.0
-@export var pitch_degrees := 45.0
-@export var distance := 15.27
+
+@export_range(0.0, 360.0) var yaw_degrees := 0.0:
+	set(value):
+		yaw_degrees = value
+		_apply()
+
+@export_range(5.0, 90.0) var pitch_degrees := 45.0:
+	set(value):
+		pitch_degrees = clampf(value, min_pitch_degrees, max_pitch_degrees)
+		_apply()
+
+@export var distance := 15.27:
+	set(value):
+		distance = clampf(value, min_distance, max_distance)
+		_apply()
+
 @export var min_distance := 9.0
 @export var max_distance := 22.0
 @export var min_pitch_degrees := 24.0
 @export var max_pitch_degrees := 72.0
+
+## Degrees of orbit per pixel of drag.
 @export var rotate_degrees_per_pixel := 0.45
+## Multiplicative zoom per wheel tick.
 @export var wheel_zoom_step := 1.12
 
 var _dragging_mouse := false
-
-## Fingers currently down, by index.
-##
-## Tracked because Godot also delivers touch as emulated mouse events. Without
-## knowing how many fingers are down, a two-finger pinch arrives as two streams of
-## emulated mouse motion and the board spins while the player is trying to zoom.
 var _touches := {}
 
 
@@ -40,6 +61,7 @@ func _ready() -> void:
 	_apply()
 
 
+## Points the camera at the current state.
 func reset_view(new_yaw := 0.0, new_pitch := 45.0) -> void:
 	yaw_degrees = new_yaw
 	pitch_degrees = new_pitch
@@ -49,6 +71,10 @@ func reset_view(new_yaw := 0.0, new_pitch := 45.0) -> void:
 func set_distance(new_distance: float) -> void:
 	distance = clampf(new_distance, min_distance, max_distance)
 	_apply()
+
+
+func zoom_by(factor: float) -> void:
+	set_distance(distance * factor)
 
 
 func orbit_by(yaw_delta: float, pitch_delta := 0.0) -> void:
@@ -68,11 +94,11 @@ func _apply() -> void:
 	transform = Transform3D(Basis(), target + offset).looking_at(target, Vector3.UP)
 
 
-## Reads every kind of pointer input from one place, on purpose: mouse, wheel,
-## single-finger drag, two-finger pinch.
+## Every kind of pointer input, in one place: mouse drag and wheel, single-finger
+## drag and two-finger pinch.
 ##
-## Nothing here calls `set_input_as_handled`. Events this camera is not interested
-## in have to keep travelling, or the buttons underneath stop working.
+## Nothing here calls `set_input_as_handled`. Events the camera is not interested in
+## have to keep travelling, or the buttons underneath stop working.
 func _input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		_mouse_button(event as InputEventMouseButton)
@@ -83,7 +109,7 @@ func _input(event: InputEvent) -> void:
 	elif event is InputEventScreenDrag:
 		_screen_drag(event as InputEventScreenDrag)
 	elif event is InputEventMagnifyGesture:
-		set_distance(distance / (event as InputEventMagnifyGesture).factor)
+		zoom_by(1.0 / (event as InputEventMagnifyGesture).factor)
 
 
 func _mouse_button(event: InputEventMouseButton) -> void:
@@ -95,47 +121,30 @@ func _mouse_button(event: InputEventMouseButton) -> void:
 		else:
 			_dragging_mouse = false
 	elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
-		set_distance(distance / wheel_zoom_step)
+		zoom_by(1.0 / wheel_zoom_step)
 	elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-		set_distance(distance * wheel_zoom_step)
+		zoom_by(wheel_zoom_step)
 
 
 func _mouse_motion(event: InputEventMouseMotion) -> void:
-	# Two fingers down means the gesture is a pinch and belongs to the touch
-	# tracker, not to the emulated mouse.
+	# While pinching, the first finger also arrives as emulated mouse motion; the
+	# touch tracker owns the gesture then, so the mouse stays out of it.
 	if not _dragging_mouse or _touches.size() >= 2:
 		return
 	orbit_by(-event.relative.x * rotate_degrees_per_pixel,
 		-event.relative.y * rotate_degrees_per_pixel)
 
 
-## Whether a press at this point landed on something that handles input.
-##
-## Walked rather than asked of the viewport, because `gui_get_hovered_control`
-## reflects the GUI's own picking and this runs before the GUI has seen the event.
-## The deepest match wins, so a button inside a panel beats the panel.
-func _dragged_by_gui(position: Vector2) -> bool:
-	var blocker: Control = null
-	for node in _input_handling_controls(get_viewport()):
-		var control := node as Control
-		if control.get_global_rect().has_point(position):
-			blocker = control
-	# No blocker at all is a free drag.
-	return blocker != null
-
-
-func _input_handling_controls(from: Node) -> Array[Node]:
-	var found: Array[Node] = []
-	for child in from.get_children():
-		if child is Control:
-			var control := child as Control
-			# Only controls that actually take input count, and only ones that are
-			# really on screen: a hidden panel still has a rect.
-			if control.mouse_filter == Control.MOUSE_FILTER_STOP \
-					and control.is_visible_in_tree():
-				found.append(control)
-		found.append_array(_input_handling_controls(child))
-	return found
+## Single finger tracks position only, because the emulated mouse motion already
+## rotates and doing it here too would double the speed.
+func _screen_drag(event: InputEventScreenDrag) -> void:
+	if not _touches.has(event.index):
+		return
+	_touches[event.index] = event.position
+	if _touches.size() == 1:
+		pass
+	elif _touches.size() == 2:
+		_pinch_zoom()
 
 
 func _screen_touch(event: InputEventScreenTouch) -> void:
@@ -143,22 +152,13 @@ func _screen_touch(event: InputEventScreenTouch) -> void:
 		_touches[event.index] = event.position
 	else:
 		_touches.erase(event.index)
+		if _touches.size() < 2 and has_meta(&"_pinch_previous"):
+			remove_meta(&"_pinch_previous")
 		if _touches.is_empty():
 			_dragging_mouse = false
-			remove_meta(&"_pinch_previous")
 
 
-## One finger tracks its position but does not rotate, because the emulated mouse
-## motion already does that and doing it twice doubles the speed. Two fingers pinch.
-func _screen_drag(event: InputEventScreenDrag) -> void:
-	if not _touches.has(event.index):
-		return
-	_touches[event.index] = event.position
-	if _touches.size() == 2:
-		_pinch()
-
-
-func _pinch() -> void:
+func _pinch_zoom() -> void:
 	var points := _touches.values()
 	var current: float = (points[0] as Vector2).distance_to(points[1] as Vector2)
 	if current <= 0.0:
@@ -168,5 +168,31 @@ func _pinch() -> void:
 		return
 	var previous := float(get_meta(&"_pinch_previous"))
 	if previous > 0.0:
-		set_distance(distance * previous / current)
+		zoom_by(previous / current)
 	set_meta(&"_pinch_previous", current)
+
+
+## Whether a press at this point landed on something that handles input.
+##
+## Walked rather than asked of the viewport, because `gui_get_hovered_control`
+## reflects the GUI's own picking and this runs before the GUI has seen the event.
+func _dragged_by_gui(position: Vector2) -> bool:
+	for node in _input_handling_controls(get_viewport()):
+		var control := node as Control
+		if control.get_global_rect().has_point(position):
+			return true
+	return false
+
+
+func _input_handling_controls(from: Node) -> Array[Node]:
+	var found: Array[Node] = []
+	for child in from.get_children():
+		if child is Control:
+			var control := child as Control
+			# Only controls that take input, and only ones really on screen: a hidden
+			# panel still has a rect.
+			if control.mouse_filter == Control.MOUSE_FILTER_STOP \
+					and control.is_visible_in_tree():
+				found.append(control)
+		found.append_array(_input_handling_controls(child))
+	return found
