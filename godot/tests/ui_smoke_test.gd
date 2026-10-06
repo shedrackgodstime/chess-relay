@@ -318,10 +318,24 @@ func _check_game_screen() -> void:
 	# The piece seam exists before any piece does. It is keyed by the identities that
 	# arrive over the application boundary rather than by an enum declared here, so
 	# there is one list of piece types and this project is not it.
-	_check(PieceMeshes.SHAPE_MESHES.is_empty(),
-		"no shapes authored yet, so nothing can be drawn by accident")
-	_check(PieceMeshes.mesh_for(&"pawn", PieceMeshes.LIGHT) == null,
-		"an identity with no shape gives nothing")
+	# Six identities, one model each, and no white or dark variant: colour is the second
+	# axis, so a full set is six models and two materials.
+	_check(PieceMeshes.SHAPE_MESHES.size() == 6,
+		"a full set is six shapes, got %d" % PieceMeshes.SHAPE_MESHES.size())
+	for identity: StringName in [&"pawn", &"knight", &"bishop", &"rook", &"queen", &"king"]:
+		var path: String = PieceMeshes.SHAPE_MESHES.get(identity, "")
+		# Checked as a committed file rather than through ResourceLoader, because
+		# loading a .glb needs the import pipeline and this is the question "is it in
+		# version control". That the engine can import and load it is a separate
+		# question, answered in the editor.
+		_check(not path.is_empty() and FileAccess.file_exists(path),
+			"%s has a model committed" % identity)
+		# Every model arrives at whatever size its author worked in, and these six are
+		# not even the same size as each other, so each is scaled separately.
+		_check(PieceMeshes.MODEL_SCALE.has(identity),
+			"%s has its own scale, since they are not a consistent set" % identity)
+	_check(PieceMeshes.mesh_for(&"dragon", PieceMeshes.LIGHT) == null,
+		"an identity that is not a piece gives nothing")
 	_check(PieceMeshes.material_for(PieceMeshes.LIGHT) != null
 			and PieceMeshes.material_for(PieceMeshes.DARK) != null,
 		"but a material per side does, so colour is ready")
