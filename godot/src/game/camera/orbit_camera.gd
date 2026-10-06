@@ -127,23 +127,34 @@ func _mouse_button(event: InputEventMouseButton) -> void:
 
 
 func _mouse_motion(event: InputEventMouseMotion) -> void:
-	# While pinching, the first finger also arrives as emulated mouse motion; the
-	# touch tracker owns the gesture then, so the mouse stays out of it.
-	if not _dragging_mouse or _touches.size() >= 2:
+	# Any finger down means the touch tracker owns the gesture, so the mouse stays out
+	# of it entirely.
+	#
+	# The prototype only stood aside for two fingers, because with one finger the
+	# emulated mouse motion did the rotating. On the device this was built on, that
+	# emulated motion does not arrive: pinch zoom works, which proves the touch events
+	# themselves are delivered, and dragging does nothing, which proves the mouse ones
+	# are not. So the touch tracker rotates on its own and the mouse stands aside
+	# whenever a finger is down rather than only when two are.
+	if not _dragging_mouse or not _touches.is_empty():
 		return
 	orbit_by(-event.relative.x * rotate_degrees_per_pixel,
 		-event.relative.y * rotate_degrees_per_pixel)
 
 
-## Single finger tracks position only, because the emulated mouse motion already
-## rotates and doing it here too would double the speed.
+## A finger drags the board. Two fingers pinch it.
+##
+## The rotation is done here rather than left to emulated mouse motion because that
+## cannot be relied on: see _mouse_motion. _mouse_motion stands aside while any finger
+## is down, so the two cannot both rotate and the board does not spin at twice speed.
 func _screen_drag(event: InputEventScreenDrag) -> void:
 	if not _touches.has(event.index):
 		return
 	_touches[event.index] = event.position
 	if _touches.size() == 1:
-		pass
-	elif _touches.size() == 2:
+		orbit_by(-event.relative.x * rotate_degrees_per_pixel,
+			-event.relative.y * rotate_degrees_per_pixel)
+	else:
 		_pinch_zoom()
 
 

@@ -267,6 +267,54 @@ func _check_game_screen() -> void:
 	_check(game._camera._dragged_by_gui(view_button.get_global_rect().get_center()),
 		"and neither is one on the board view button")
 
+	# A finger rotates, on the evidence that pinch works and drag did not: the touch
+	# events are delivered and the emulated mouse ones are not. Driven as touch events
+	# rather than as mouse ones, because driving mouse motion would pass whether or not
+	# the touch path works at all, which is the check that was wrong three times.
+	# Put the camera back at the end. Three of these checks have now broken the ones
+	# after them by leaving it somewhere else, which is the same mistake each time:
+	# shared state that a check moves and does not put back.
+	var cam := game._camera
+	var saved_yaw: float = cam.yaw_degrees
+	var saved_pitch: float = cam.pitch_degrees
+	var touch_yaw: float = cam.yaw_degrees
+	var touch_down := InputEventScreenTouch.new()
+	touch_down.index = 0
+	touch_down.pressed = true
+	touch_down.position = Vector2(400.0, 520.0)
+	cam._input(touch_down)
+	var touch_drag := InputEventScreenDrag.new()
+	touch_drag.index = 0
+	touch_drag.position = Vector2(440.0, 520.0)
+	touch_drag.relative = Vector2(40.0, 0.0)
+	cam._input(touch_drag)
+	_check(not is_equal_approx(cam.yaw_degrees, touch_yaw),
+		"a one-finger drag rotates the board, yaw %.1f -> %.1f"
+			% [touch_yaw, cam.yaw_degrees])
+
+	# And the emulated mouse must not also rotate while that finger is down, or the
+	# board would turn at twice the speed on a device where both do arrive.
+	var before_double: float = cam.yaw_degrees
+	var emulated := InputEventMouseMotion.new()
+	emulated.relative = Vector2(40.0, 0.0)
+	cam._dragging_mouse = true
+	cam._input(emulated)
+	_check(is_equal_approx(cam.yaw_degrees, before_double),
+		"and the emulated mouse does not rotate on top of it")
+
+	var lift := InputEventScreenTouch.new()
+	lift.index = 0
+	lift.pressed = false
+	cam._input(lift)
+	cam._dragging_mouse = true
+	var mouse_yaw: float = cam.yaw_degrees
+	cam._input(emulated)
+	_check(not is_equal_approx(cam.yaw_degrees, mouse_yaw),
+		"while a plain mouse drag still rotates once no finger is down")
+	cam.yaw_degrees = saved_yaw
+	cam.pitch_degrees = saved_pitch
+	cam._dragging_mouse = false
+
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
 	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
