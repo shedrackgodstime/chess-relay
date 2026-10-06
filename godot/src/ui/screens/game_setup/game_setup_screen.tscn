@@ -1,9 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://src/ui/screens/game_setup/game_setup_screen.gd" id="1_setup"]
 [ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="2_header"]
 [ext_resource type="PackedScene" path="res://src/ui/components/participant_card/participant_card.tscn" id="3_participant"]
-[ext_resource type="PackedScene" path="res://src/ui/components/card/card.tscn" id="4_card"]
 [ext_resource type="PackedScene" path="res://src/ui/components/choice_group/choice_group.tscn" id="5_choice_group"]
 
 [node name="GameSetupScreen" type="Control"]
@@ -98,10 +97,15 @@ theme_override_constants/h_separation = 20
 theme_override_constants/v_separation = 18
 columns = 3
 
-[node name="SideOptions" parent="Workspace/Scroll/Margins/Content/Settings" instance=ExtResource("4_card")]
+[node name="SideOptions" type="PanelContainer" parent="Workspace/Scroll/Margins/Content/Settings"]
+theme_type_variation = &"Card"
 layout_mode = 2
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 202)
+
+[node name="Content" type="VBoxContainer" parent="Workspace/Scroll/Margins/Content/Settings/SideOptions"]
+theme_override_constants/separation = 10
+layout_mode = 2
 
 [node name="SideChoice" parent="Workspace/Scroll/Margins/Content/Settings/SideOptions/Content" instance=ExtResource("5_choice_group")]
 unique_name_in_owner = true
@@ -111,10 +115,15 @@ choices = PackedStringArray("White", "Black", "Random")
 columns = 3
 selected_index = 0
 
-[node name="TimeOptions" parent="Workspace/Scroll/Margins/Content/Settings" instance=ExtResource("4_card")]
+[node name="TimeOptions" type="PanelContainer" parent="Workspace/Scroll/Margins/Content/Settings"]
+theme_type_variation = &"Card"
 layout_mode = 2
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 202)
+
+[node name="Content" type="VBoxContainer" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions"]
+theme_override_constants/separation = 10
+layout_mode = 2
 
 [node name="TimeChoice" parent="Workspace/Scroll/Margins/Content/Settings/TimeOptions/Content" instance=ExtResource("5_choice_group")]
 unique_name_in_owner = true
@@ -157,10 +166,15 @@ size_flags_horizontal = 3
 min_value = 0.0
 max_value = 60.0
 
-[node name="MatchOptions" parent="Workspace/Scroll/Margins/Content/Settings" instance=ExtResource("4_card")]
+[node name="MatchOptions" type="PanelContainer" parent="Workspace/Scroll/Margins/Content/Settings"]
+theme_type_variation = &"Card"
 layout_mode = 2
 size_flags_horizontal = 3
 custom_minimum_size = Vector2(0, 202)
+
+[node name="Content" type="VBoxContainer" parent="Workspace/Scroll/Margins/Content/Settings/MatchOptions"]
+theme_override_constants/separation = 10
+layout_mode = 2
 
 [node name="OptionsContent" type="VBoxContainer" parent="Workspace/Scroll/Margins/Content/Settings/MatchOptions/Content"]
 layout_mode = 2
