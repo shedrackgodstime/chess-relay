@@ -386,6 +386,8 @@ pub(crate) enum IllegalMoveKind {
     InvalidPromotion { role: char },
     /// Unparseable text, with the offending input.
     Parse { input: String },
+    /// Well-formed move that is illegal in the current position.
+    NotLegal { text: String },
 }
 
 impl IllegalMove {
@@ -417,6 +419,13 @@ impl IllegalMove {
         }
     }
 
+    pub(crate) fn not_legal(text: String) -> Self {
+        Self {
+            kind: IllegalMoveKind::NotLegal { text },
+            backtrace: Backtrace::capture(),
+        }
+    }
+
     /// Whether a board index or coordinate was off-board.
     #[must_use]
     pub fn is_out_of_range(&self) -> bool {
@@ -440,6 +449,12 @@ impl IllegalMove {
     pub fn is_parse(&self) -> bool {
         matches!(self.kind, IllegalMoveKind::Parse { .. })
     }
+
+    /// Whether a well-formed move is illegal in its position.
+    #[must_use]
+    pub fn is_not_legal(&self) -> bool {
+        matches!(self.kind, IllegalMoveKind::NotLegal { .. })
+    }
 }
 
 impl Display for IllegalMove {
@@ -456,6 +471,9 @@ impl Display for IllegalMove {
             }
             IllegalMoveKind::Parse { input } => {
                 write!(f, "illegal move: cannot parse '{input}'")
+            }
+            IllegalMoveKind::NotLegal { text } => {
+                write!(f, "illegal move in this position: '{text}'")
             }
         }?;
         use std::backtrace::BacktraceStatus::Captured;

@@ -152,12 +152,12 @@ impl std::str::FromStr for CastlingRights {
 /// ```
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
-    squares: [Option<Piece>; 64],
-    side_to_move: Color,
-    castling: CastlingRights,
-    en_passant: Option<Square>,
-    halfmove_clock: u32,
-    fullmove_number: u32,
+    pub(crate) squares: [Option<Piece>; 64],
+    pub(crate) side_to_move: Color,
+    pub(crate) castling: CastlingRights,
+    pub(crate) en_passant: Option<Square>,
+    pub(crate) halfmove_clock: u32,
+    pub(crate) fullmove_number: u32,
 }
 
 impl Board {

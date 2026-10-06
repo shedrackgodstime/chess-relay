@@ -252,6 +252,9 @@ func _check_game_screen() -> void:
 		"clock strip shows the opponent clock")
 	_check(clock_strip.get_node("Content/PlayerClock").text == "10:00  YOU",
 		"clock strip shows the local clock")
+	game._on_clock_tick()
+	_check(clock_strip.get_node("Content/PlayerClock").text == "09:59  YOU",
+		"active clock ticks in the game UI")
 	_check(not game.get_node("HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
 		"computer game keeps network status hidden")
 	var peer_game := GAME_SCENE.instantiate() as GameScreen

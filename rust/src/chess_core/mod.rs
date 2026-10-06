@@ -8,9 +8,15 @@
 //! either; perft vectors must agree with both (see plan Phase 1).
 
 pub(crate) mod board;
+pub(crate) mod game;
+pub(crate) mod movegen;
 pub(crate) mod types;
 
 #[doc(inline)]
 pub use board::{Board, CastlingRights};
+#[doc(inline)]
+pub use game::{DrawReason, Game, Outcome};
+#[doc(inline)]
+pub use movegen::{apply_move, is_attacked, is_in_check, legal_moves, perft, pseudo_legal_moves};
 #[doc(inline)]
 pub use types::{Color, IllegalMove, Move, Piece, Role, Square};

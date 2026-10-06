@@ -3,5 +3,5 @@
 [resource]
 resource_name = "ChessPieceWhite"
 albedo_color = Color(0.86, 0.82, 0.73, 1)
-metallic = 0.18
-roughness = 0.28
+metallic = 0.06
+roughness = 0.38

@@ -8,11 +8,17 @@ signal leave_requested
 @onready var _header: GameHeader = %GameHeader
 @onready var _camera: Camera3D = %Camera
 @onready var _board_view_button: Button = %BoardViewButton
+@onready var _opponent_clock: Label = $HUD/HUDRoot/ClockStrip/Content/OpponentClock
+@onready var _player_clock: Label = $HUD/HUDRoot/ClockStrip/Content/PlayerClock
+@onready var _clock_timer: Timer = $ClockTimer
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
 var _camera_scale := 1.0
 var _is_multiplayer := false
+var _active_clock_side := "white"
+var _white_seconds := 600
+var _black_seconds := 598
 
 
 func configure_peer() -> void:
@@ -25,7 +31,9 @@ func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
+	_clock_timer.timeout.connect(_on_clock_tick)
 	_update_header_visibility()
+	_update_clock_strip()
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
 	_build_demo_position()
@@ -33,6 +41,29 @@ func _ready() -> void:
 
 func _update_header_visibility() -> void:
 	_header.set_visibility(_is_multiplayer, _is_multiplayer, true, true)
+
+
+func _on_clock_tick() -> void:
+	if _active_clock_side == "white":
+		_white_seconds = maxi(0, _white_seconds - 1)
+	else:
+		_black_seconds = maxi(0, _black_seconds - 1)
+	_update_clock_strip()
+
+
+func _update_clock_strip() -> void:
+	_opponent_clock.text = "MORGAN  %s" % _format_clock(_black_seconds)
+	_player_clock.text = "%s  YOU" % _format_clock(_white_seconds)
+	var active_color := Color(1.0, 0.94, 0.82, 1.0)
+	var idle_color := Color(0.72, 0.66, 0.58, 1.0)
+	_opponent_clock.add_theme_color_override(
+		"font_color", active_color if _active_clock_side == "black" else idle_color)
+	_player_clock.add_theme_color_override(
+		"font_color", active_color if _active_clock_side == "white" else idle_color)
+
+
+func _format_clock(seconds: int) -> String:
+	return "%02d:%02d" % [seconds / 60, seconds % 60]
 
 
 func _build_demo_position() -> void:
