@@ -59,6 +59,32 @@ exist. The shape library is a lookup table; the list of piece types is Rust's.
 This is cheap to get right now, because nothing has been drawn yet, and expensive
 later, because by then six pieces will exist under two sets of names.
 
+## Stage 2: the world
+
+Status: **done.**
+
+The world was already largely here: a `WorldEnvironment` with a custom background
+and ambient light, a `DirectionalLight3D` key, three fill lights, and a
+`Camera3D` carrying the orbit script. What was missing was the camera actually
+receiving anything.
+
+- **The screen root now passes input through.** `Control.mouse_filter` defaults to
+  `MOUSE_FILTER_STOP`, so the full-rect root was consuming every mouse event before
+  it reached `_unhandled_input`, where the camera does all its input. `IGNORE`, not
+  `PASS`, because `PASS` takes the event and hands it to a parent, and there is no
+  parent `Control` to hand it to.
+- **Touch and pinch are handled.** The camera took mouse events only, so on a phone
+  it relied entirely on emulated mouse events and had no pinch at all. It now takes
+  `InputEventScreenTouch`, `InputEventScreenDrag` and `InputEventMagnifyGesture`,
+  and suppresses emulated mouse rotation while two fingers are down — otherwise a
+  pinch arrives as two streams of emulated mouse motion and the board spins while
+  the player is trying to zoom.
+
+Both are checked in the UI suite, and the checks restore the camera's position
+afterwards. They did not at first, which broke two unrelated checks that share the
+camera; a check that leaves shared state changed is a check that makes the next one
+lie.
+
 ## Stage 1: the board shell
 
 Status: **squares done, frame and coordinates still in script.**

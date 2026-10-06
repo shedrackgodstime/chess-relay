@@ -14,6 +14,13 @@ extends Camera3D
 
 var _dragging_mouse := false
 
+## Fingers currently down, by index.
+##
+## Tracked because Godot also delivers touch as emulated mouse events. Without
+## knowing how many fingers are down, a two-finger pinch arrives as two streams of
+## emulated mouse motion and the board spins while the player is trying to zoom.
+var _touches := {}
+
 
 func _ready() -> void:
 	_apply()
@@ -56,5 +63,45 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
 			set_distance(distance * wheel_zoom_step)
 	elif event is InputEventMouseMotion and _dragging_mouse:
-		orbit_by(-event.relative.x * rotate_degrees_per_pixel,
-			-event.relative.y * rotate_degrees_per_pixel)
+		# Two fingers down means the gesture is a pinch and belongs to the touch
+		# tracker, not to the emulated mouse.
+		if _touches.size() < 2:
+			orbit_by(-event.relative.x * rotate_degrees_per_pixel,
+				-event.relative.y * rotate_degrees_per_pixel)
+	elif event is InputEventScreenTouch:
+		var touch := event as InputEventScreenTouch
+		if touch.pressed:
+			_touches[touch.index] = touch.position
+		else:
+			_touches.erase(touch.index)
+			if _touches.is_empty():
+				_dragging_mouse = false
+				remove_meta(&"_pinch_previous")
+	elif event is InputEventScreenDrag:
+		_screen_drag(event as InputEventScreenDrag)
+	elif event is InputEventMagnifyGesture:
+		set_distance(distance / (event as InputEventMagnifyGesture).factor)
+
+
+## One finger tracks its position but does not rotate, because the emulated mouse
+## motion already does that and doing it twice doubles the speed. Two fingers pinch.
+func _screen_drag(event: InputEventScreenDrag) -> void:
+	if not _touches.has(event.index):
+		return
+	_touches[event.index] = event.position
+	if _touches.size() == 2:
+		_pinch()
+
+
+func _pinch() -> void:
+	var points := _touches.values()
+	var current: float = (points[0] as Vector2).distance_to(points[1] as Vector2)
+	if current <= 0.0:
+		return
+	if not has_meta(&"_pinch_previous"):
+		set_meta(&"_pinch_previous", current)
+		return
+	var previous := float(get_meta(&"_pinch_previous"))
+	if previous > 0.0:
+		set_distance(distance * previous / current)
+	set_meta(&"_pinch_previous", current)

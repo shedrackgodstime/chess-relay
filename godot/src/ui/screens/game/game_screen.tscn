@@ -20,6 +20,16 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+; Control.mouse_filter defaults to MOUSE_FILTER_STOP, so a full-rect Control that does
+; not say otherwise consumes every mouse event before it reaches _unhandled_input.
+; The camera does all of its input there, so with this left at the default the board
+; could not be drag-rotated at all, while taps still worked because the board's
+; Area3D receives input from the physics server on a different path. See
+; docs/architecture/board_foundation.md.
+;
+; IGNORE and not PASS: PASS would still take the event and hand it to the parent,
+; and there is no parent Control to pass it on to.
+mouse_filter = 2
 script = ExtResource("1_game")
 accessibility_name = "Chess game"
 

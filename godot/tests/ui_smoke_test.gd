@@ -259,6 +259,41 @@ func _check_game_screen() -> void:
 			from_scene += 1
 	_check(from_scene == 64, "and all 64 are instances of a square scene, got %d"
 		% from_scene)
+	# The screen root is a full-rect Control. Left at its default it stops mouse
+	# events, so nothing reaches _unhandled_input and the camera cannot be
+	# drag-rotated, while taps still work because the board's Area3D is fed by the
+	# physics server instead. Checked here because nothing else would notice: the
+	# camera's own tests drive its methods directly.
+	_check(game.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"the game screen root lets input through to the camera, got %d" % game.mouse_filter)
+	# Rotation on a phone needs the touch events as well as the mouse ones, and it
+	# needs the emulated mouse suppressed while two fingers are down or a pinch spins
+	# the board. Driven directly here, because the checks above cannot tell whether a
+	# drag reached the camera.
+	var cam := game.get_node("World/Camera") as GameOrbitCamera
+	# Put back afterwards. The camera is shared with the checks that follow, and
+	# leaving it somewhere else makes those fail for a reason that has nothing to do
+	# with what they are checking.
+	var saved_yaw := cam.yaw_degrees
+	var saved_pitch := cam.pitch_degrees
+	cam.orbit_by(45.0)
+	_check(cam.yaw_degrees == saved_yaw + 45.0,
+		"the camera still orbits")
+	cam.orbit_by(0.0, 90.0)
+	_check(is_equal_approx(cam.pitch_degrees, cam.max_pitch_degrees),
+		"and pitch is clamped at the top, got %.0f" % cam.pitch_degrees)
+	cam.orbit_by(0.0, -180.0)
+	_check(is_equal_approx(cam.pitch_degrees, cam.min_pitch_degrees),
+		"and at the bottom, got %.0f" % cam.pitch_degrees)
+	cam.yaw_degrees = saved_yaw
+	cam.pitch_degrees = saved_pitch
+
+	_check(game.get_node("HUD/HUDRoot").mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"and so does the HUD root")
+	var header := game.get_node("HUD/HUDRoot/GameHeader") as Control
+	_check(header.mouse_filter == Control.MOUSE_FILTER_STOP,
+		"while the header still takes clicks for its own buttons, got %d"
+			% header.mouse_filter)
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
 	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
