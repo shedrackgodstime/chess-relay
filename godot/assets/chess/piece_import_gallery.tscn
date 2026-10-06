@@ -1,0 +1,161 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="PackedScene" path="res://assets/chess/pieces/pawn.tscn" id="1_pawn"]
+[ext_resource type="PackedScene" path="res://assets/chess/pieces/rook.tscn" id="2_rook"]
+[ext_resource type="PackedScene" path="res://assets/chess/pieces/knight.tscn" id="3_knight"]
+[ext_resource type="PackedScene" path="res://assets/chess/pieces/bishop.tscn" id="4_bishop"]
+[ext_resource type="PackedScene" path="res://assets/chess/pieces/queen.tscn" id="5_queen"]
+[ext_resource type="PackedScene" path="res://assets/chess/pieces/king.tscn" id="6_king"]
+[ext_resource type="Script" path="res://assets/chess/polyhaven_geometry_gallery.gd" id="7_script"]
+
+[sub_resource type="Environment" id="Environment_gallery"]
+background_mode = 1
+background_color = Color(0.055, 0.065, 0.08, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.62, 0.68, 0.78, 1)
+ambient_light_energy = 0.65
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="Material_floor"]
+albedo_color = Color(0.12, 0.14, 0.17, 1)
+roughness = 0.72
+
+[sub_resource type="PlaneMesh" id="Plane_floor"]
+size = Vector2(18, 7)
+
+[sub_resource type="StandardMaterial3D" id="Material_pedestal"]
+albedo_color = Color(0.22, 0.25, 0.3, 1)
+roughness = 0.55
+
+[sub_resource type="BoxMesh" id="Box_pedestal"]
+size = Vector3(1.3, 0.12, 1.3)
+
+[sub_resource type="StandardMaterial3D" id="Material_label"]
+albedo_color = Color(0.82, 0.86, 0.92, 1)
+shading_mode = 0
+
+[node name="PieceImportGallery" type="Node3D"]
+script = ExtResource("7_script")
+
+[node name="Environment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_gallery")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-52, -28, 0)
+light_color = Color(1, 0.94, 0.84, 1)
+light_energy = 1.7
+shadow_enabled = true
+
+[node name="FillLight" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-35, 145, 0)
+light_color = Color(0.68, 0.78, 1, 1)
+light_energy = 0.85
+
+[node name="Floor" type="MeshInstance3D" parent="."]
+mesh = SubResource("Plane_floor")
+material_override = SubResource("Material_floor")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.996195, 0.0871557, 0, -0.0871557, 0.996195, 0, 2.65, 9.8)
+current = true
+fov = 42.0
+
+[node name="Pieces" type="Node3D" parent="."]
+
+[node name="PawnPedestal" type="MeshInstance3D" parent="Pieces"]
+position = Vector3(-6.25, 0.06, 0)
+mesh = SubResource("Box_pedestal")
+material_override = SubResource("Material_pedestal")
+
+[node name="RookPedestal" type="MeshInstance3D" parent="Pieces"]
+position = Vector3(-3.75, 0.06, 0)
+mesh = SubResource("Box_pedestal")
+material_override = SubResource("Material_pedestal")
+
+[node name="KnightPedestal" type="MeshInstance3D" parent="Pieces"]
+position = Vector3(-1.25, 0.06, 0)
+mesh = SubResource("Box_pedestal")
+material_override = SubResource("Material_pedestal")
+
+[node name="BishopPedestal" type="MeshInstance3D" parent="Pieces"]
+position = Vector3(1.25, 0.06, 0)
+mesh = SubResource("Box_pedestal")
+material_override = SubResource("Material_pedestal")
+
+[node name="QueenPedestal" type="MeshInstance3D" parent="Pieces"]
+position = Vector3(3.75, 0.06, 0)
+mesh = SubResource("Box_pedestal")
+material_override = SubResource("Material_pedestal")
+
+[node name="KingPedestal" type="MeshInstance3D" parent="Pieces"]
+position = Vector3(6.25, 0.06, 0)
+mesh = SubResource("Box_pedestal")
+material_override = SubResource("Material_pedestal")
+
+[node name="Pawn" parent="Pieces" instance=ExtResource("1_pawn")]
+position = Vector3(-6.25, 0.12, 0)
+scale = Vector3(8, 8, 8)
+
+[node name="Rook" parent="Pieces" instance=ExtResource("2_rook")]
+position = Vector3(-3.75, 0.12, 0)
+scale = Vector3(8, 8, 8)
+
+[node name="Knight" parent="Pieces" instance=ExtResource("3_knight")]
+position = Vector3(-1.25, 0.12, 0)
+scale = Vector3(8, 8, 8)
+
+[node name="Bishop" parent="Pieces" instance=ExtResource("4_bishop")]
+position = Vector3(1.25, 0.12, 0)
+scale = Vector3(8, 8, 8)
+
+[node name="Queen" parent="Pieces" instance=ExtResource("5_queen")]
+position = Vector3(3.75, 0.12, 0)
+scale = Vector3(8, 8, 8)
+
+[node name="King" parent="Pieces" instance=ExtResource("6_king")]
+position = Vector3(6.25, 0.12, 0)
+scale = Vector3(8, 8, 8)
+
+[node name="Labels" type="Node3D" parent="."]
+
+[node name="PawnLabel" type="Label3D" parent="Labels"]
+position = Vector3(-6.25, 1.15, 0)
+text = "PAWN"
+font_size = 32
+outline_size = 8
+modulate = Color(0.82, 0.86, 0.92, 1)
+
+[node name="RookLabel" type="Label3D" parent="Labels"]
+position = Vector3(-3.75, 1.15, 0)
+text = "ROOK"
+font_size = 32
+outline_size = 8
+modulate = Color(0.82, 0.86, 0.92, 1)
+
+[node name="KnightLabel" type="Label3D" parent="Labels"]
+position = Vector3(-1.25, 1.15, 0)
+text = "KNIGHT"
+font_size = 32
+outline_size = 8
+modulate = Color(0.82, 0.86, 0.92, 1)
+
+[node name="BishopLabel" type="Label3D" parent="Labels"]
+position = Vector3(1.25, 1.15, 0)
+text = "BISHOP"
+font_size = 32
+outline_size = 8
+modulate = Color(0.82, 0.86, 0.92, 1)
+
+[node name="QueenLabel" type="Label3D" parent="Labels"]
+position = Vector3(3.75, 1.15, 0)
+text = "QUEEN"
+font_size = 32
+outline_size = 8
+modulate = Color(0.82, 0.86, 0.92, 1)
+
+[node name="KingLabel" type="Label3D" parent="Labels"]
+position = Vector3(6.25, 1.15, 0)
+text = "KING"
+font_size = 32
+outline_size = 8
+modulate = Color(0.82, 0.86, 0.92, 1)

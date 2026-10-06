@@ -1,7 +1,19 @@
-[gd_resource type="Theme" format=3]
+[gd_resource type="Theme" format=3 uid="uid://cb6ymcj8gxj1"]
 
-[sub_resource type="StyleBoxFlat" id="button_normal"]
-bg_color = Color(0.11, 0.09, 0.08, 1)
+[sub_resource type="StyleBoxFlat" id="button_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.88, 0.62, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="button_hover"]
+bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -12,8 +24,8 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[sub_resource type="StyleBoxFlat" id="button_hover"]
-bg_color = Color(0.16, 0.13, 0.11, 1)
+[sub_resource type="StyleBoxFlat" id="button_normal"]
+bg_color = Color(0.11, 0.09, 0.08, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
@@ -36,54 +48,6 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[sub_resource type="StyleBoxFlat" id="button_chosen"]
-bg_color = Color(0.42, 0.32, 0.12, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.24, 0.18, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxEmpty" id="button_flat"]
-
-[sub_resource type="StyleBoxFlat" id="button_faint_hover"]
-bg_color = Color(1, 0.88, 0.62, 0.06)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxFlat" id="button_focus"]
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.88, 0.62, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxFlat" id="surface_panel"]
-bg_color = Color(0.11, 0.09, 0.08, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.3, 0.24, 0.18, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxFlat" id="modal_backdrop_panel"]
-bg_color = Color(0.05, 0.04, 0.03, 0.72)
-
 [sub_resource type="StyleBoxFlat" id="card_panel"]
 content_margin_left = 18.0
 content_margin_top = 18.0
@@ -100,24 +64,29 @@ corner_radius_top_right = 14
 corner_radius_bottom_right = 14
 corner_radius_bottom_left = 14
 
-[sub_resource type="StyleBoxFlat" id="player_list_row"]
-content_margin_left = 12.0
-content_margin_top = 6.0
-content_margin_right = 12.0
-content_margin_bottom = 6.0
-bg_color = Color(0.11, 0.09, 0.08, 1)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.3, 0.24, 0.18, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
+[sub_resource type="StyleBoxFlat" id="button_faint_hover"]
+bg_color = Color(1, 0.88, 0.62, 0.06)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
-[sub_resource type="StyleBoxFlat" id="header_menu_normal"]
-bg_color = Color(0.09, 0.08, 0.07, 0.72)
+[sub_resource type="StyleBoxEmpty" id="button_flat"]
+
+[sub_resource type="StyleBoxFlat" id="button_chosen"]
+bg_color = Color(0.42, 0.32, 0.12, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.24, 0.18, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="header_menu_hover"]
+bg_color = Color(0.16, 0.13, 0.11, 1)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -128,8 +97,8 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[sub_resource type="StyleBoxFlat" id="header_menu_hover"]
-bg_color = Color(0.16, 0.13, 0.11, 1)
+[sub_resource type="StyleBoxFlat" id="header_menu_normal"]
+bg_color = Color(0.09, 0.08, 0.07, 0.72)
 border_width_left = 1
 border_width_top = 1
 border_width_right = 1
@@ -164,65 +133,16 @@ corner_radius_top_right = 32
 corner_radius_bottom_right = 32
 corner_radius_bottom_left = 32
 
-[sub_resource type="StyleBoxFlat" id="remote_speaking_dot"]
-bg_color = Color(0.55, 0.92, 0.62, 0.92)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.1, 0.14, 0.1, 0.85)
-corner_radius_top_left = 6
-corner_radius_top_right = 6
-corner_radius_bottom_right = 6
-corner_radius_bottom_left = 6
+[sub_resource type="StyleBoxFlat" id="modal_backdrop_panel"]
+bg_color = Color(0.05, 0.04, 0.03, 0.72)
 
-[sub_resource type="StyleBoxFlat" id="modal_panel"]
-content_margin_left = 24.0
-content_margin_top = 22.0
-content_margin_right = 24.0
-content_margin_bottom = 20.0
-bg_color = Color(0.16, 0.13, 0.11, 1)
+[sub_resource type="StyleBoxFlat" id="modal_danger_hover"]
+bg_color = Color(0.52, 0.18, 0.13, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.45, 0.34, 0.24, 1)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
-
-[sub_resource type="StyleBoxFlat" id="modal_secondary_normal"]
-bg_color = Color(0.11, 0.09, 0.08, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.42, 0.36, 0.29, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="modal_secondary_hover"]
-bg_color = Color(0.22, 0.18, 0.15, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.58, 0.46, 0.34, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
-[sub_resource type="StyleBoxFlat" id="modal_secondary_pressed"]
-bg_color = Color(0.3, 0.24, 0.18, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.58, 0.46, 0.34, 1)
+border_color = Color(0.94, 0.48, 0.36, 1)
 corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
@@ -240,18 +160,6 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
-[sub_resource type="StyleBoxFlat" id="modal_danger_hover"]
-bg_color = Color(0.52, 0.18, 0.13, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.94, 0.48, 0.36, 1)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-
 [sub_resource type="StyleBoxFlat" id="modal_danger_pressed"]
 bg_color = Color(0.29, 0.08, 0.07, 1)
 border_width_left = 2
@@ -264,7 +172,59 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
-[sub_resource type="StyleBoxFlat" id="setup_workspace"]
+[sub_resource type="StyleBoxFlat" id="modal_panel"]
+content_margin_left = 24.0
+content_margin_top = 22.0
+content_margin_right = 24.0
+content_margin_bottom = 20.0
+bg_color = Color(0.16, 0.13, 0.11, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.45, 0.34, 0.24, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+
+[sub_resource type="StyleBoxFlat" id="modal_secondary_hover"]
+bg_color = Color(0.22, 0.18, 0.15, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.58, 0.46, 0.34, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_secondary_normal"]
+bg_color = Color(0.11, 0.09, 0.08, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.42, 0.36, 0.29, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="modal_secondary_pressed"]
+bg_color = Color(0.3, 0.24, 0.18, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.58, 0.46, 0.34, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="surface_panel"]
 bg_color = Color(0.11, 0.09, 0.08, 1)
 border_width_left = 2
 border_width_top = 2
@@ -276,21 +236,33 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[sub_resource type="StyleBoxFlat" id="setup_participant_card"]
-content_margin_left = 20.0
-content_margin_top = 18.0
-content_margin_right = 20.0
-content_margin_bottom = 18.0
+[sub_resource type="StyleBoxFlat" id="player_list_row"]
+content_margin_left = 12.0
+content_margin_top = 6.0
+content_margin_right = 12.0
+content_margin_bottom = 6.0
 bg_color = Color(0.11, 0.09, 0.08, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
 border_color = Color(0.3, 0.24, 0.18, 1)
-corner_radius_top_left = 12
-corner_radius_top_right = 12
-corner_radius_bottom_right = 12
-corner_radius_bottom_left = 12
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="remote_speaking_dot"]
+bg_color = Color(0.55, 0.92, 0.62, 0.92)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.1, 0.14, 0.1, 0.85)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
 
 [sub_resource type="StyleBoxFlat" id="setup_avatar"]
 bg_color = Color(0.11, 0.09, 0.08, 1)
@@ -303,29 +275,6 @@ corner_radius_top_left = 12
 corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
-
-[sub_resource type="StyleBoxFlat" id="setup_option_focus"]
-bg_color = Color(0, 0, 0, 0)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(1, 0.88, 0.62, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
-
-[sub_resource type="StyleBoxFlat" id="setup_side_badge"]
-content_margin_left = 10.0
-content_margin_top = 4.0
-content_margin_right = 10.0
-content_margin_bottom = 4.0
-bg_color = Color(1, 1, 1, 1)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
 
 [sub_resource type="StyleBoxFlat" id="setup_dark_side_badge"]
 content_margin_left = 10.0
@@ -359,6 +308,52 @@ corner_radius_top_right = 5
 corner_radius_bottom_right = 5
 corner_radius_bottom_left = 5
 
+[sub_resource type="StyleBoxFlat" id="setup_option_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.88, 0.62, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="setup_participant_card"]
+content_margin_left = 20.0
+content_margin_top = 18.0
+content_margin_right = 20.0
+content_margin_bottom = 18.0
+bg_color = Color(0.11, 0.09, 0.08, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.24, 0.18, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[sub_resource type="StyleBoxFlat" id="setup_ready_dot"]
+bg_color = Color(1, 0.88, 0.62, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="setup_side_badge"]
+content_margin_left = 10.0
+content_margin_top = 4.0
+content_margin_right = 10.0
+content_margin_bottom = 4.0
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
 [sub_resource type="StyleBoxFlat" id="setup_status_bar"]
 content_margin_left = 18.0
 content_margin_top = 12.0
@@ -375,195 +370,161 @@ corner_radius_top_right = 12
 corner_radius_bottom_right = 12
 corner_radius_bottom_left = 12
 
-[sub_resource type="StyleBoxFlat" id="setup_ready_dot"]
-bg_color = Color(1, 0.88, 0.62, 1)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
+[sub_resource type="StyleBoxFlat" id="setup_workspace"]
+bg_color = Color(0.11, 0.09, 0.08, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.24, 0.18, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
 
 [resource]
 Button/colors/font_color = Color(1, 0.9, 0.72, 1)
 Button/colors/font_hover_color = Color(1, 1, 1, 1)
 Button/colors/font_pressed_color = Color(1, 0.9, 0.72, 1)
 Button/font_sizes/font_size = 22
-Button/styles/normal = SubResource("button_normal")
-Button/styles/hover = SubResource("button_hover")
-Button/styles/pressed = SubResource("button_pressed")
 Button/styles/focus = SubResource("button_focus")
-Label/colors/font_color = Color(1, 0.9, 0.72, 1)
-PanelContainer/styles/panel = SubResource("surface_panel")
-
+Button/styles/hover = SubResource("button_hover")
+Button/styles/normal = SubResource("button_normal")
+Button/styles/pressed = SubResource("button_pressed")
+Caption/base_type = &"Label"
+Caption/colors/font_color = Color(0.92, 0.86, 0.74, 1)
+Caption/font_sizes/font_size = 13
 Card/base_type = &"PanelContainer"
 Card/styles/panel = SubResource("card_panel")
-
-PlayerListRow/base_type = &"PanelContainer"
-PlayerListRow/styles/panel = SubResource("player_list_row")
-
-PlayerRowAvatar/base_type = &"Label"
-PlayerRowAvatar/colors/font_color = Color(1, 0.9, 0.72, 1)
-PlayerRowAvatar/font_sizes/font_size = 18
-
-QuietButton/base_type = &"Button"
-QuietButton/colors/font_color = Color(0.72, 0.66, 0.58, 1)
-QuietButton/colors/font_hover_color = Color(1, 0.9, 0.72, 1)
-QuietButton/font_sizes/font_size = 16
-QuietButton/styles/normal = SubResource("button_flat")
-QuietButton/styles/hover = SubResource("button_faint_hover")
-QuietButton/styles/pressed = SubResource("button_flat")
-
 ChoiceButton/base_type = &"Button"
 ChoiceButton/colors/font_color = Color(0.92, 0.86, 0.74, 1)
 ChoiceButton/colors/font_hover_color = Color(1, 0.9, 0.72, 1)
 ChoiceButton/font_sizes/font_size = 20
-ChoiceButton/styles/normal = SubResource("button_flat")
 ChoiceButton/styles/hover = SubResource("button_faint_hover")
+ChoiceButton/styles/normal = SubResource("button_flat")
 ChoiceButton/styles/pressed = SubResource("button_chosen")
-
-ScreenTitle/base_type = &"Label"
-ScreenTitle/colors/font_color = Color(1, 0.88, 0.62, 1)
-ScreenTitle/colors/font_outline_color = Color(0.05, 0.04, 0.03, 1)
-ScreenTitle/constants/outline_size = 8
-ScreenTitle/font_sizes/font_size = 40
-
-HomeTitle/base_type = &"ScreenTitle"
-HomeTitle/font_sizes/font_size = 44
-
 CodeDisplay/base_type = &"ScreenTitle"
 CodeDisplay/font_sizes/font_size = 46
-
-Caption/base_type = &"Label"
-Caption/colors/font_color = Color(0.92, 0.86, 0.74, 1)
-Caption/font_sizes/font_size = 13
-
-QuietLabel/base_type = &"Label"
-QuietLabel/colors/font_color = Color(0.72, 0.66, 0.58, 1)
-QuietLabel/colors/font_outline_color = Color(0.05, 0.04, 0.03, 1)
-QuietLabel/constants/outline_size = 6
-QuietLabel/font_sizes/font_size = 15
-
 HeaderCenterText/base_type = &"Label"
 HeaderCenterText/colors/font_color = Color(1, 0.94, 0.82, 1)
 HeaderCenterText/colors/font_outline_color = Color(0.05, 0.04, 0.03, 1)
 HeaderCenterText/constants/outline_size = 6
 HeaderCenterText/font_sizes/font_size = 22
-
 HeaderMenuButton/base_type = &"Button"
-HeaderMenuButton/styles/normal = SubResource("header_menu_normal")
 HeaderMenuButton/styles/hover = SubResource("header_menu_hover")
+HeaderMenuButton/styles/normal = SubResource("header_menu_normal")
 HeaderMenuButton/styles/pressed = SubResource("header_menu_pressed")
-
+HomeTitle/base_type = &"ScreenTitle"
+HomeTitle/font_sizes/font_size = 44
+Label/colors/font_color = Color(1, 0.9, 0.72, 1)
 MicLiveRing/base_type = &"Panel"
 MicLiveRing/styles/panel = SubResource("mic_live_ring")
-
-RemoteSpeakingDot/base_type = &"Panel"
-RemoteSpeakingDot/styles/panel = SubResource("remote_speaking_dot")
-
-ModalDialog/base_type = &"ConfirmationDialog"
-ModalDialog/constants/buttons_min_width = 144
-ModalDialog/constants/buttons_min_height = 48
-ModalDialog/constants/buttons_separation = 12
-ModalDialog/styles/panel = SubResource("modal_panel")
-
-ModalSecondaryButton/base_type = &"Button"
-ModalSecondaryButton/colors/font_color = Color(1, 0.9, 0.72, 1)
-ModalSecondaryButton/colors/font_hover_color = Color(1, 1, 1, 1)
-ModalSecondaryButton/font_sizes/font_size = 18
-ModalSecondaryButton/styles/normal = SubResource("modal_secondary_normal")
-ModalSecondaryButton/styles/hover = SubResource("modal_secondary_hover")
-ModalSecondaryButton/styles/pressed = SubResource("modal_secondary_pressed")
-ModalSecondaryButton/styles/focus = SubResource("button_focus")
-
+ModalBackdrop/base_type = &"Panel"
+ModalBackdrop/styles/panel = SubResource("modal_backdrop_panel")
 ModalDangerButton/base_type = &"Button"
 ModalDangerButton/colors/font_color = Color(1, 0.94, 0.9, 1)
 ModalDangerButton/colors/font_hover_color = Color(1, 1, 1, 1)
 ModalDangerButton/font_sizes/font_size = 18
-ModalDangerButton/styles/normal = SubResource("modal_danger_normal")
-ModalDangerButton/styles/hover = SubResource("modal_danger_hover")
-ModalDangerButton/styles/pressed = SubResource("modal_danger_pressed")
 ModalDangerButton/styles/focus = SubResource("button_focus")
-
-SetupWorkspace/base_type = &"PanelContainer"
-SetupWorkspace/styles/panel = SubResource("setup_workspace")
-
-SetupParticipantCard/base_type = &"PanelContainer"
-SetupParticipantCard/styles/panel = SubResource("setup_participant_card")
-
+ModalDangerButton/styles/hover = SubResource("modal_danger_hover")
+ModalDangerButton/styles/normal = SubResource("modal_danger_normal")
+ModalDangerButton/styles/pressed = SubResource("modal_danger_pressed")
+ModalDialog/base_type = &"ConfirmationDialog"
+ModalDialog/constants/buttons_min_height = 48
+ModalDialog/constants/buttons_min_width = 144
+ModalDialog/constants/buttons_separation = 12
+ModalDialog/styles/panel = SubResource("modal_panel")
+ModalSecondaryButton/base_type = &"Button"
+ModalSecondaryButton/colors/font_color = Color(1, 0.9, 0.72, 1)
+ModalSecondaryButton/colors/font_hover_color = Color(1, 1, 1, 1)
+ModalSecondaryButton/font_sizes/font_size = 18
+ModalSecondaryButton/styles/focus = SubResource("button_focus")
+ModalSecondaryButton/styles/hover = SubResource("modal_secondary_hover")
+ModalSecondaryButton/styles/normal = SubResource("modal_secondary_normal")
+ModalSecondaryButton/styles/pressed = SubResource("modal_secondary_pressed")
+MutedPieceIcon/base_type = &"TextureRect"
+MutedPieceIcon/colors/modulate = Color(0.72, 0.66, 0.58, 1)
+NetworkBars/colors/bar_connecting = Color(1, 0.85, 0.25, 1)
+NetworkBars/colors/bar_ghost = Color(1, 1, 1, 0.26)
+NetworkBars/colors/bar_good = Color(0.42, 0.92, 0.52, 1)
+NetworkBars/colors/bar_idle = Color(0.62, 0.6, 0.58, 1)
+NetworkBars/colors/bar_lost = Color(1, 0.27, 0.2, 1)
+PanelContainer/styles/panel = SubResource("surface_panel")
+PlayerListRow/base_type = &"PanelContainer"
+PlayerListRow/styles/panel = SubResource("player_list_row")
+PlayerRowAvatar/base_type = &"Label"
+PlayerRowAvatar/colors/font_color = Color(1, 0.9, 0.72, 1)
+PlayerRowAvatar/font_sizes/font_size = 18
+QuietButton/base_type = &"Button"
+QuietButton/colors/font_color = Color(0.72, 0.66, 0.58, 1)
+QuietButton/colors/font_hover_color = Color(1, 0.9, 0.72, 1)
+QuietButton/font_sizes/font_size = 16
+QuietButton/styles/hover = SubResource("button_faint_hover")
+QuietButton/styles/normal = SubResource("button_flat")
+QuietButton/styles/pressed = SubResource("button_flat")
+QuietLabel/base_type = &"Label"
+QuietLabel/colors/font_color = Color(0.72, 0.66, 0.58, 1)
+QuietLabel/colors/font_outline_color = Color(0.05, 0.04, 0.03, 1)
+QuietLabel/constants/outline_size = 6
+QuietLabel/font_sizes/font_size = 15
+RemoteSpeakingDot/base_type = &"Panel"
+RemoteSpeakingDot/styles/panel = SubResource("remote_speaking_dot")
+ScreenTitle/base_type = &"Label"
+ScreenTitle/colors/font_color = Color(1, 0.88, 0.62, 1)
+ScreenTitle/colors/font_outline_color = Color(0.05, 0.04, 0.03, 1)
+ScreenTitle/constants/outline_size = 8
+ScreenTitle/font_sizes/font_size = 40
 SetupAvatar/base_type = &"Panel"
 SetupAvatar/styles/panel = SubResource("setup_avatar")
-
+SetupDarkSideBadge/base_type = &"Label"
+SetupDarkSideBadge/colors/font_color = Color(1, 0.9, 0.72, 1)
+SetupDarkSideBadge/font_sizes/font_size = 13
+SetupDarkSideBadge/styles/normal = SubResource("setup_dark_side_badge")
+SetupFooter/base_type = &"PanelContainer"
+SetupFooter/styles/panel = SubResource("surface_panel")
+SetupNeutralSideBadge/base_type = &"Label"
+SetupNeutralSideBadge/colors/font_color = Color(1, 0.9, 0.72, 1)
+SetupNeutralSideBadge/font_sizes/font_size = 13
+SetupNeutralSideBadge/styles/normal = SubResource("setup_neutral_side_badge")
 SetupOptionButton/base_type = &"Button"
 SetupOptionButton/colors/font_color = Color(0.92, 0.86, 0.74, 1)
+SetupOptionButton/colors/font_focus_color = Color(1, 0.9, 0.72, 1)
 SetupOptionButton/colors/font_hover_color = Color(1, 0.9, 0.72, 1)
 SetupOptionButton/colors/font_pressed_color = Color(1, 0.9, 0.72, 1)
-SetupOptionButton/colors/font_focus_color = Color(1, 0.9, 0.72, 1)
 SetupOptionButton/font_sizes/font_size = 20
-SetupOptionButton/styles/normal = SubResource("button_normal")
-SetupOptionButton/styles/hover = SubResource("button_hover")
-SetupOptionButton/styles/pressed = SubResource("button_chosen")
 SetupOptionButton/styles/focus = SubResource("setup_option_focus")
-
+SetupOptionButton/styles/hover = SubResource("button_hover")
+SetupOptionButton/styles/normal = SubResource("button_normal")
+SetupOptionButton/styles/pressed = SubResource("button_chosen")
+SetupParticipantCard/base_type = &"PanelContainer"
+SetupParticipantCard/styles/panel = SubResource("setup_participant_card")
+SetupParticipantName/base_type = &"Label"
+SetupParticipantName/colors/font_color = Color(1, 0.9, 0.72, 1)
+SetupParticipantName/font_sizes/font_size = 22
+SetupParticipantType/base_type = &"Label"
+SetupParticipantType/colors/font_color = Color(1, 0.88, 0.62, 1)
+SetupParticipantType/font_sizes/font_size = 13
 SetupPrimaryButton/base_type = &"Button"
 SetupPrimaryButton/colors/font_color = Color(1, 0.9, 0.72, 1)
 SetupPrimaryButton/colors/font_hover_color = Color(1, 1, 1, 1)
 SetupPrimaryButton/colors/font_pressed_color = Color(1, 0.9, 0.72, 1)
 SetupPrimaryButton/font_sizes/font_size = 22
-SetupPrimaryButton/styles/normal = SubResource("button_normal")
 SetupPrimaryButton/styles/hover = SubResource("button_hover")
+SetupPrimaryButton/styles/normal = SubResource("button_normal")
 SetupPrimaryButton/styles/pressed = SubResource("button_pressed")
-
+SetupReadyDot/base_type = &"Panel"
+SetupReadyDot/styles/panel = SubResource("setup_ready_dot")
 SetupSectionTitle/base_type = &"Label"
 SetupSectionTitle/colors/font_color = Color(0.92, 0.86, 0.74, 1)
 SetupSectionTitle/font_sizes/font_size = 15
-
-SetupParticipantName/base_type = &"Label"
-SetupParticipantName/colors/font_color = Color(1, 0.9, 0.72, 1)
-SetupParticipantName/font_sizes/font_size = 22
-
-SetupParticipantType/base_type = &"Label"
-SetupParticipantType/colors/font_color = Color(1, 0.88, 0.62, 1)
-SetupParticipantType/font_sizes/font_size = 13
-
 SetupSideBadge/base_type = &"Label"
 SetupSideBadge/colors/font_color = Color(0.05, 0.04, 0.03, 1)
 SetupSideBadge/font_sizes/font_size = 13
 SetupSideBadge/styles/normal = SubResource("setup_side_badge")
-
-SetupDarkSideBadge/base_type = &"Label"
-SetupDarkSideBadge/colors/font_color = Color(1, 0.9, 0.72, 1)
-SetupDarkSideBadge/font_sizes/font_size = 13
-SetupDarkSideBadge/styles/normal = SubResource("setup_dark_side_badge")
-
-SetupNeutralSideBadge/base_type = &"Label"
-SetupNeutralSideBadge/colors/font_color = Color(1, 0.9, 0.72, 1)
-SetupNeutralSideBadge/font_sizes/font_size = 13
-SetupNeutralSideBadge/styles/normal = SubResource("setup_neutral_side_badge")
-
 SetupStatusBar/base_type = &"PanelContainer"
 SetupStatusBar/styles/panel = SubResource("setup_status_bar")
-
-SetupReadyDot/base_type = &"Panel"
-SetupReadyDot/styles/panel = SubResource("setup_ready_dot")
-
 SetupStatusText/base_type = &"Label"
 SetupStatusText/colors/font_color = Color(0.92, 0.86, 0.74, 1)
 SetupStatusText/font_sizes/font_size = 15
-
-SetupFooter/base_type = &"PanelContainer"
-SetupFooter/styles/panel = SubResource("surface_panel")
-
-ModalBackdrop/base_type = &"Panel"
-ModalBackdrop/styles/panel = SubResource("modal_backdrop_panel")
-
-MutedPieceIcon/base_type = &"TextureRect"
-MutedPieceIcon/colors/modulate = Color(0.72, 0.66, 0.58, 1)
-
-; The connection meter draws its own bars, so it cannot take these from a built-in
-; type. A custom theme type read by the script is the documented route for a custom
-; control: "Because built-in controls have no knowledge of your custom theme types, you
-; must utilize scripts to access those items."
-NetworkBars/colors/bar_idle = Color(0.62, 0.6, 0.58, 1)
-NetworkBars/colors/bar_connecting = Color(1.0, 0.85, 0.25, 1)
-NetworkBars/colors/bar_good = Color(0.42, 0.92, 0.52, 1)
-NetworkBars/colors/bar_lost = Color(1.0, 0.27, 0.2, 1)
-NetworkBars/colors/bar_ghost = Color(1.0, 1.0, 1.0, 0.26)
+SetupWorkspace/base_type = &"PanelContainer"
+SetupWorkspace/styles/panel = SubResource("setup_workspace")

@@ -10,7 +10,19 @@ signal leave_requested
 @onready var _board_view_button: Button = %BoardViewButton
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
+const PIECE_SCENES := {
+	"pawn": preload("res://assets/chess/pieces/pawn.tscn"),
+	"rook": preload("res://assets/chess/pieces/rook.tscn"),
+	"knight": preload("res://assets/chess/pieces/knight.tscn"),
+	"bishop": preload("res://assets/chess/pieces/bishop.tscn"),
+	"queen": preload("res://assets/chess/pieces/queen.tscn"),
+	"king": preload("res://assets/chess/pieces/king.tscn"),
+}
+const PIECE_SCALE := 16.0
+const KNIGHT_FACING_OFFSET := deg_to_rad(60.0)
 var _camera_scale := 1.0
+var _white_piece_material: StandardMaterial3D
+var _black_piece_material: StandardMaterial3D
 
 
 func _ready() -> void:
@@ -19,6 +31,64 @@ func _ready() -> void:
 	_board.square_pressed.connect(_on_square_pressed)
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
+	_white_piece_material = _create_piece_material(Color(0.86, 0.82, 0.73, 1.0))
+	_black_piece_material = _create_piece_material(Color(0.09, 0.07, 0.06, 1.0))
+	_build_demo_position()
+
+
+func _build_demo_position() -> void:
+	var pieces_root := Node3D.new()
+	pieces_root.name = "Pieces"
+	_board.add_child(pieces_root)
+	var back_rank := ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"]
+	for file in range(8):
+		_add_piece(pieces_root, back_rank[file], "white", "%s1" % char("a".unicode_at(0) + file))
+		_add_piece(pieces_root, "pawn", "white", "%s2" % char("a".unicode_at(0) + file))
+		_add_piece(pieces_root, "pawn", "black", "%s7" % char("a".unicode_at(0) + file))
+		_add_piece(pieces_root, back_rank[file], "black", "%s8" % char("a".unicode_at(0) + file))
+
+
+func _add_piece(parent: Node3D, piece_type: String, side: String, square: String) -> void:
+	var piece_scene: PackedScene = PIECE_SCENES[piece_type]
+	var piece := piece_scene.instantiate()
+	piece.name = "%s_%s_%s" % [side.capitalize(), piece_type.capitalize(), square]
+	piece.scale = Vector3.ONE * PIECE_SCALE
+	piece.position = _board.square_to_world(square, 0.02)
+	piece.position.y = -_piece_min_y(piece) * PIECE_SCALE + 0.01
+	if piece_type == "knight":
+		piece.rotation.y = PI + KNIGHT_FACING_OFFSET if side == "white" else -KNIGHT_FACING_OFFSET
+	elif side == "black":
+		piece.rotation.y = PI
+	_apply_piece_material(piece, _piece_material(side))
+	parent.add_child(piece)
+
+
+func _piece_material(side: String) -> StandardMaterial3D:
+	return _white_piece_material if side == "white" else _black_piece_material
+
+
+func _create_piece_material(color: Color) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.metallic = 0.18
+	material.roughness = 0.28
+	return material
+
+
+func _apply_piece_material(node: Node, material: StandardMaterial3D) -> void:
+	if node is MeshInstance3D:
+		node.material_override = material
+	for child in node.get_children():
+		_apply_piece_material(child, material)
+
+
+func _piece_min_y(node: Node) -> float:
+	var minimum := INF
+	if node is MeshInstance3D and node.mesh != null:
+		minimum = minf(minimum, node.get_aabb().position.y)
+	for child in node.get_children():
+		minimum = minf(minimum, _piece_min_y(child))
+	return 0.0 if is_inf(minimum) else minimum
 
 
 func _notification(what: int) -> void:

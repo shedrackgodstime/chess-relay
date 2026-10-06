@@ -330,6 +330,14 @@ func _check_game_screen() -> void:
 		"rank labels are pinned to the frame midpoint")
 	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.y, 0.029),
 		"coordinate markings sit on the frame top surface")
+	var pieces := game._board.get_node("Pieces")
+	_check(pieces.get_child_count() == 32, "game builds the reusable starting piece position")
+	var white_mesh := pieces.get_node("White_Pawn_a2/Mesh") as MeshInstance3D
+	var black_mesh := pieces.get_node("Black_Pawn_a7/Mesh") as MeshInstance3D
+	_check(white_mesh.material_override != null and black_mesh.material_override != null,
+		"pieces receive controlled side materials")
+	_check(white_mesh.material_override != black_mesh.material_override,
+		"white and black pieces use separate shared materials")
 	var key_light := game.get_node("World/KeyLight") as DirectionalLight3D
 	_check(is_equal_approx(key_light.rotation_degrees.x, -90.0),
 		"game key light is directly above the board")

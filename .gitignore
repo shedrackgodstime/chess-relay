@@ -30,3 +30,6 @@ ref/
 # Reference material, not part of the project. The prototype checkout used as a
 # Godot and behaviour reference; never a runtime dependency.
 /ref/
+
+# Local temporary downloads and asset comparisons
+/temp/
