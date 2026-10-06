@@ -15,6 +15,13 @@ config/description="A UI-led chess experience."
 run/main_scene="res://src/ui/app/app_root.tscn"
 config/features=PackedStringArray("4.7")
 
+[debug]
+
+; Warnings are errors. project_structure.md asks for warnings to be treated as
+; issues to resolve rather than noise to suppress, and this is what turns that
+; from a thing to remember into a thing the project refuses to compile past.
+gdscript/warnings/treat_warnings_as_errors=true
+
 [display]
 
 window/size/viewport_width=1440
