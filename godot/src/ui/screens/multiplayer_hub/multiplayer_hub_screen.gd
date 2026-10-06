@@ -24,8 +24,10 @@ const CODE_LENGTH := 6
 const TEXT := Color(1.0, 0.9, 0.72, 1.0)
 
 @onready var _invite_grid: GridContainer = %InviteGrid
-@onready var _invite_flow_card: PanelContainer = %InviteFlowCard
-@onready var _invite_flow_content: VBoxContainer = %InviteFlowContent
+## The card the running flow fills. A component rather than a panel built here,
+## because five flows in this screen want the same card and none of them want a
+## different kind of one.
+@onready var _flow: InviteFlowCard = %InviteFlowCard
 @onready var _player_list: ScrollContainer = %PlayerList
 @onready var _player_rows: VBoxContainer = %PlayerRows
 @onready var _profile_status: Label = %ProfileStatus
@@ -88,12 +90,11 @@ func _show_mock_invite(player_name: String) -> void:
 	_active_invite_flow = "player-invite"
 	_current_player_invite = player_name
 	_invite_grid.hide()
-	_invite_flow_card.show()
+	_flow.show()
 	_set_player_invites_enabled(false)
-	_clear_invite_flow()
-	_invite_flow_content.add_child(_label("Invite %s" % player_name, "SetupParticipantName"))
-	_invite_flow_content.add_child(_label("Invitation sent · waiting for response...", "SetupStatusText"))
-	_invite_flow_content.add_child(_flow_cancel_button(_cancel_player_invite))
+	_flow.show_flow("Invite %s" % player_name, "")
+	_flow.add_status("Invitation sent · waiting for response...")
+	_flow_cancel_button(_cancel_player_invite)
 	player_invite_requested.emit(player_name)
 
 
@@ -108,20 +109,10 @@ func player_invite_accepted(player_name: String) -> void:
 func player_invite_declined(player_name: String) -> void:
 	if _active_invite_flow != "player-invite":
 		return
-	_clear_invite_flow()
-	_invite_flow_content.add_child(_label("Invite %s" % player_name, "SetupParticipantName"))
-	_invite_flow_content.add_child(_label("Invitation declined.", "SetupStatusText"))
-	var actions := HBoxContainer.new()
-	actions.alignment = BoxContainer.ALIGNMENT_CENTER
-	actions.add_theme_constant_override("separation", 12)
-	_invite_flow_content.add_child(actions)
-	actions.add_child(_action_button("Invite again", _retry_player_invite))
-	var done := Button.new()
-	done.text = "Done"
-	done.theme_type_variation = &"QuietButton"
-	done.custom_minimum_size = FLOW_ACTION_SIZE
-	done.pressed.connect(_cancel_player_invite)
-	actions.add_child(done)
+	_flow.show_flow("Invite %s" % player_name, "")
+	_flow.add_status("Invitation declined.")
+	_flow.add_action("Invite again").pressed.connect(_retry_player_invite)
+	_flow.add_action("Done", &"QuietButton").pressed.connect(_cancel_player_invite)
 
 
 func _retry_player_invite() -> void:
@@ -145,22 +136,11 @@ func _show_incoming_invite(player_name: String) -> void:
 	_active_invite_flow = "incoming-invite"
 	_current_player_invite = player_name
 	_invite_grid.hide()
-	_invite_flow_card.show()
+	_flow.show()
 	_set_player_invites_enabled(false)
-	_clear_invite_flow()
-	_invite_flow_content.add_child(_label("Game invitation", "SetupParticipantName"))
-	_invite_flow_content.add_child(_label("%s invited you to play." % player_name, "QuietLabel"))
-	var actions := HBoxContainer.new()
-	actions.alignment = BoxContainer.ALIGNMENT_CENTER
-	actions.add_theme_constant_override("separation", 12)
-	_invite_flow_content.add_child(actions)
-	actions.add_child(_action_button("Accept", _accept_incoming_invite))
-	var decline := Button.new()
-	decline.text = "Decline"
-	decline.custom_minimum_size = FLOW_ACTION_SIZE
-	decline.theme_type_variation = &"QuietButton"
-	decline.pressed.connect(_decline_incoming_invite)
-	actions.add_child(decline)
+	_flow.show_flow("Game invitation", "%s invited you to play." % player_name)
+	_flow.add_action("Accept").pressed.connect(_accept_incoming_invite)
+	_flow.add_action("Decline", &"QuietButton").pressed.connect(_decline_incoming_invite)
 
 
 func _accept_incoming_invite() -> void:
@@ -176,9 +156,9 @@ func _decline_incoming_invite() -> void:
 		return
 	var player_name := _current_player_invite
 	incoming_invite_responded.emit(player_name, false)
-	_clear_invite_flow()
-	_invite_flow_content.add_child(_label("Invitation declined.", "SetupStatusText"))
-	_invite_flow_content.add_child(_flow_cancel_button(_reset_invite_flow))
+	_flow.show_flow("", "")
+	_flow.add_status("Invitation declined.")
+	_flow_cancel_button(_reset_invite_flow)
 
 
 func _show_discovery_settings() -> void:
@@ -229,23 +209,15 @@ func _on_create_invite() -> void:
 	_active_invite_flow = "create"
 	_create_waiting = true
 	_invite_grid.hide()
-	_invite_flow_card.show()
+	_flow.show()
 	_set_player_invites_enabled(false)
-	_clear_invite_flow()
-	_invite_flow_content.add_child(_label("YOUR GAME CODE", "Caption"))
-	_create_code_label = _label(_generate_invite_code(), "CodeDisplay")
-	_create_code_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_invite_flow_content.add_child(_create_code_label)
-	var copy_row := HBoxContainer.new()
-	copy_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	_invite_flow_content.add_child(copy_row)
-	_copy_button = _action_button("Copy code", _on_copy_code)
-	_copy_button.custom_minimum_size = Vector2(170, 48)
-	copy_row.add_child(_copy_button)
-	_create_status = _label("Waiting for opponent...", "SetupStatusText")
-	_create_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_invite_flow_content.add_child(_create_status)
-	_invite_flow_content.add_child(_flow_cancel_button(_cancel_create_wait))
+	_flow.show_flow("", "")
+	_flow.add_status("YOUR GAME CODE", &"Caption")
+	_create_code_label = _flow.add_code(_generate_invite_code())
+	_copy_button = _flow.add_action("Copy code")
+	_copy_button.pressed.connect(_on_copy_code)
+	_create_status = _flow.add_status("Waiting for opponent...")
+	_flow_cancel_button(_cancel_create_wait)
 	create_requested.emit(_create_code_label.text)
 
 
@@ -287,43 +259,23 @@ func _begin_join_flow() -> void:
 	_current_join_code = ""
 	_join_is_connecting = false
 	_invite_grid.hide()
-	_invite_flow_card.show()
+	_flow.show()
 	_set_player_invites_enabled(false)
-	_clear_invite_flow()
-	_invite_flow_content.add_child(_label("Join with a code", "SetupParticipantName"))
-	_invite_flow_content.add_child(_label("Enter the code someone shared with you.", "QuietLabel"))
-	_join_field = LineEdit.new()
-	_join_field.placeholder_text = "ABC-123"
-	_join_field.max_length = 9
-	_join_field.custom_minimum_size.y = 48
+	_flow.show_flow("Join with a code", "Enter the code someone shared with you.")
+	_join_field = _flow.add_content(_code_field()) as LineEdit
 	_join_field.text_changed.connect(_on_join_code_changed)
-	_invite_flow_content.add_child(_join_field)
-	_join_echo = _label("", "Caption")
-	_join_echo.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_join_echo = _flow.add_status("", &"Caption")
 	_join_echo.hide()
-	_invite_flow_content.add_child(_join_echo)
-	_join_status = _label("", "SetupStatusText")
-	_join_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_join_status = _flow.add_status("")
 	_join_status.hide()
-	_invite_flow_content.add_child(_join_status)
-	var actions := HBoxContainer.new()
-	actions.alignment = BoxContainer.ALIGNMENT_CENTER
-	actions.add_theme_constant_override("separation", 12)
-	_invite_flow_content.add_child(actions)
-	_join_button = _action_button("Join game", _on_join_pressed)
+	_join_button = _flow.add_action("Join game")
 	_join_button.disabled = true
-	_join_button.custom_minimum_size = FLOW_ACTION_SIZE
-	actions.add_child(_join_button)
-	_join_retry_button = _action_button("Retry", _retry_join)
-	_join_retry_button.custom_minimum_size = FLOW_ACTION_SIZE
+	_join_button.pressed.connect(_on_join_pressed)
+	_join_retry_button = _flow.add_action("Retry")
 	_join_retry_button.hide()
-	actions.add_child(_join_retry_button)
-	_join_cancel_button = Button.new()
-	_join_cancel_button.text = "Cancel"
-	_join_cancel_button.custom_minimum_size = FLOW_ACTION_SIZE
-	_join_cancel_button.theme_type_variation = &"QuietButton"
+	_join_retry_button.pressed.connect(_retry_join)
+	_join_cancel_button = _flow.add_action("Cancel", &"QuietButton")
 	_join_cancel_button.pressed.connect(_cancel_join)
-	actions.add_child(_join_cancel_button)
 	call_deferred("_focus_join_field")
 
 
@@ -400,7 +352,7 @@ func _reset_invite_flow() -> void:
 	_create_waiting = false
 	_join_is_connecting = false
 	_current_player_invite = ""
-	_invite_flow_card.hide()
+	_flow.hide()
 	_invite_grid.show()
 	_clear_invite_flow()
 	_set_player_invites_enabled(true)
@@ -410,10 +362,9 @@ func _reset_invite_flow() -> void:
 		_show_incoming_invite(queued_player)
 
 
+## The card, emptied, without changing which flow is active.
 func _clear_invite_flow() -> void:
-	for child in _invite_flow_content.get_children():
-		_invite_flow_content.remove_child(child)
-		child.queue_free()
+	_flow.show_flow("", "")
 
 
 func _set_player_invites_enabled(enabled: bool) -> void:
@@ -422,14 +373,19 @@ func _set_player_invites_enabled(enabled: bool) -> void:
 			row.set_invite_enabled(enabled)
 
 
+## A Cancel in the card's own action row. Put there rather than in the body because it
+## is an action on the flow, not a line of content.
 func _flow_cancel_button(action: Callable) -> Button:
-	var button := Button.new()
-	button.text = "Cancel"
-	button.custom_minimum_size = FLOW_ACTION_SIZE
-	button.theme_type_variation = &"QuietButton"
-	button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	var button := _flow.add_action("Cancel", &"QuietButton")
 	button.pressed.connect(action)
 	return button
+
+
+## Where a code is typed.
+##
+## Its own method because the join flow is the only thing that needs one, and a
+## control that exists only for one caller is not yet a component. When a second caller
+## appears it should become a scene of its own, like PlayerRow did.
 
 
 func _generate_invite_code() -> String:
@@ -474,22 +430,9 @@ func _update_responsive_layout(width: float = -1.0) -> void:
 		_invite_grid.columns = 1 if screen_width < 900.0 else 2
 
 
-func _action_button(title: String, action: Callable) -> Button:
-	var button := Button.new()
-	button.text = title
-	button.custom_minimum_size = FLOW_ACTION_SIZE
-	button.theme_type_variation = &"SetupPrimaryButton"
-	button.pressed.connect(action)
-	return button
-
-
-func _label(value: String, variation: StringName = &"") -> Label:
-	var label := Label.new()
-	label.text = value
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD
-	if variation != &"":
-		label.theme_type_variation = variation
-	else:
-		label.add_theme_color_override("font_color", TEXT)
-	return label
+func _code_field() -> LineEdit:
+	var field := LineEdit.new()
+	field.placeholder_text = "ABC-123"
+	field.max_length = 9
+	field.custom_minimum_size.y = 48
+	return field

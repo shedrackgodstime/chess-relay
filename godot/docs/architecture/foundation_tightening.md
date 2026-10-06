@@ -31,7 +31,7 @@ while the compiler is already objecting.
 
 ## 2. The multiplayer hub builds its UI in script
 
-Status: **in progress. The player row is done.**
+Status: **in progress. The player row and the flow card are done.**
 
 `src/ui/screens/multiplayer_hub/multiplayer_hub_screen.gd` is 511 lines and
 constructs its own controls with `PanelContainer.new()`, `HBoxContainer.new()`,
@@ -75,7 +75,32 @@ All six theme variations the row uses already existed in the shared theme, so th
 extraction changed how the row is made and not how it looks. Worth checking that
 in the editor, since a headless run cannot compare pixels.
 
-Still to extract from the same script: the invite card and the join field.
+### The flow card
+
+Done. `src/ui/components/invite_flow_card/`, instantiated into the hub's scene in
+place of the panel and content box it used to build at runtime. It carries the
+heading, the detail line, a body, and an action row, and the screen asks it for
+what it needs rather than reaching into it.
+
+Five flows use it — create a code, join with a code, invite a listed player, respond
+to an invitation, and recover from a declined one — which is what made it worth
+extracting. Two helpers in the hub became dead when the flows moved and were
+removed; the screen is 511 lines down to 438.
+
+Extracting the card also removed a subtle problem. Each flow used to clear the
+content box by queueing its children for deletion and then immediately adding the
+next flow's, so for a frame the card held both. The card now removes and frees in
+one step.
+
+### Still in the hub script
+
+- **The discovery settings dialog.** Built with `AcceptDialog.new()` and two
+  `CheckButton.new()`, in `_show_discovery_settings`. It is the last multi-node
+  block left and should become a scene when the piece work starts needing dialogs
+  elsewhere, so that it is not a one-off.
+- **The join code field.** Deliberately still a method, not a component. Only the
+  join flow needs one, and a control with a single caller is not yet reusable. The
+  note above it says so, so it is a decision rather than an oversight.
 
 ### The headless class cache
 

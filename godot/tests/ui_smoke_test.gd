@@ -137,8 +137,13 @@ func _check_hub_interactions() -> void:
 		"and tracks one invite control per row, got %d" % hub._player_rows_added.size())
 	hub._create_invite_button.pressed.emit()
 	_check(hub._active_invite_flow == "create", "hub enters create invite flow")
-	_check(not hub._invite_grid.visible and hub._invite_flow_card.visible,
+	_check(not hub._invite_grid.visible and hub._flow.visible,
 		"hub hides invite choices during create flow")
+	_check(hub._flow.get_child_count() > 0,
+		"and the flow card is instanced from a scene, not built by the screen")
+	var card: String = hub._flow.get_script().resource_path
+	_check(card == "res://src/ui/components/invite_flow_card/invite_flow_card.gd",
+		"flow card is the shared component, got %s" % card)
 	hub._cancel_create_wait()
 	_check(hub._active_invite_flow.is_empty() and hub._invite_grid.visible,
 		"hub restores invite choices after cancel")

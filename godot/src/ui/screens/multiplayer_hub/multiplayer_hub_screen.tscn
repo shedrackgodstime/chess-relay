@@ -1,6 +1,7 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.gd" id="1_hub"]
+[ext_resource type="PackedScene" path="res://src/ui/components/invite_flow_card/invite_flow_card.tscn" id="20_invite_flow_card"]
 [ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="2_header"]
 
 [node name="MultiplayerHubScreen" type="Control"]
@@ -173,16 +174,9 @@ text = "Join game"
 theme_type_variation = &"SetupPrimaryButton"
 accessibility_name = "Join a multiplayer game with a code"
 
-[node name="InviteFlowCard" type="PanelContainer" parent="Workspace/Margins/Content/InviteSection"]
-unique_name_in_owner = true
-visible = false
-layout_mode = 2
-theme_type_variation = &"Card"
-
-[node name="InviteFlowContent" type="VBoxContainer" parent="Workspace/Margins/Content/InviteSection/InviteFlowCard"]
+[node name="InviteFlowCard" parent="Workspace/Margins/Content/InviteSection" instance=ExtResource("20_invite_flow_card")]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_constants/separation = 8
 
 [node name="PlayersSection" type="VBoxContainer" parent="Workspace/Margins/Content"]
 layout_mode = 2
