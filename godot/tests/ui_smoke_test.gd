@@ -330,6 +330,20 @@ func _check_game_screen() -> void:
 				"%s %s is committed" % [set_name, identity])
 		_check(PieceMeshes.SET_SCALE.has(set_name),
 			"%s has its own sizing" % set_name)
+	# The mesh is a shared resource carrying only geometry. Colour and size belong to
+	# the node, which is why thirty-two pieces do not cost thirty-two copies of a mesh.
+	# Read at run time through GLTFDocument, because a .glb is only loadable once it has
+	# been imported and the import step does not run headlessly on every build. Without
+	# this the board was empty with a warning per piece.
+	_check(PieceMeshes.mesh_for(&"pawn") != null, "the pawn model is readable")
+	_check(PieceMeshes.mesh_for(&"pawn") == PieceMeshes.mesh_for(&"pawn"),
+		"and is shared rather than copied per piece")
+	# A model's own root transform is part of it. These files are authored large and
+	# scaled down by their root node, and taking only the mesh resource would make a
+	# piece fifty times too large.
+	var sample := PieceMeshes.mesh_for(&"pawn").get_aabb().size
+	_check(sample.x < 0.2 and sample.y < 0.2,
+		"and its own scale is baked in, pawn %.3f x %.3f" % [sample.x, sample.y])
 
 	# The active set is one constant, so comparing the two is flipping it.
 	_check(PieceMeshes.SET_SCALE.has(PieceMeshes.ACTIVE_SET),
@@ -339,7 +353,7 @@ func _check_game_screen() -> void:
 	_check(PieceMeshes.SET_SCALE[PieceMeshes.ACTIVE_SET] is float,
 		"and the active set is scaled as one set, which only a consistent set can be")
 
-	_check(PieceMeshes.mesh_for(&"dragon", PieceMeshes.LIGHT) == null,
+	_check(PieceMeshes.mesh_for(&"dragon") == null,
 		"an identity that is not a piece gives nothing")
 
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
@@ -410,6 +424,25 @@ func _check_game_screen() -> void:
 	_check(light_piece.missing_shape.is_empty()
 			or light_piece.mesh == null,
 		"a piece either has a model or says which one it is missing")
+
+	# Every piece on the board must have a real mesh, and the set must be in tournament
+	# proportion. Counting children cannot tell an empty board from a full one, which is
+	# the whole reason the board was silently empty.
+	var drawn := 0
+	var tallest := 0.0
+	for child in game._pieces.get_children():
+		var piece := child as ChessPieceView
+		if piece.mesh != null:
+			drawn += 1
+			tallest = maxf(tallest, piece.mesh.get_aabb().size.y * piece.scale.x)
+	_check(drawn == 32, "every piece has a mesh, got %d of 32" % drawn)
+	for child in game._pieces.get_children():
+		var piece := child as ChessPieceView
+		if piece.mesh == null:
+			continue
+		var ratio := (piece.mesh.get_aabb().size.y * piece.scale.x) / tallest
+		_check(ratio > 0.45 and ratio <= 1.0,
+			"%s is a sensible fraction of the king, %.2f" % [piece.piece_type, ratio])
 	game._update_camera_framing(1440.0, 900.0)
 	var wide_camera_height := game._camera.position.y
 	game._update_camera_framing(640.0, 900.0)

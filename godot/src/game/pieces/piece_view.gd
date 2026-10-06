@@ -52,13 +52,18 @@ func place_on(target_square: String, world_position: Vector3) -> void:
 func _apply() -> void:
 	rotation.y = PI if side == "black" else 0.0
 	var identity := StringName(piece_type)
-	var found := PieceMeshes.mesh_for(identity,
-		PieceMeshes.DARK if side == "black" else PieceMeshes.LIGHT)
+	var found := PieceMeshes.mesh_for(identity)
 	if found == null:
 		missing_shape = piece_type
 		mesh = null
+		material_override = null
 		push_warning("no model for piece '%s' in set '%s'"
 			% [piece_type, PieceMeshes.ACTIVE_SET])
 		return
 	missing_shape = ""
+	# The mesh is shared and carries only geometry. Colour and size are this node's:
+	# they are how a piece is presented here, not something about the shape.
 	mesh = found
+	material_override = PieceMeshes.material_for(
+		PieceMeshes.DARK if side == "black" else PieceMeshes.LIGHT)
+	scale = PieceMeshes.model_scale_for(identity)

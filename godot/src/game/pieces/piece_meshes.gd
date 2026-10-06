@@ -78,28 +78,35 @@ const SET_SCALE := {
 static var _loaded: Dictionary = {}
 
 
-## The mesh for an identity and a side in the active set, or null if that identity
-## has no model yet.
+## The mesh for an identity in the active set, or null if that identity has no model.
 ##
 ## Null rather than a placeholder on purpose. A pawn standing in for a missing king
 ## would look like a bug somewhere else entirely.
-static func mesh_for(identity: StringName, side: StringName) -> Mesh:
+##
+## **The mesh is a shared resource and carries nothing but geometry.** No material and
+## no scale, because both are properties of the node that draws it and not of the
+## geometry: a colour and a size belong to how a piece is presented here, and thirty-two
+## nodes sharing one mesh is thirty-two times less memory than thirty-two copies.
+static func mesh_for(identity: StringName) -> Mesh:
 	var set_paths: Dictionary = SETS.get(ACTIVE_SET, {})
 	var path: String = set_paths.get(identity, "")
-	if path.is_empty() or not ResourceLoader.exists(path):
+	if path.is_empty() or not FileAccess.file_exists(path):
 		return null
 	var mesh := _mesh(path)
 	if mesh == null or mesh.get_surface_count() == 0:
 		return null
-	# Duplicated rather than loaded and mutated in place: two sides ask for the same
-	# shape and a shared mesh with one surface's material overwritten would make the
-	# light pieces turn dark the first time a dark one was drawn.
-	var copy: Mesh = mesh.duplicate()
-	copy.surface_set_material(0, material_for(side))
-	var scale: float = _scale_for(identity)
-	if not is_equal_approx(scale, 1.0):
-		copy.scale = Vector3.ONE * scale
-	return copy
+	return mesh
+
+
+## How large this identity's model is drawn.
+##
+## A `Vector3` rather than a float because it is applied to a node, and a node's scale
+## is a vector. Uniform, because every scale here is uniform.
+static func model_scale_for(identity: StringName) -> Vector3:
+	var entry = SET_SCALE.get(ACTIVE_SET, 1.0)
+	if entry is Dictionary:
+		return Vector3.ONE * float((entry as Dictionary).get(identity, 1.0))
+	return Vector3.ONE * float(entry)
 
 
 ## A piece material, kept as a resource rather than applied as an override at each
@@ -141,12 +148,113 @@ static func _dark() -> StandardMaterial3D:
 	return material
 
 
+## The mesh for a model path.
+##
+## Two routes, in order. The first is the imported resource, which is what the game
+## should normally use: it is faster to load and it is what the import pipeline is for.
+##
+## The second reads the glTF at run time through `GLTFDocument`. That exists because
+## a `.glb` is only loadable once it has been imported, and the import step is the one
+## part of this project that cannot always run headlessly — `--import` and `--editor`
+## both abort on some builds. Without this the board was simply empty, with a warning
+## per piece and nothing to see.
 static func _mesh(path: String) -> Mesh:
 	if _loaded.has(path):
 		return _loaded[path] as Mesh
-	var mesh := load(path) as Mesh
+	var mesh := _imported_mesh(path)
+	if mesh == null:
+		mesh = _gltf_mesh(path)
 	_loaded[path] = mesh
 	return mesh
+
+
+## Through the import pipeline, which is the normal route.
+static func _imported_mesh(path: String) -> Mesh:
+	if not ResourceLoader.exists(path):
+		return null
+	var packed := load(path) as PackedScene
+	if packed == null:
+		return load(path) as Mesh
+	var root := packed.instantiate()
+	var found := _first_mesh(root)
+	var mesh := found.mesh if found != null else null
+	if root != null:
+		root.free()
+	return mesh
+
+
+## Straight out of the glTF, with no import step.
+static func _gltf_mesh(path: String) -> Mesh:
+	if not FileAccess.file_exists(path):
+		return null
+	var document := GLTFDocument.new()
+	var state := GLTFState.new()
+	var err := document.append_from_file(ProjectSettings.globalize_path(path), state)
+	if err != OK:
+		push_warning("could not read %s: %d" % [path, err])
+		return null
+	var root := document.generate_scene(state)
+	if root == null:
+		return null
+	var found := _first_mesh(root)
+	var mesh := found.mesh if found != null else null
+	if mesh == null:
+		root.free()
+		return null
+	# The node's own transform is part of the model. These files are authored at large
+	# raw sizes and scaled down by their root node — a pawn's vertices span 2.5 units
+	# behind a node scaled by 0.02 — and taking only the mesh resource throws that away,
+	# so a piece would come out fifty times too large.
+	mesh = _bake_transform(mesh, found.transform)
+	root.free()
+	return mesh
+
+
+## Normals pushed through a basis.
+static func _reorient_normals(normals: PackedVector3Array, basis: Basis) -> PackedVector3Array:
+	var moved := PackedVector3Array()
+	moved.resize(normals.size())
+	for index in normals.size():
+		moved[index] = basis * normals[index]
+	return moved
+
+
+## A copy of the mesh with a transform folded into its vertices.
+##
+## Baking rather than keeping the node transform, because the piece node is the only
+## thing that will ever draw this and it should carry one transform of its own.
+static func _bake_transform(mesh: Mesh, transform: Transform3D) -> Mesh:
+	var baked := ArrayMesh.new()
+	var basis := transform.basis
+	for surface in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(surface)
+		if arrays.is_empty():
+			continue
+		if arrays[Mesh.ARRAY_VERTEX] != null:
+			arrays[Mesh.ARRAY_VERTEX] = transform * arrays[Mesh.ARRAY_VERTEX]
+		if arrays[Mesh.ARRAY_NORMAL] != null:
+			# Normals follow the inverse transpose, so a non-uniform scale would
+			# otherwise tilt them.
+			# Normals follow the inverse transpose, so a non-uniform scale would
+			# otherwise tilt them. One at a time: `Basis * PackedVector3Array` is
+			# not a valid operation even though `Transform3D * PackedVector3Array`
+			# is, which is an easy thing to assume.
+			arrays[Mesh.ARRAY_NORMAL] = _reorient_normals(
+				arrays[Mesh.ARRAY_NORMAL], basis.inverse().transposed())
+		baked.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return baked
+
+
+## The first MeshInstance3D anywhere below a node. A glTF scene carries its own root
+## and naming, so the mesh is looked for rather than assumed at a fixed path.
+static func _first_mesh(from: Node) -> MeshInstance3D:
+	if from is MeshInstance3D:
+		return from as MeshInstance3D
+	for child in from.get_children():
+		var found := _first_mesh(child)
+		if found != null:
+			return found
+	return null
 
 
 ## Drops the cache. For tests, and for the editor after a shape is rebuilt.
