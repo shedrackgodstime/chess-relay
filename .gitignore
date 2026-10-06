@@ -4,6 +4,7 @@
 /godot/.nomedia
 /android/
 /godot/android/
+/godot/bin/
 .import/
 export.cfg
 export_presets.cfg

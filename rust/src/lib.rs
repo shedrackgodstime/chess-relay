@@ -7,6 +7,7 @@
 //! forces it"). Each module is currently an empty boundary with no logic.
 
 pub mod app;
+pub mod bridge;
 pub mod chess_core;
 pub mod protocol;
 pub mod session;

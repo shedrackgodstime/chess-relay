@@ -17,6 +17,7 @@
 
 use crate::chess_core::{Color, Move, Role};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
+use serde::{Deserialize, Serialize};
 
 /// Peer identity: 32 ed25519 public-key bytes.
 ///
@@ -32,7 +33,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 /// let peer = PeerId::of(&SigningKey::from_bytes(&[7u8; 32]));
 /// assert_eq!(peer.to_string().len(), 8);
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct PeerId([u8; 32]);
 
 impl PeerId {
@@ -81,7 +82,7 @@ fn hex_of(bytes: &[u8]) -> String {
 }
 
 /// Log payload: what one entry records.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LogPayload {
     /// First entry: pins protocol version, sides, and host.
     Genesis {
@@ -113,7 +114,7 @@ pub enum LogPayload {
 }
 
 /// One signed link in the match record.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LogEntry {
     /// Position in the log; must equal the entry index.
     pub seq: u64,
@@ -124,8 +125,10 @@ pub struct LogEntry {
     /// Peer that authored (and signed) this entry.
     pub mover: PeerId,
     /// `mover`'s signature over the entry hash.
+    #[serde(with = "serde_bytes")]
     pub mover_sig: [u8; 64],
     /// Opponent's co-signature (moves and genesis only).
+    #[serde(with = "serde_bytes")]
     pub co_sig: Option<[u8; 64]>,
 }
 

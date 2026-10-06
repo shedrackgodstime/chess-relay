@@ -20,6 +20,7 @@
 //! # Ok::<(), chess_relay_core::chess_core::IllegalMove>(())
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::backtrace::Backtrace;
 use std::fmt::{self, Display, Formatter, Write as _};
 use std::str::FromStr;
@@ -33,7 +34,7 @@ use std::str::FromStr;
 ///
 /// assert_eq!(Color::White.opposite(), Color::Black);
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Color {
     /// First mover; ranks 1-2 at start.
     White,
@@ -73,7 +74,7 @@ impl Display for Color {
 /// assert_eq!(Role::from_char('n')?, Role::Knight);
 /// # Ok::<(), chess_relay_core::chess_core::IllegalMove>(())
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Role {
     /// Moves forward, captures diagonally, promotes on last rank.
     Pawn,
@@ -139,7 +140,7 @@ impl Display for Role {
 /// let piece = Piece::new(Color::White, Role::Knight);
 /// assert_eq!(piece.to_string(), "N");
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Piece {
     /// Owning side.
     pub color: Color,
@@ -179,7 +180,7 @@ impl Display for Piece {
 /// assert_eq!(e4.to_string(), "e4");
 /// # Ok::<(), chess_relay_core::chess_core::IllegalMove>(())
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Square(u8);
 
 impl Square {
@@ -281,7 +282,7 @@ impl FromStr for Square {
 /// assert_eq!(mv.to_string(), "e7e8q");
 /// # Ok::<(), chess_relay_core::chess_core::IllegalMove>(())
 /// ```
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Move {
     /// Departure square.
     pub from: Square,

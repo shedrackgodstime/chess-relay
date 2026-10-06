@@ -68,21 +68,38 @@ Goal: `handle(command) -> Result<Vec<Event>, Error>` over Phase 2.
 Gates: command→event table test per command (valid + each rejection);
 Godot team signs the frozen names.
 
-## Phase 4 — Iroh spike (desktop CLI first, no Godot)
+## Phase 4 — Iroh spike ✅ DONE (2026-10-06)
 
-Goal: two CLIs, one session, moves over Iroh, co-signed both sides,
-kill + resume from log. Proves the contract survives the network.
+Proven with throwaway `rust/examples/iroh_spike.rs` (postcard framing,
+real `App` views both ends, `src/` untouched except doc-mandated serde
+derives on wire types):
 
-- `ALPN = b"chess-relay/1"`; protocol version in first message.
-- Ticket sharing as-is; short human code stays an open question with
-  raw-ticket fallback (arch doc §Identity).
-- Transport trait pulled **out of** this spike, not designed up front.
+- Endpoint boot with `chess-relay/1` (+ reserved voice ALPN on the same
+  endpoint), relay reachable, ticket dial via `EndpointTicket` strings
+  (pattern borrowed from irosh's transport module).
+- Full game across processes: genesis → join → readiness → moves both
+  ways → co-signatures back verified → identical FENs, fully agreed logs.
+- Dropout mid-game: host played on alone, guest redialled the same
+  ticket, tips compared, 1-entry gap replayed, FENs asserted equal
+  in-process on both sides.
 
-Gates: full game over loopback + relay-forced path; mid-game kill of
-one side, resume, logs converge; contract changes from lessons land
-before Phase 6 depends on it.
+Verdicts (arch doc step 4 demands):
 
-## Phase 5 — Mobile spike (gate)
+- Contract survived unchanged: everything ran through frozen commands
+  plus the three Phase 3 `note_*` methods. No fixes needed.
+- Joining: ticket fallback works (initial dial and redial). Short
+  human-readable code stays open; nothing blocks on it.
+- Transport shape for Phase 7: one endpoint, game + voice ALPNs, one
+  uni stream per message, tip-compare + replay-from-log resume.
+
+## Phase 5 — Mobile spike (in progress, gate below)
+
+Bridge (`rust/src/bridge.rs`, one `GodotClass` node, typed signals,
+outbox drained in `process()`) loads on desktop: headless
+`bridge_spike_test.gd` PASSes. Both Android ABIs cross-compile
+(`rust/build_android.sh`, NDK 27d, platform 24) and stage under
+`godot/android/libs/`. Phone gate runs `phone_spike.sh` (export +
+apksigner verify + install + logcat verdict) on attached hardware.
 
 Goal: minimal `GodotClass` bridge on a **real Android device**:
 call into chess core, event back as signal; then one Iroh

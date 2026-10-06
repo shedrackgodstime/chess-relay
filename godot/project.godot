@@ -31,3 +31,7 @@ window/stretch/aspect="expand"
 [gui]
 
 theme/custom="res://src/ui/theme/chess_relay_theme.tres"
+
+[rendering]
+
+textures/vram_compression/import_etc2_astc=true
