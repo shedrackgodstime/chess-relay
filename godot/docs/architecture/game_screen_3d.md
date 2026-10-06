@@ -66,6 +66,12 @@ label height      = board top + 0.025
 **Any future board resize must use these same calculations.** Do not replace
 the calculated frame midpoint with viewport offsets or screen-space labels.
 
+**The playing surface is `y = 0`.** Squares use a `0.07` thickness and a
+`0.035` gap. The frame is four separate rails with a `0.38` margin, a `0.16`
+depth, and a `0.025` top lip. A separate plinth provides the solid base below
+the rails. Pieces rest from the playing surface rather than from the camera or
+screen layout.
+
 ## Rendering choices
 
 - Use simple procedural meshes for the first shell so geometry can be tested
@@ -74,9 +80,14 @@ the calculated frame midpoint with viewport offsets or screen-space labels.
 - Use one camera and deliberate lighting before adding room decoration.
 - Keep the HUD in the project theme and use the existing header component.
 
-The game camera supports a left-button drag on the board area. Dragging orbits
-the camera around the board target while preserving the framing scale. The
-header remains UI-owned and does not begin an orbit drag.
+The game camera uses a dedicated `Camera3D` orbit controller. It receives drag
+input through `_unhandled_input`, so normal UI controls get first refusal. The
+camera stores yaw, pitch, and distance, then applies a
+`Transform3D.looking_at()` transform around the board target.
+
+**Camera distance is clamped.** Wheel zoom changes distance within the camera
+contract instead of allowing the view to pass through the board or drift away
+from the playable surface.
 
 The **Board view** control provides deterministic rotate-left, rotate-right,
 flip, and reset actions for users who do not want to drag the camera.

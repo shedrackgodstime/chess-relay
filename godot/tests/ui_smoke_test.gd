@@ -181,14 +181,28 @@ func _check_game_screen() -> void:
 		"board exposes file coordinate labels")
 	_check(game._board.get_node("Coordinates/RankLeft_1").mesh.text == "1",
 		"board exposes rank coordinate labels")
-	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.z, 4.21),
+	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.z, 4.19),
 		"file labels are pinned to the frame midpoint")
-	_check(is_equal_approx(game._board.get_node("Coordinates/RankLeft_1").position.x, -4.21),
+	_check(is_equal_approx(game._board.get_node("Coordinates/RankLeft_1").position.x, -4.19),
 		"rank labels are pinned to the frame midpoint")
-	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.y, 0.054),
+	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.y, 0.029),
 		"coordinate markings sit on the frame top surface")
 	_check(game._pieces.get_child_count() == 32,
 		"game screen renders a complete demo position")
+	var key_light := game.get_node("World/KeyLight") as DirectionalLight3D
+	_check(is_equal_approx(key_light.rotation_degrees.x, -90.0),
+		"game key light is directly above the board")
+	_check(game.get_node("World/OpponentFillLight") is OmniLight3D,
+		"game has an opponent-side fill light")
+	_check(game.get_node("World/PlayerFillLight") is OmniLight3D,
+		"game has a player-side fill light")
+	_check(game.get_node("World/LeftFillLight") is OmniLight3D,
+		"game has a left-side fill light")
+	_check(game.get_node("World/RightFillLight") is OmniLight3D,
+		"game has a right-side fill light")
+	var black_piece := game._pieces.get_child(2) as ChessPieceView
+	_check(is_equal_approx(black_piece.rotation.y, PI),
+		"black pieces face the opposing side")
 	game._update_camera_framing(1440.0, 900.0)
 	var wide_camera_height := game._camera.position.y
 	game._update_camera_framing(640.0, 900.0)
@@ -198,16 +212,44 @@ func _check_game_screen() -> void:
 	_check(is_equal_approx(game._camera.position.y, wide_camera_height),
 		"game camera restores framing for a wide viewport")
 	var initial_camera_position := game._camera.position
-	game._camera_yaw = 90.0
-	game._apply_camera_orbit()
+	game._camera.orbit_by(90.0)
 	_check(not game._camera.position.is_equal_approx(initial_camera_position),
 		"game camera orbits around the board")
+	var drag_yaw: float = game._camera.yaw_degrees
+	var drag_start := InputEventMouseButton.new()
+	drag_start.button_index = MOUSE_BUTTON_LEFT
+	drag_start.pressed = true
+	game._camera._unhandled_input(drag_start)
+	var drag_motion := InputEventMouseMotion.new()
+	drag_motion.relative = Vector2(40.0, 0.0)
+	game._camera._unhandled_input(drag_motion)
+	var drag_end := InputEventMouseButton.new()
+	drag_end.button_index = MOUSE_BUTTON_LEFT
+	drag_end.pressed = false
+	game._camera._unhandled_input(drag_end)
+	_check(not is_equal_approx(game._camera.yaw_degrees, drag_yaw),
+		"camera drag input changes orbit yaw")
+	var camera_distance: float = game._camera.distance
+	game._camera.set_distance(camera_distance + 2.0)
+	_check(game._camera.distance > camera_distance,
+		"game camera zooms out within its distance contract")
 	game._board_view_button.pressed.emit()
-	_check(game.get_node_or_null("HUD/BoardViewMenu") != null,
+	_check(game.get_node_or_null("HUD/BoardViewOverlay/BoardViewMenu") != null,
 		"game opens board view controls")
-	game.get_node("HUD/BoardViewMenu").get_child(0).get_child(2).pressed.emit()
-	_check(is_equal_approx(game._camera_yaw, 270.0),
+	game.get_node("HUD/BoardViewOverlay/BoardViewMenu").get_child(0).get_child(1).pressed.emit()
+	_check(is_equal_approx(game._camera.yaw_degrees, 94.5),
+		"board view controls rotate by the prototype step")
+	_check(game.get_node_or_null("HUD/BoardViewOverlay/BoardViewMenu") != null,
+		"board view stays open after an internal action")
+	game.get_node("HUD/BoardViewOverlay/BoardViewMenu").get_child(0).get_child(2).pressed.emit()
+	_check(is_equal_approx(game._camera.yaw_degrees, 274.5),
 		"board view controls flip the board")
+	var outside_click := InputEventMouseButton.new()
+	outside_click.pressed = true
+	game._on_board_view_overlay_input(outside_click,
+		game.get_node("HUD/BoardViewOverlay"))
+	_check(game.get_node("HUD/BoardViewOverlay").is_queued_for_deletion(),
+		"board view closes from an outside click")
 	for square in ["a1", "e4", "h8"]:
 		_check(game._board.world_to_square(game._board.square_to_world(square)) == square,
 			"board coordinate round trip works for %s" % square)

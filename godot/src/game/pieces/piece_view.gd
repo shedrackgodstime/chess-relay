@@ -15,11 +15,13 @@ func _ready() -> void:
 func configure(type: String, piece_side: String) -> void:
 	piece_type = type
 	side = piece_side
+	rotation.y = PI if side == "black" else 0.0
 	if is_node_ready():
 		_build_visual()
 
 
 func _build_visual() -> void:
+	rotation.y = PI if side == "black" else 0.0
 	for child in get_children():
 		child.queue_free()
 	var root_material := StandardMaterial3D.new()
@@ -32,7 +34,7 @@ func _build_visual() -> void:
 	base_mesh.height = 0.16
 	base.mesh = base_mesh
 	base.material_override = root_material
-	base.position.y = 0.1
+	base.position.y = 0.08
 	add_child(base)
 	var body := MeshInstance3D.new()
 	var body_mesh := CylinderMesh.new()

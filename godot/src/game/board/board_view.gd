@@ -5,10 +5,14 @@ signal square_pressed(square: String)
 
 const BOARD_SIZE := 8
 const SQUARE_SIZE := 1.0
-const BOARD_HEIGHT := 0.16
-const FRAME_MARGIN := 0.42
-const FRAME_HEIGHT := 0.34
-const FRAME_CENTER_Y := -0.12
+const SQUARE_GAP := 0.035
+const SQUARE_THICKNESS := 0.07
+const BOARD_SURFACE_Y := 0.0
+const FRAME_MARGIN := 0.38
+const FRAME_LIP := 0.025
+const FRAME_DEPTH := 0.16
+const PLINTH_DEPTH := 0.26
+const PLINTH_INSET := 0.12
 
 const LIGHT_SQUARE := Color(0.76, 0.67, 0.52, 1.0)
 const DARK_SQUARE := Color(0.28, 0.20, 0.14, 1.0)
@@ -63,7 +67,7 @@ func set_highlight(square: String, color := HIGHLIGHT_COLOR) -> void:
 	var highlight := _make_box(
 		Vector3(SQUARE_SIZE * 0.86, 0.025, SQUARE_SIZE * 0.86),
 		color,
-		Vector3(square_to_world(square, BOARD_HEIGHT + 0.04))
+		Vector3(square_to_world(square, BOARD_SURFACE_Y + 0.012))
 	)
 	highlight.name = "SelectedSquare"
 	_highlights_root.add_child(highlight)
@@ -104,18 +108,14 @@ func _build_board() -> void:
 	_legal_moves_root = _new_overlay_root("LegalMoves")
 	_check_root = _new_overlay_root("Check")
 	_square_colors = [LIGHT_SQUARE, DARK_SQUARE]
-	var footprint := BOARD_SIZE * SQUARE_SIZE + FRAME_MARGIN * 2.0
-	var frame := _make_box(
-		Vector3(footprint, FRAME_HEIGHT, footprint), FRAME_COLOR, Vector3(0, FRAME_CENTER_Y, 0)
-	)
-	frame.name = "BoardFrame"
-	add_child(frame)
+	_build_frame()
 	for rank in BOARD_SIZE:
 		for file in BOARD_SIZE:
 			var square := _make_box(
-				Vector3(SQUARE_SIZE, BOARD_HEIGHT, SQUARE_SIZE),
+				Vector3(SQUARE_SIZE - SQUARE_GAP, SQUARE_THICKNESS, SQUARE_SIZE - SQUARE_GAP),
 					_square_colors[(file + rank) % 2],
-				square_to_world("%s%d" % [char("a".unicode_at(0) + file), rank + 1], BOARD_HEIGHT * 0.5)
+				square_to_world("%s%d" % [char("a".unicode_at(0) + file), rank + 1],
+					BOARD_SURFACE_Y - SQUARE_THICKNESS * 0.5)
 			)
 			square.name = "Square_%s%d" % [char("a".unicode_at(0) + file), rank + 1]
 			_squares_root.add_child(square)
@@ -126,7 +126,8 @@ func _build_input_surface() -> void:
 	area.name = "BoardInputSurface"
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
-	shape.size = Vector3(BOARD_SIZE * SQUARE_SIZE, BOARD_HEIGHT, BOARD_SIZE * SQUARE_SIZE)
+	shape.size = Vector3(BOARD_SIZE * SQUARE_SIZE, SQUARE_THICKNESS, BOARD_SIZE * SQUARE_SIZE)
+	area.position.y = BOARD_SURFACE_Y - SQUARE_THICKNESS * 0.5
 	collision.shape = shape
 	area.add_child(collision)
 	area.input_event.connect(_on_board_input)
@@ -140,7 +141,7 @@ func _build_coordinates() -> void:
 	var board_half := BOARD_SIZE * SQUARE_SIZE * 0.5
 	var frame_half := board_half + FRAME_MARGIN
 	var frame_label_offset := (board_half + frame_half) * 0.5
-	var frame_top := FRAME_CENTER_Y + FRAME_HEIGHT * 0.5
+	var frame_top := FRAME_LIP
 	var label_height := frame_top + 0.004
 	for file in BOARD_SIZE:
 		var file_name := char("a".unicode_at(0) + file)
@@ -201,11 +202,37 @@ func _clear_root(root: Node3D) -> void:
 		child.free()
 
 
+func _build_frame() -> void:
+	var inner := BOARD_SIZE * SQUARE_SIZE * 0.5
+	var outer := inner + FRAME_MARGIN
+	var centre_offset := (outer + inner) * 0.5
+	var rail_y := FRAME_LIP - FRAME_DEPTH * 0.5
+	var front_back_size := Vector3(outer * 2.0, FRAME_DEPTH, FRAME_MARGIN)
+	var left_right_size := Vector3(FRAME_MARGIN, FRAME_DEPTH, inner * 2.0)
+	for side in [-1.0, 1.0]:
+		var rail := _make_box(front_back_size, FRAME_COLOR,
+			Vector3(0.0, rail_y, side * centre_offset))
+		rail.name = "FrameRail_%s" % ("Front" if side > 0.0 else "Back")
+		add_child(rail)
+		rail = _make_box(left_right_size, FRAME_COLOR,
+			Vector3(side * centre_offset, rail_y, 0.0))
+		rail.name = "FrameRail_%s" % ("Right" if side > 0.0 else "Left")
+		add_child(rail)
+	var plinth_half := outer - PLINTH_INSET
+	var plinth := _make_box(
+		Vector3(plinth_half * 2.0, PLINTH_DEPTH, plinth_half * 2.0),
+		FRAME_COLOR,
+		Vector3(0.0, -SQUARE_THICKNESS - PLINTH_DEPTH * 0.5, 0.0)
+	)
+	plinth.name = "BoardPlinth"
+	add_child(plinth)
+
+
 func _square_overlay(square: String, color: Color, prefix: String) -> MeshInstance3D:
 	var overlay := _make_box(
 		Vector3(SQUARE_SIZE * 0.84, 0.026, SQUARE_SIZE * 0.84),
 		color,
-		Vector3(square_to_world(square, BOARD_HEIGHT + 0.045))
+		Vector3(square_to_world(square, BOARD_SURFACE_Y + 0.012))
 	)
 	overlay.name = "%s_%s" % [prefix, square]
 	return overlay

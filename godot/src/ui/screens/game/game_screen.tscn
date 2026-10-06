@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://src/ui/screens/game/game_screen.gd" id="1_game"]
 [ext_resource type="PackedScene" path="res://src/game/board/board_view.tscn" id="2_board"]
 [ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="3_header"]
+[ext_resource type="Script" path="res://src/game/camera/orbit_camera.gd" id="4_camera"]
 
 [sub_resource type="Environment" id="Environment_game"]
 background_mode = 1
@@ -28,10 +29,34 @@ accessibility_name = "Chess game"
 environment = SubResource("Environment_game")
 
 [node name="KeyLight" type="DirectionalLight3D" parent="World"]
-rotation_degrees = Vector3(-52, -28, 0)
+rotation_degrees = Vector3(-90, 0, 0)
 light_color = Color(1, 0.91, 0.75, 1)
 light_energy = 1.35
 shadow_enabled = true
+
+[node name="OpponentFillLight" type="OmniLight3D" parent="World"]
+position = Vector3(0, 6, -7)
+light_color = Color(0.82, 0.88, 1, 1)
+light_energy = 0.55
+omni_range = 18.0
+
+[node name="PlayerFillLight" type="OmniLight3D" parent="World"]
+position = Vector3(0, 6, 7)
+light_color = Color(1, 0.9, 0.76, 1)
+light_energy = 0.55
+omni_range = 18.0
+
+[node name="LeftFillLight" type="OmniLight3D" parent="World"]
+position = Vector3(-7, 5, 0)
+light_color = Color(0.84, 0.9, 1, 1)
+light_energy = 0.35
+omni_range = 18.0
+
+[node name="RightFillLight" type="OmniLight3D" parent="World"]
+position = Vector3(7, 5, 0)
+light_color = Color(1, 0.86, 0.72, 1)
+light_energy = 0.35
+omni_range = 18.0
 
 [node name="Camera" type="Camera3D" parent="World"]
 unique_name_in_owner = true
@@ -39,6 +64,7 @@ position = Vector3(0, 10.8, 10.8)
 rotation_degrees = Vector3(-43, 0, 0)
 current = true
 fov = 38.0
+script = ExtResource("4_camera")
 
 [node name="Board" parent="World" instance=ExtResource("2_board")]
 unique_name_in_owner = true
