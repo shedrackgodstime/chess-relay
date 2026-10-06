@@ -1,6 +1,204 @@
-[gd_scene load_steps=2 format=3]
-
+[gd_scene load_steps=4 format=3]
 [ext_resource type="Script" path="res://src/game/board/board_view.gd" id="1_board"]
+[ext_resource type="PackedScene" path="res://src/game/board/square.tscn" id="2_light"]
+[ext_resource type="PackedScene" path="res://src/game/board/square_dark.tscn" id="3_dark"]
+[sub_resource type="BoxMesh" id="5_plinth_mesh"]
+size = Vector3(8.520, 0.260, 8.520)
 
 [node name="ChessBoardView" type="Node3D"]
 script = ExtResource("1_board")
+
+[node name="Squares" type="Node3D" parent="."]
+
+[node name="a1" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 2.5)
+
+[node name="b1" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 2.5)
+
+[node name="c1" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 2.5)
+
+[node name="d1" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 2.5)
+
+[node name="e1" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 2.5)
+
+[node name="f1" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 2.5)
+
+[node name="g1" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 2.5)
+
+[node name="h1" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 2.5)
+
+[node name="a2" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 1.5)
+
+[node name="b2" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 1.5)
+
+[node name="c2" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 1.5)
+
+[node name="d2" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 1.5)
+
+[node name="e2" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 1.5)
+
+[node name="f2" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 1.5)
+
+[node name="g2" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 1.5)
+
+[node name="h2" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 1.5)
+
+[node name="a3" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, 0.5)
+
+[node name="b3" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, 0.5)
+
+[node name="c3" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, 0.5)
+
+[node name="d3" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, 0.5)
+
+[node name="e3" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, 0.5)
+
+[node name="f3" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, 0.5)
+
+[node name="g3" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, 0.5)
+
+[node name="h3" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, 0.5)
+
+[node name="a4" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -0.5)
+
+[node name="b4" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -0.5)
+
+[node name="c4" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -0.5)
+
+[node name="d4" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -0.5)
+
+[node name="e4" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -0.5)
+
+[node name="f4" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -0.5)
+
+[node name="g4" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -0.5)
+
+[node name="h4" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -0.5)
+
+[node name="a5" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -1.5)
+
+[node name="b5" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -1.5)
+
+[node name="c5" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -1.5)
+
+[node name="d5" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -1.5)
+
+[node name="e5" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -1.5)
+
+[node name="f5" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -1.5)
+
+[node name="g5" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -1.5)
+
+[node name="h5" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -1.5)
+
+[node name="a6" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -2.5)
+
+[node name="b6" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -2.5)
+
+[node name="c6" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -2.5)
+
+[node name="d6" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -2.5)
+
+[node name="e6" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -2.5)
+
+[node name="f6" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -2.5)
+
+[node name="g6" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -2.5)
+
+[node name="h6" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -2.5)
+
+[node name="a7" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -3.5)
+
+[node name="b7" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -3.5)
+
+[node name="c7" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -3.5)
+
+[node name="d7" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -3.5)
+
+[node name="e7" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -3.5)
+
+[node name="f7" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -3.5)
+
+[node name="g7" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -3.5)
+
+[node name="h7" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -3.5)
+
+[node name="a8" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3.5, 0, -4.5)
+
+[node name="b8" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0, -4.5)
+
+[node name="c8" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0, -4.5)
+
+[node name="d8" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.5, 0, -4.5)
+
+[node name="e8" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5, 0, -4.5)
+
+[node name="f8" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0, -4.5)
+
+[node name="g8" parent="Squares" instance=ExtResource("2_light")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 0, -4.5)
+
+[node name="h8" parent="Squares" instance=ExtResource("3_dark")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5, 0, -4.5)
+

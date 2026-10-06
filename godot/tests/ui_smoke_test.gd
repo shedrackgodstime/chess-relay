@@ -246,8 +246,19 @@ func _check_game_screen() -> void:
 	var game := GAME_SCENE.instantiate() as GameScreen
 	root.add_child(game)
 	await process_frame
-	_check(game._board.get_node("Squares").get_child_count() == 64,
+	# The squares are authored instances of one square scene, not nodes a script
+	# built. Checked by type, so the board cannot quietly go back to being assembled
+	# at runtime and still pass.
+	var squares := game._board.get_node("Squares")
+	_check(squares.get_child_count() == 64,
 		"game board builds 64 reusable squares")
+	var from_scene := 0
+	for child in squares.get_children():
+		if child.get_script() == null and child.scene_file_path.ends_with("square.tscn") \
+				or child.scene_file_path.ends_with("square_dark.tscn"):
+			from_scene += 1
+	_check(from_scene == 64, "and all 64 are instances of a square scene, got %d"
+		% from_scene)
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
 	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
