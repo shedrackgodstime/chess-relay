@@ -38,6 +38,7 @@ func _ready() -> void:
 	_custom_increment.value_changed.connect(_on_custom_time_changed)
 	_play_button.pressed.connect(_on_play_pressed)
 	_header.menu_requested.connect(_toggle_header_menu)
+	_configure_choices()
 	_update_header_visibility()
 	_update_screen_columns()
 	call_deferred("_update_screen_columns")
@@ -46,6 +47,16 @@ func _ready() -> void:
 	_update_summary()
 	if _peer_setup:
 		_apply_peer_setup()
+
+
+## Choice content owned here in code (see ChoiceGroup.configure): the
+## option arrays live outside scene overrides so export conversion
+## cannot drop them.
+func _configure_choices() -> void:
+	_side_choice.configure("Choose Color", ["White", "Black", "Random"], 3, 0)
+	_time_choice.configure("Time Control", ["1 | 0", "3 | 2", "5 | 3", "10 | 0", "15 | 10", "Custom"], 3, 2)
+	_variant_choice.configure("Variant", ["Standard", "Chess960"], 2, 0)
+	_difficulty_choice.configure("Difficulty", ["Easy", "Medium", "Hard"], 3, 1)
 
 
 ## Configures this shared screen after a peer has joined or accepted an invite.

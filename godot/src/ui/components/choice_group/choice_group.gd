@@ -21,6 +21,23 @@ func _ready() -> void:
 	_build_options()
 
 
+## Bulk configuration owned by code, not scene overrides: array-typed
+## instance overrides do not survive export conversion (titles and other
+## scalars do; PackedStringArrays vanish), so callers set choices here.
+func configure(p_title: String, p_choices: PackedStringArray, p_columns: int, p_selected: int) -> void:
+	title = p_title
+	choices = p_choices
+	columns = p_columns
+	selected_index = p_selected
+	for child in _options_grid.get_children():
+		_options_grid.remove_child(child)
+		child.queue_free()
+	_buttons.clear()
+	_title_label.text = title
+	_options_grid.columns = columns
+	_build_options()
+
+
 func set_selection(index: int) -> void:
 	if index < 0 or index >= _buttons.size():
 		return
