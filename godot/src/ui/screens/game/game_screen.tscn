@@ -14,8 +14,10 @@ ambient_light_energy = 1.05
 tonemap_mode = 2
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
-albedo_color = Color(0.055, 0.043, 0.035, 1)
-roughness = 0.92
+albedo_color = Color(0.022, 0.016, 0.012, 1)
+metallic = 0.0
+roughness = 1.0
+specular_mode = 2
 
 [sub_resource type="PlaneMesh" id="GroundMesh"]
 material = SubResource("GroundMaterial")
