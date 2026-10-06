@@ -326,8 +326,15 @@ func _check_game_screen() -> void:
 	_check(board_surface.mesh is ArrayMesh, "board uses one procedural ArrayMesh surface")
 	_check((board_surface.mesh as ArrayMesh).get_surface_count() == 3,
 		"board mesh separates light, dark, and frame materials")
+	var light_vertices := (board_surface.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array
+	_check(light_vertices.size() / 3 == 32 * 20,
+		"board tiles use the beveled tile geometry")
 	_check(game._board.get_node("Squares/Square_a1").get_child_count() == 0,
 		"square markers carry no duplicate render geometry")
+	game._board.set_highlight("a1")
+	var selection := game._board.get_node("Highlights/SelectedSquare") as MeshInstance3D
+	_check(selection.mesh is ArrayMesh and (selection.mesh as ArrayMesh).get_surface_count() == 1,
+		"selection uses a reusable square frame mesh")
 	var board_aabb := (board_surface.mesh as ArrayMesh).get_aabb()
 	_check(board_aabb.size.x > 8.7 and board_aabb.size.z > 8.7 and board_aabb.size.y > 0.3,
 		"board mesh includes the full frame and plinth bounds")
@@ -343,6 +350,11 @@ func _check_game_screen() -> void:
 	_check(pieces.get_child_count() == 32, "game builds the reusable starting piece position")
 	var white_mesh := pieces.get_node("White_Pawn_a2/Mesh") as MeshInstance3D
 	var black_mesh := pieces.get_node("Black_Pawn_a7/Mesh") as MeshInstance3D
+	var piece_surface := pieces.get_node_or_null("White_Pawn_a2/PieceInputSurface")
+	_check(piece_surface != null and piece_surface.get_child_count() == 1,
+		"pieces expose a reusable input collider")
+	_check(piece_surface.collision_layer == 2 and game._board.get_node("BoardInputSurface").collision_layer == 1,
+		"piece and board picking use separate collision layers")
 	_check(white_mesh.material_override != null and black_mesh.material_override != null,
 		"pieces receive controlled side materials")
 	_check(white_mesh.material_override != black_mesh.material_override,

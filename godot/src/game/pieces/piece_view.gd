@@ -1,6 +1,8 @@
 class_name ChessPieceView
 extends Node3D
 
+signal piece_pressed(piece: Node)
+
 const PIECE_SCALE := 16.0
 const KNIGHT_FACING_OFFSET := deg_to_rad(60.0)
 const CATALOG_SCRIPT := preload("res://src/game/pieces/piece_catalog.gd")
@@ -38,10 +40,32 @@ func configure(type: String, piece_side: String) -> void:
 	mesh.position.y = -_mesh_min_y(mesh) * PIECE_SCALE
 	mesh.material_override = WHITE_MATERIAL if side == "white" else BLACK_MATERIAL
 	add_child(mesh)
+	_add_input_collider(mesh)
 	if piece_type == "knight":
 		rotation.y = PI + KNIGHT_FACING_OFFSET if side == "white" else -KNIGHT_FACING_OFFSET
 	else:
 		rotation.y = PI if side == "black" else 0.0
+
+func _add_input_collider(mesh: MeshInstance3D) -> void:
+	var surface := Area3D.new()
+	surface.name = "PieceInputSurface"
+	surface.collision_layer = 2
+	surface.collision_mask = 0
+	var collision := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	var bounds := mesh.get_aabb()
+	shape.size = bounds.size * PIECE_SCALE
+	collision.position = mesh.position + (bounds.position + bounds.size * 0.5) * PIECE_SCALE
+	collision.shape = shape
+	surface.add_child(collision)
+	surface.input_event.connect(_on_piece_input)
+	add_child(surface)
+
+func _on_piece_input(_camera: Node, event: InputEvent, _position: Vector3,
+		_normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.pressed \
+			and event.button_index == MOUSE_BUTTON_LEFT:
+		piece_pressed.emit(self)
 
 func _find_mesh(node: Node) -> MeshInstance3D:
 	if node is MeshInstance3D:

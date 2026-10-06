@@ -11,6 +11,7 @@ static func build(
 	board_size: int,
 	square_size: float,
 	square_gap: float,
+	square_bevel: float,
 	square_thickness: float,
 	frame_margin: float,
 	frame_lip: float,
@@ -38,10 +39,12 @@ static func build(
 				-square_thickness * 0.5,
 				(rank - (board_size - 1) * 0.5) * square_size
 			)
-			var tile := BoxMesh.new()
-			tile.size = Vector3(tile_size, square_thickness, tile_size)
 			var target := light if (file + rank) % 2 == 0 else dark
-			target.append_from(tile, 0, Transform3D(Basis.IDENTITY, centre))
+			_append_beveled_box(
+				target,
+				Vector3(tile_size, square_thickness, tile_size),
+				square_bevel,
+				centre)
 
 	var outer := half + frame_margin
 	var centre_offset := (outer + half) * 0.5
@@ -70,3 +73,75 @@ static func build(
 	frame.commit(mesh)
 	mesh.surface_set_material(mesh.get_surface_count() - 1, frame_material)
 	return mesh
+
+
+## Emits a box with a chamfered top edge. The bottom remains flat so every tile
+## keeps a precise playing surface while the bevel gives the light a controlled
+## edge to catch. Faces are emitted with their own vertices and normals, which
+## keeps the top, sides, and chamfer visually crisp under directional light.
+static func _append_beveled_box(
+	tool: SurfaceTool, size: Vector3, bevel: float, centre: Vector3
+) -> void:
+	var half := size * 0.5
+	var amount := clampf(bevel, 0.0, minf(half.x, minf(half.y, half.z)) * 0.5)
+	var top_side := half.y - amount
+	var local_faces := [
+		[Vector3(0.0, 0.0, 1.0), [
+			Vector3(-half.x, -half.y, half.z), Vector3(half.x, -half.y, half.z),
+			Vector3(half.x, top_side, half.z), Vector3(-half.x, top_side, half.z)]],
+		[Vector3(0.0, 0.0, -1.0), [
+			Vector3(half.x, -half.y, -half.z), Vector3(-half.x, -half.y, -half.z),
+			Vector3(-half.x, top_side, -half.z), Vector3(half.x, top_side, -half.z)]],
+		[Vector3(1.0, 0.0, 0.0), [
+			Vector3(half.x, -half.y, half.z), Vector3(half.x, -half.y, -half.z),
+			Vector3(half.x, top_side, -half.z), Vector3(half.x, top_side, half.z)]],
+		[Vector3(-1.0, 0.0, 0.0), [
+			Vector3(-half.x, -half.y, -half.z), Vector3(-half.x, -half.y, half.z),
+			Vector3(-half.x, top_side, half.z), Vector3(-half.x, top_side, -half.z)]]
+	]
+	for face in local_faces:
+		_append_quad(tool, face[0], face[1], centre)
+
+	if amount <= 0.0:
+		_append_quad(tool, Vector3.UP, [
+			Vector3(-half.x, half.y, half.z), Vector3(half.x, half.y, half.z),
+			Vector3(half.x, half.y, -half.z), Vector3(-half.x, half.y, -half.z)], centre)
+	else:
+		var chamfers := [
+			[Vector3(0.0, 1.0, 1.0).normalized(), [
+				Vector3(-half.x, top_side, half.z), Vector3(half.x, top_side, half.z),
+				Vector3(half.x - amount, half.y, half.z - amount),
+				Vector3(-half.x + amount, half.y, half.z - amount)]],
+			[Vector3(0.0, 1.0, -1.0).normalized(), [
+				Vector3(half.x, top_side, -half.z), Vector3(-half.x, top_side, -half.z),
+				Vector3(-half.x + amount, half.y, -half.z + amount),
+				Vector3(half.x - amount, half.y, -half.z + amount)]],
+			[Vector3(1.0, 1.0, 0.0).normalized(), [
+				Vector3(half.x, top_side, half.z), Vector3(half.x, top_side, -half.z),
+				Vector3(half.x - amount, half.y, -half.z + amount),
+				Vector3(half.x - amount, half.y, half.z - amount)]],
+			[Vector3(-1.0, 1.0, 0.0).normalized(), [
+				Vector3(-half.x, top_side, -half.z), Vector3(-half.x, top_side, half.z),
+				Vector3(-half.x + amount, half.y, half.z - amount),
+				Vector3(-half.x + amount, half.y, -half.z + amount)]]
+		]
+		for chamfer in chamfers:
+			_append_quad(tool, chamfer[0], chamfer[1], centre)
+		_append_quad(tool, Vector3.UP, [
+			Vector3(-half.x + amount, half.y, half.z - amount),
+			Vector3(half.x - amount, half.y, half.z - amount),
+			Vector3(half.x - amount, half.y, -half.z + amount),
+			Vector3(-half.x + amount, half.y, -half.z + amount)], centre)
+
+	_append_quad(tool, Vector3.DOWN, [
+		Vector3(-half.x, -half.y, -half.z), Vector3(half.x, -half.y, -half.z),
+		Vector3(half.x, -half.y, half.z), Vector3(-half.x, -half.y, half.z)], centre)
+
+
+static func _append_quad(
+	tool: SurfaceTool, normal: Vector3, corners: Array, centre: Vector3
+) -> void:
+	for triangle in [[0, 2, 1], [0, 3, 2]]:
+		for corner_index in triangle:
+			tool.set_normal(normal)
+			tool.add_vertex(centre + corners[corner_index])
