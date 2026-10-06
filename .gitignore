@@ -1,6 +1,7 @@
 # Godot-generated caches and export state
 .godot/
 /godot/.godot/
+/godot/.nomedia
 /android/
 /godot/android/
 .import/
