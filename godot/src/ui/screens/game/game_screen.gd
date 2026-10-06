@@ -18,7 +18,6 @@ func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
-	_board.piece_pressed.connect(_on_piece_pressed)
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
 	_build_demo_position()
@@ -42,10 +41,6 @@ func _add_piece(parent: Node3D, piece_type: String, side: String, square: String
 	piece.configure(piece_type, side)
 	piece.position = _board.square_to_world(square, 0.02)
 	parent.add_child(piece)
-
-
-func _on_piece_pressed(piece: Node) -> void:
-	_header.set_center_text("Selected %s" % piece.name.replace("_", " ").to_upper())
 
 
 func _notification(what: int) -> void:

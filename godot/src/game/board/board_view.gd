@@ -1,18 +1,13 @@
-@tool
 class_name ChessBoardView
 extends Node3D
 
 const BOARD_MESH_SCRIPT := preload("res://src/game/board/board_mesh.gd")
-const SQUARE_MARKER_SCRIPT := preload("res://src/game/board/square_marker.gd")
-const BOARD_MATERIALS_SCRIPT := preload("res://src/game/board/board_materials.gd")
 
 signal square_pressed(square: String)
-signal piece_pressed(piece: Node)
 
 const BOARD_SIZE := 8
 const SQUARE_SIZE := 1.0
 const SQUARE_GAP := 0.035
-const SQUARE_BEVEL := 0.018
 const SQUARE_THICKNESS := 0.07
 const BOARD_SURFACE_Y := 0.0
 const FRAME_MARGIN := 0.38
@@ -71,8 +66,11 @@ func set_highlight(square: String, color := HIGHLIGHT_COLOR) -> void:
 	if square.is_empty():
 		return
 	_highlighted_square = square
-	var highlight := SQUARE_MARKER_SCRIPT.create(color)
-	highlight.position = square_to_world(square, BOARD_SURFACE_Y + 0.012)
+	var highlight := _make_box(
+		Vector3(SQUARE_SIZE * 0.86, 0.025, SQUARE_SIZE * 0.86),
+		color,
+		Vector3(square_to_world(square, BOARD_SURFACE_Y + 0.012))
+	)
 	highlight.name = "SelectedSquare"
 	_highlights_root.add_child(highlight)
 
@@ -126,8 +124,6 @@ func _build_board() -> void:
 func _build_input_surface() -> void:
 	var area := Area3D.new()
 	area.name = "BoardInputSurface"
-	area.collision_layer = 1
-	area.collision_mask = 0
 	var collision := CollisionShape3D.new()
 	var shape := BoxShape3D.new()
 	shape.size = Vector3(BOARD_SIZE * SQUARE_SIZE, SQUARE_THICKNESS, BOARD_SIZE * SQUARE_SIZE)
@@ -181,36 +177,10 @@ func _add_coordinate(text: String, position: Vector3, node_name: String) -> void
 
 func _on_board_input(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _emit_piece_at_pointer(_camera, event.position):
-			return
 		var square := world_to_square(event_position)
 		if not square.is_empty():
 			set_highlight(square)
 			square_pressed.emit(square)
-	elif event is InputEventScreenTouch and event.pressed:
-		if _emit_piece_at_pointer(_camera, event.position):
-			return
-		var touch_square := world_to_square(event_position)
-		if not touch_square.is_empty():
-			set_highlight(touch_square)
-			square_pressed.emit(touch_square)
-
-
-func _emit_piece_at_pointer(camera_node: Node, screen_position: Vector2) -> bool:
-	if not camera_node is Camera3D:
-		return false
-	var camera := camera_node as Camera3D
-	var origin := camera.project_ray_origin(screen_position)
-	var endpoint := origin + camera.project_ray_normal(screen_position) * 40.0
-	var query := PhysicsRayQueryParameters3D.create(origin, endpoint, 2)
-	var hit := get_world_3d().direct_space_state.intersect_ray(query)
-	if hit.is_empty():
-		return false
-	var collider := hit.get("collider") as Node
-	if collider == null or collider.name != "PieceInputSurface" or collider.get_parent() == null:
-		return false
-	piece_pressed.emit(collider.get_parent())
-	return true
 
 
 func _clear_highlights() -> void:
@@ -239,23 +209,25 @@ func _build_render_mesh() -> void:
 		BOARD_SIZE,
 		SQUARE_SIZE,
 		SQUARE_GAP,
-		SQUARE_BEVEL,
 		SQUARE_THICKNESS,
 		FRAME_MARGIN,
 		FRAME_LIP,
 		FRAME_DEPTH,
 		PLINTH_DEPTH,
 		PLINTH_INSET,
-		BOARD_MATERIALS_SCRIPT.light_square(),
-		BOARD_MATERIALS_SCRIPT.dark_square(),
-		BOARD_MATERIALS_SCRIPT.frame()
+		_material(LIGHT_SQUARE),
+		_material(DARK_SQUARE),
+		_material(FRAME_COLOR)
 	)
 	add_child(board_surface)
 
 
 func _square_overlay(square: String, color: Color, prefix: String) -> MeshInstance3D:
-	var overlay := SQUARE_MARKER_SCRIPT.create(color)
-	overlay.position = square_to_world(square, BOARD_SURFACE_Y + 0.012)
+	var overlay := _make_box(
+		Vector3(SQUARE_SIZE * 0.84, 0.026, SQUARE_SIZE * 0.84),
+		color,
+		Vector3(square_to_world(square, BOARD_SURFACE_Y + 0.012))
+	)
 	overlay.name = "%s_%s" % [prefix, square]
 	return overlay
 

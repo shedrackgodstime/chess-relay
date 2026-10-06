@@ -167,12 +167,6 @@ without running the game and reading code.
 This is the same finding as item 2 of `foundation_tightening`, in 3D. It was not
 in that document because the audit was scoped to the UI.
 
-The board shell now follows the procedural mesh path: `ChessBoardView` is a
-`@tool` node, `board_mesh.gd` builds one `ArrayMesh` with light, dark, and frame
-surfaces using `SurfaceTool`, and the 64 square nodes remain as non-rendering
-markers for interaction and diagnostics. Tile geometry uses a controlled top
-bevel, while square state uses reusable emissive frame meshes.
-
 | | This project | Prototype |
 | --- | --- | --- |
 | Board node | `Node3D`, 64 children built in code | `MeshInstance3D`, one procedural mesh |

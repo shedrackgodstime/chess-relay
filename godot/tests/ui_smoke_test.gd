@@ -282,12 +282,12 @@ func _check_game_screen() -> void:
 	touch_down.index = 0
 	touch_down.pressed = true
 	touch_down.position = Vector2(400.0, 520.0)
-	cam._unhandled_input(touch_down)
+	cam._input(touch_down)
 	var touch_drag := InputEventScreenDrag.new()
 	touch_drag.index = 0
 	touch_drag.position = Vector2(440.0, 520.0)
 	touch_drag.relative = Vector2(40.0, 0.0)
-	cam._unhandled_input(touch_drag)
+	cam._input(touch_drag)
 	_check(not is_equal_approx(cam.yaw_degrees, touch_yaw),
 		"a one-finger drag rotates the board, yaw %.1f -> %.1f"
 			% [touch_yaw, cam.yaw_degrees])
@@ -298,39 +298,19 @@ func _check_game_screen() -> void:
 	var emulated := InputEventMouseMotion.new()
 	emulated.relative = Vector2(40.0, 0.0)
 	cam._dragging_mouse = true
-	cam._polling_mouse_drag = true
-	cam._unhandled_input(emulated)
+	cam._input(emulated)
 	_check(is_equal_approx(cam.yaw_degrees, before_double),
 		"and the emulated mouse does not rotate on top of it")
 
 	var lift := InputEventScreenTouch.new()
 	lift.index = 0
 	lift.pressed = false
-	cam._unhandled_input(lift)
-	cam._dragging_mouse = false
+	cam._input(lift)
+	cam._dragging_mouse = true
 	var mouse_yaw: float = cam.yaw_degrees
-	cam._update_mouse_drag(Vector2(400.0, 520.0), true)
-	cam._update_mouse_drag(Vector2(440.0, 520.0), true)
+	cam._input(emulated)
 	_check(not is_equal_approx(cam.yaw_degrees, mouse_yaw),
 		"while a plain mouse drag still rotates once no finger is down")
-	cam._dragging_mouse = false
-	var polled_yaw: float = cam.yaw_degrees
-	cam._update_mouse_drag(free_press, true)
-	cam._update_mouse_drag(free_press + Vector2(40.0, 0.0), true)
-	_check(not is_equal_approx(cam.yaw_degrees, polled_yaw),
-		"polled desktop drag rotates from held mouse state")
-	cam._update_mouse_drag(free_press + Vector2(40.0, 0.0), false)
-	cam.set_distance(cam.min_distance + 2.0)
-	var pan := InputEventPanGesture.new()
-	pan.delta = Vector2(0.0, 4.0)
-	var zoom_before_pan: float = cam.distance
-	cam._unhandled_input(pan)
-	_check(cam.distance > zoom_before_pan, "two-finger trackpad pan zooms the board")
-	var magnify := InputEventMagnifyGesture.new()
-	magnify.factor = 1.1
-	var zoom_before_magnify: float = cam.distance
-	cam._unhandled_input(magnify)
-	_check(cam.distance < zoom_before_magnify, "trackpad magnify gesture zooms in")
 	cam.yaw_degrees = saved_yaw
 	cam.pitch_degrees = saved_pitch
 	cam._dragging_mouse = false
@@ -346,15 +326,8 @@ func _check_game_screen() -> void:
 	_check(board_surface.mesh is ArrayMesh, "board uses one procedural ArrayMesh surface")
 	_check((board_surface.mesh as ArrayMesh).get_surface_count() == 3,
 		"board mesh separates light, dark, and frame materials")
-	var light_vertices := (board_surface.mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector3Array
-	_check(light_vertices.size() / 3 == 32 * 20,
-		"board tiles use the beveled tile geometry")
 	_check(game._board.get_node("Squares/Square_a1").get_child_count() == 0,
 		"square markers carry no duplicate render geometry")
-	game._board.set_highlight("a1")
-	var selection := game._board.get_node("Highlights/SelectedSquare") as MeshInstance3D
-	_check(selection.mesh is ArrayMesh and (selection.mesh as ArrayMesh).get_surface_count() == 1,
-		"selection uses a reusable square frame mesh")
 	var board_aabb := (board_surface.mesh as ArrayMesh).get_aabb()
 	_check(board_aabb.size.x > 8.7 and board_aabb.size.z > 8.7 and board_aabb.size.y > 0.3,
 		"board mesh includes the full frame and plinth bounds")
@@ -370,11 +343,6 @@ func _check_game_screen() -> void:
 	_check(pieces.get_child_count() == 32, "game builds the reusable starting piece position")
 	var white_mesh := pieces.get_node("White_Pawn_a2/Mesh") as MeshInstance3D
 	var black_mesh := pieces.get_node("Black_Pawn_a7/Mesh") as MeshInstance3D
-	var piece_surface := pieces.get_node_or_null("White_Pawn_a2/PieceInputSurface")
-	_check(piece_surface != null and piece_surface.get_child_count() == 1,
-		"pieces expose a reusable input collider")
-	_check(piece_surface.collision_layer == 2 and game._board.get_node("BoardInputSurface").collision_layer == 1,
-		"piece and board picking use separate collision layers")
 	_check(white_mesh.material_override != null and black_mesh.material_override != null,
 		"pieces receive controlled side materials")
 	_check(white_mesh.material_override != black_mesh.material_override,
@@ -427,10 +395,14 @@ func _check_game_screen() -> void:
 	# camera now refuses to drag from there, so a drag test that does not say where it
 	# presses was testing the refusal rather than the rotation.
 	drag_start.position = Vector2(400.0, 520.0)
-	game._camera._dragging_mouse = false
-	game._camera._update_mouse_drag(drag_start.position, true)
-	game._camera._update_mouse_drag(drag_start.position + Vector2(40.0, 0.0), true)
-	game._camera._update_mouse_drag(drag_start.position + Vector2(40.0, 0.0), false)
+	game._camera._input(drag_start)
+	var drag_motion := InputEventMouseMotion.new()
+	drag_motion.relative = Vector2(40.0, 0.0)
+	game._camera._input(drag_motion)
+	var drag_end := InputEventMouseButton.new()
+	drag_end.button_index = MOUSE_BUTTON_LEFT
+	drag_end.pressed = false
+	game._camera._input(drag_end)
 	_check(not is_equal_approx(game._camera.yaw_degrees, drag_yaw),
 		"camera drag input changes orbit yaw")
 	var camera_distance: float = game._camera.distance
