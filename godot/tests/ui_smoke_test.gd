@@ -175,6 +175,18 @@ func _check_game_screen() -> void:
 	await process_frame
 	_check(game._board.get_node("Squares").get_child_count() == 64,
 		"game board builds 64 reusable squares")
+	_check(game._board.get_node("Coordinates").get_child_count() == 16,
+		"game board builds reusable file and rank labels")
+	_check(game._board.get_node("Coordinates/File_a").mesh.text == "a",
+		"board exposes file coordinate labels")
+	_check(game._board.get_node("Coordinates/Rank_1").mesh.text == "1",
+		"board exposes rank coordinate labels")
+	_check(is_equal_approx(game._board.get_node("Coordinates/File_a").position.z, 4.21),
+		"file labels are pinned to the frame midpoint")
+	_check(is_equal_approx(game._board.get_node("Coordinates/Rank_1").position.x, -4.21),
+		"rank labels are pinned to the frame midpoint")
+	_check(is_equal_approx(game._board.get_node("Coordinates/File_a").position.y, 0.054),
+		"coordinate markings sit on the frame top surface")
 	_check(game._pieces.get_child_count() == 32,
 		"game screen renders a complete demo position")
 	game._update_camera_framing(1440.0, 900.0)
@@ -193,6 +205,15 @@ func _check_game_screen() -> void:
 		"board exposes selected square state")
 	_check(game._board.get_node("Highlights").get_child_count() == 1,
 		"board renders selected square highlight")
+	game._board.set_last_move("e2", "e4")
+	_check(game._board.get_node("LastMove").get_child_count() == 2,
+		"board renders last move squares")
+	game._board.set_legal_moves(["e5", "f5"])
+	_check(game._board.get_node("LegalMoves").get_child_count() == 2,
+		"board renders legal move previews")
+	game._board.set_check_square("e8")
+	_check(game._board.get_node("Check").get_child_count() == 1,
+		"board renders check state")
 	game._on_square_pressed("e4")
 	_check("E4" in game._header.center_text, "header responds to square selection")
 	game.queue_free()

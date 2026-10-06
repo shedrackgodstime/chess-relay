@@ -48,10 +48,23 @@ part should become responsible for the other part's layout.
 
 ## Coordinate contract
 
-The board is centered at the world origin. Files run along local X and ranks
+**The board is centered at the world origin.** Files run along local X and ranks
 run along local negative Z from the camera-facing side. The board view is the
 single owner of conversion between algebraic squares and world positions. This
 keeps picking, piece placement, highlights, and camera framing consistent.
+
+**Coordinate labels are part of the physical frame.** They are not floating HUD
+elements. Their placement is calculated from the frame geometry:
+
+```text
+board half-width  = (8 × 1.0) / 2 = 4.00
+frame half-width  = 4.00 + 0.42 = 4.42
+label center      = (4.00 + 4.42) / 2 = 4.21
+label height      = board top + 0.025
+```
+
+**Any future board resize must use these same calculations.** Do not replace
+the calculated frame midpoint with viewport offsets or screen-space labels.
 
 ## Rendering choices
 
