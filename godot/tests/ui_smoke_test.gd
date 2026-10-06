@@ -322,6 +322,15 @@ func _check_game_screen() -> void:
 		"game board builds reusable labels on all four frame sides")
 	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
 		"board exposes file coordinate labels")
+	var board_surface := game._board.get_node("BoardSurface") as MeshInstance3D
+	_check(board_surface.mesh is ArrayMesh, "board uses one procedural ArrayMesh surface")
+	_check((board_surface.mesh as ArrayMesh).get_surface_count() == 3,
+		"board mesh separates light, dark, and frame materials")
+	_check(game._board.get_node("Squares/Square_a1").get_child_count() == 0,
+		"square markers carry no duplicate render geometry")
+	var board_aabb := (board_surface.mesh as ArrayMesh).get_aabb()
+	_check(board_aabb.size.x > 8.7 and board_aabb.size.z > 8.7 and board_aabb.size.y > 0.3,
+		"board mesh includes the full frame and plinth bounds")
 	_check(game._board.get_node("Coordinates/RankLeft_1").mesh.text == "1",
 		"board exposes rank coordinate labels")
 	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.z, 4.19),

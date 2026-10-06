@@ -1,6 +1,8 @@
 class_name ChessBoardView
 extends Node3D
 
+const BOARD_MESH_SCRIPT := preload("res://src/game/board/board_mesh.gd")
+
 signal square_pressed(square: String)
 
 const BOARD_SIZE := 8
@@ -108,16 +110,14 @@ func _build_board() -> void:
 	_legal_moves_root = _new_overlay_root("LegalMoves")
 	_check_root = _new_overlay_root("Check")
 	_square_colors = [LIGHT_SQUARE, DARK_SQUARE]
-	_build_frame()
+	_build_render_mesh()
 	for rank in BOARD_SIZE:
 		for file in BOARD_SIZE:
-			var square := _make_box(
-				Vector3(SQUARE_SIZE - SQUARE_GAP, SQUARE_THICKNESS, SQUARE_SIZE - SQUARE_GAP),
-					_square_colors[(file + rank) % 2],
-				square_to_world("%s%d" % [char("a".unicode_at(0) + file), rank + 1],
-					BOARD_SURFACE_Y - SQUARE_THICKNESS * 0.5)
-			)
+			var square := Node3D.new()
 			square.name = "Square_%s%d" % [char("a".unicode_at(0) + file), rank + 1]
+			square.position = square_to_world(
+				"%s%d" % [char("a".unicode_at(0) + file), rank + 1],
+				BOARD_SURFACE_Y - SQUARE_THICKNESS * 0.5)
 			_squares_root.add_child(square)
 
 
@@ -202,30 +202,24 @@ func _clear_root(root: Node3D) -> void:
 		child.free()
 
 
-func _build_frame() -> void:
-	var inner := BOARD_SIZE * SQUARE_SIZE * 0.5
-	var outer := inner + FRAME_MARGIN
-	var centre_offset := (outer + inner) * 0.5
-	var rail_y := FRAME_LIP - FRAME_DEPTH * 0.5
-	var front_back_size := Vector3(outer * 2.0, FRAME_DEPTH, FRAME_MARGIN)
-	var left_right_size := Vector3(FRAME_MARGIN, FRAME_DEPTH, inner * 2.0)
-	for side in [-1.0, 1.0]:
-		var rail := _make_box(front_back_size, FRAME_COLOR,
-			Vector3(0.0, rail_y, side * centre_offset))
-		rail.name = "FrameRail_%s" % ("Front" if side > 0.0 else "Back")
-		add_child(rail)
-		rail = _make_box(left_right_size, FRAME_COLOR,
-			Vector3(side * centre_offset, rail_y, 0.0))
-		rail.name = "FrameRail_%s" % ("Right" if side > 0.0 else "Left")
-		add_child(rail)
-	var plinth_half := outer - PLINTH_INSET
-	var plinth := _make_box(
-		Vector3(plinth_half * 2.0, PLINTH_DEPTH, plinth_half * 2.0),
-		FRAME_COLOR,
-		Vector3(0.0, -SQUARE_THICKNESS - PLINTH_DEPTH * 0.5, 0.0)
+func _build_render_mesh() -> void:
+	var board_surface := MeshInstance3D.new()
+	board_surface.name = "BoardSurface"
+	board_surface.mesh = BOARD_MESH_SCRIPT.build(
+		BOARD_SIZE,
+		SQUARE_SIZE,
+		SQUARE_GAP,
+		SQUARE_THICKNESS,
+		FRAME_MARGIN,
+		FRAME_LIP,
+		FRAME_DEPTH,
+		PLINTH_DEPTH,
+		PLINTH_INSET,
+		_material(LIGHT_SQUARE),
+		_material(DARK_SQUARE),
+		_material(FRAME_COLOR)
 	)
-	plinth.name = "BoardPlinth"
-	add_child(plinth)
+	add_child(board_surface)
 
 
 func _square_overlay(square: String, color: Color, prefix: String) -> MeshInstance3D:
