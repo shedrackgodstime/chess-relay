@@ -10,6 +10,7 @@ signal leave_requested
 @onready var _board_view_button: Button = %BoardViewButton
 @onready var _opponent_clock: Label = $HUD/HUDRoot/ClockStrip/Content/OpponentClock
 @onready var _player_clock: Label = $HUD/HUDRoot/ClockStrip/Content/PlayerClock
+@onready var _move_number_label: Label = $HUD/HUDRoot/ClockStrip/Content/MoveNumber
 @onready var _clock_timer: Timer = $ClockTimer
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
@@ -19,6 +20,9 @@ var _is_multiplayer := false
 var _active_clock_side := "white"
 var _white_seconds := 600
 var _black_seconds := 598
+var _selected_piece_square := ""
+var _demo_legal_moves: Array[String] = []
+var _move_number := 1
 
 
 func configure_peer() -> void:
@@ -46,8 +50,12 @@ func _update_header_visibility() -> void:
 func _on_clock_tick() -> void:
 	if _active_clock_side == "white":
 		_white_seconds = maxi(0, _white_seconds - 1)
+		if _white_seconds == 0:
+			_clock_timer.stop()
 	else:
 		_black_seconds = maxi(0, _black_seconds - 1)
+		if _black_seconds == 0:
+			_clock_timer.stop()
 	_update_clock_strip()
 
 
@@ -56,10 +64,15 @@ func _update_clock_strip() -> void:
 	_player_clock.text = "%s  YOU" % _format_clock(_white_seconds)
 	var active_color := Color(1.0, 0.94, 0.82, 1.0)
 	var idle_color := Color(0.72, 0.66, 0.58, 1.0)
+	var warning_color := Color(1.0, 0.45, 0.28, 1.0)
+	var opponent_color := warning_color if _black_seconds <= 60 \
+		else active_color if _active_clock_side == "black" else idle_color
+	var player_color := warning_color if _white_seconds <= 60 \
+		else active_color if _active_clock_side == "white" else idle_color
 	_opponent_clock.add_theme_color_override(
-		"font_color", active_color if _active_clock_side == "black" else idle_color)
+		"font_color", opponent_color)
 	_player_clock.add_theme_color_override(
-		"font_color", active_color if _active_clock_side == "white" else idle_color)
+		"font_color", player_color)
 
 
 func _format_clock(seconds: int) -> String:
@@ -81,6 +94,7 @@ func _build_demo_position() -> void:
 func _add_piece(parent: Node3D, piece_type: String, side: String, square: String) -> void:
 	var piece = PIECE_VIEW_SCENE.instantiate()
 	piece.name = "%s_%s_%s" % [side.capitalize(), piece_type.capitalize(), square]
+	piece.piece_pressed.connect(_on_piece_pressed)
 	piece.configure(piece_type, side)
 	piece.position = _board.square_to_world(square, 0.02)
 	parent.add_child(piece)
@@ -156,7 +170,45 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 
 
 func _on_square_pressed(square: String) -> void:
+	if not _selected_piece_square.is_empty() and square in _demo_legal_moves:
+		_move_demo_piece(_selected_piece_square, square)
+		_board.set_last_move(_selected_piece_square, square)
+		_board.set_highlight("")
+		_board.set_legal_moves([])
+		_selected_piece_square = ""
+		_demo_legal_moves.clear()
+		_move_number += 1
+		_move_number_label.text = "M%d" % _move_number
+		_active_clock_side = "black"
+		_update_clock_strip()
+		_header.set_center_text("Opponent's turn · Move %d" % _move_number)
+		return
 	_header.set_center_text("Selected %s" % square.to_upper())
+
+
+func _move_demo_piece(from_square: String, to_square: String) -> void:
+	var piece := _board.get_node_or_null("Pieces/White_Pawn_%s" % from_square)
+	if piece == null:
+		return
+	piece.name = "White_Pawn_%s" % to_square
+	var destination := _board.square_to_world(to_square, 0.02)
+	piece.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT) \
+		.tween_property(piece, "position", destination, 0.24)
+
+
+func _on_piece_pressed(piece: Node) -> void:
+	_selected_piece_square = piece.name.right(2).to_lower()
+	_demo_legal_moves.clear()
+	if _selected_piece_square == "e2" and piece.get("side") == "white" \
+		and piece.get("piece_type") == "pawn":
+		_demo_legal_moves = ["e3", "e4"]
+		_board.set_highlight(_selected_piece_square)
+		_board.set_legal_moves(_demo_legal_moves)
+		_header.set_center_text("Choose a move")
+	else:
+		_board.set_highlight(_selected_piece_square)
+		_board.set_legal_moves([])
+		_header.set_center_text("Selected %s" % piece.name.replace("_", " ").to_upper())
 
 
 func _open_game_menu() -> void:

@@ -1,0 +1,21 @@
+; Engine configuration file.
+; Chess Relay GDExtension: Rust application core + Godot bridge.
+
+[configuration]
+
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = "4.2"
+ios_minimum_version = "17.0"
+
+[libraries]
+
+linux.debug.x86_64 = "res://../rust/target/debug/libchess_relay_core.so"
+linux.release.x86_64 = "res://../rust/target/release/libchess_relay_core.so"
+windows.debug.x86_64 = "res://../rust/target/debug/chess_relay_core.dll"
+windows.release.x86_64 = "res://../rust/target/release/chess_relay_core.dll"
+macos.debug = "res://../rust/target/debug/libchess_relay_core.dylib"
+macos.release = "res://../rust/target/release/libchess_relay_core.dylib"
+android.debug.arm64-v8a = "res://android/libs/arm64-v8a/libchess_relay_core.so"
+android.release.arm64-v8a = "res://android/libs/arm64-v8a/libchess_relay_core.so"
+android.debug.armeabi-v7a = "res://android/libs/armeabi-v7a/libchess_relay_core.so"
+android.release.armeabi-v7a = "res://android/libs/armeabi-v7a/libchess_relay_core.so"

@@ -2,6 +2,7 @@ class_name ChessBoardView
 extends Node3D
 
 const BOARD_MESH_SCRIPT := preload("res://src/game/board/board_mesh.gd")
+const SQUARE_MARKER_SCRIPT := preload("res://src/game/board/square_marker.gd")
 
 signal square_pressed(square: String)
 
@@ -66,12 +67,11 @@ func set_highlight(square: String, color := HIGHLIGHT_COLOR) -> void:
 	if square.is_empty():
 		return
 	_highlighted_square = square
-	var highlight := _make_box(
-		Vector3(SQUARE_SIZE * 0.86, 0.025, SQUARE_SIZE * 0.86),
+	var highlight := SQUARE_MARKER_SCRIPT.create_square(
 		color,
-		Vector3(square_to_world(square, BOARD_SURFACE_Y + 0.012))
+		"SelectedSquare",
+		square_to_world(square, BOARD_SURFACE_Y + 0.012)
 	)
-	highlight.name = "SelectedSquare"
 	_highlights_root.add_child(highlight)
 
 
@@ -90,7 +90,7 @@ func set_legal_moves(squares: Array[String]) -> void:
 	_clear_root(_legal_moves_root)
 	for square in squares:
 		if not square.is_empty():
-			_legal_moves_root.add_child(_square_overlay(square, LEGAL_MOVE_COLOR, "LegalMove"))
+			_legal_moves_root.add_child(_legal_move_marker(square))
 
 
 func set_check_square(square: String) -> void:
@@ -176,11 +176,16 @@ func _add_coordinate(text: String, position: Vector3, node_name: String) -> void
 
 
 func _on_board_input(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	var pressed: bool = event is InputEventMouseButton and event.pressed \
+		and event.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventScreenTouch:
+		pressed = event.pressed
+	if pressed:
 		var square := world_to_square(event_position)
 		if not square.is_empty():
 			set_highlight(square)
 			square_pressed.emit(square)
+			get_viewport().set_input_as_handled()
 
 
 func _clear_highlights() -> void:
@@ -223,23 +228,19 @@ func _build_render_mesh() -> void:
 
 
 func _square_overlay(square: String, color: Color, prefix: String) -> MeshInstance3D:
-	var overlay := _make_box(
-		Vector3(SQUARE_SIZE * 0.84, 0.026, SQUARE_SIZE * 0.84),
+	return SQUARE_MARKER_SCRIPT.create_square(
 		color,
-		Vector3(square_to_world(square, BOARD_SURFACE_Y + 0.012))
+		"%s_%s" % [prefix, square],
+		square_to_world(square, BOARD_SURFACE_Y + 0.012)
 	)
-	overlay.name = "%s_%s" % [prefix, square]
-	return overlay
 
 
-func _make_box(dimensions: Vector3, color: Color, position: Vector3) -> MeshInstance3D:
-	var mesh := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = dimensions
-	mesh.mesh = box
-	mesh.material_override = _material(color)
-	mesh.position = position
-	return mesh
+func _legal_move_marker(square: String) -> MeshInstance3D:
+	return SQUARE_MARKER_SCRIPT.create_dot(
+		LEGAL_MOVE_COLOR,
+		"LegalMove_%s" % square,
+		square_to_world(square, BOARD_SURFACE_Y + 0.018)
+	)
 
 
 func _material(color: Color) -> StandardMaterial3D:

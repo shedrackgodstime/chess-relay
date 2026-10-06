@@ -252,6 +252,8 @@ func _check_game_screen() -> void:
 		"clock strip shows the opponent clock")
 	_check(clock_strip.get_node("Content/PlayerClock").text == "10:00  YOU",
 		"clock strip shows the local clock")
+	_check(clock_strip.get_node("Content/MoveNumber").text == "M1",
+		"clock strip shows the current move number")
 	game._on_clock_tick()
 	_check(clock_strip.get_node("Content/PlayerClock").text == "09:59  YOU",
 		"active clock ticks in the game UI")
@@ -266,6 +268,40 @@ func _check_game_screen() -> void:
 	_check(peer_game.get_node("HUD/HUDRoot/GameHeader/VoiceCluster").visible,
 		"peer game restores voice control in the header")
 	peer_game.queue_free()
+	var demo_pawn: Node = game.get_node("World/Board/Pieces/White_Pawn_e2")
+	_check(demo_pawn.get_node("PieceInputSurface") is Area3D,
+		"pieces expose a controlled input surface")
+	var piece_press := InputEventMouseButton.new()
+	piece_press.button_index = MOUSE_BUTTON_LEFT
+	piece_press.pressed = true
+	demo_pawn.get_node("PieceInputSurface").input_event.emit(
+		game._camera, piece_press, Vector3.ZERO, Vector3.UP, 0)
+	_check(game._demo_legal_moves == ["e3", "e4"],
+		"demo pawn exposes its legal move preview")
+	_check(game._board.get_highlighted_square() == "e2",
+		"selecting a piece highlights its source square")
+	game._on_square_pressed("e4")
+	_check(game._board.get_highlighted_square().is_empty(),
+		"committing the demo move clears selection")
+	await game.get_tree().create_timer(0.3).timeout
+	_check(game.get_node("World/Board/Pieces/White_Pawn_e4").position
+		== game._board.square_to_world("e4", 0.02),
+		"committing the demo move repositions the piece")
+	_check(clock_strip.get_node("Content/MoveNumber").text == "M2",
+		"committing the demo move advances the move number")
+	_check(game._active_clock_side == "black",
+		"committing the demo move switches the active clock")
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	touch.position = Vector2(420.0, 420.0)
+	game._board._on_board_input(game._camera, touch,
+		game._board.square_to_world("d4"), Vector3.UP, 0)
+	_check(game._board.get_highlighted_square() == "d4",
+		"touch input selects a board square")
+	game._white_seconds = 45
+	game._update_clock_strip()
+	_check(game._player_clock.get_theme_color("font_color") == Color(1.0, 0.45, 0.28, 1.0),
+		"low clock state uses a warning colour")
 	# The screen root is a full-rect Control and Control.mouse_filter defaults to
 	# MOUSE_FILTER_STOP, which is why it is set to IGNORE. Without this, no mouse
 	# event reaches the camera at all.
@@ -461,12 +497,16 @@ func _check_game_screen() -> void:
 		"board exposes selected square state")
 	_check(game._board.get_node("Highlights").get_child_count() == 1,
 		"board renders selected square highlight")
+	_check(game._board.get_node("Highlights/SelectedSquare").mesh is BoxMesh,
+		"selection uses the reusable square marker")
 	game._board.set_last_move("e2", "e4")
 	_check(game._board.get_node("LastMove").get_child_count() == 2,
 		"board renders last move squares")
 	game._board.set_legal_moves(["e5", "f5"])
 	_check(game._board.get_node("LegalMoves").get_child_count() == 2,
 		"board renders legal move previews")
+	_check(game._board.get_node("LegalMoves/LegalMove_e5").mesh is CylinderMesh,
+		"legal move previews use reusable centered dots")
 	game._board.set_check_square("e8")
 	_check(game._board.get_node("Check").get_child_count() == 1,
 		"board renders check state")

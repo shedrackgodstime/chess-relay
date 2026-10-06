@@ -160,10 +160,10 @@ text = "MORGAN  09:58"
 horizontal_alignment = 2
 vertical_alignment = 1
 
-[node name="Divider" type="Label" parent="HUD/HUDRoot/ClockStrip/Content"]
+[node name="MoveNumber" type="Label" parent="HUD/HUDRoot/ClockStrip/Content"]
 layout_mode = 2
 theme_type_variation = &"Caption"
-text = "·"
+text = "M1"
 vertical_alignment = 1
 
 [node name="PlayerClock" type="Label" parent="HUD/HUDRoot/ClockStrip/Content"]
