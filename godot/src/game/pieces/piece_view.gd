@@ -35,7 +35,7 @@ func configure(type: String, piece_side: String) -> void:
 	source.free()
 	mesh.name = "Mesh"
 	mesh.scale = Vector3.ONE * PIECE_SCALE
-	mesh.position.y = -_mesh_min_y(mesh) * PIECE_SCALE + 0.01
+	mesh.position.y = -_mesh_min_y(mesh) * PIECE_SCALE
 	mesh.material_override = WHITE_MATERIAL if side == "white" else BLACK_MATERIAL
 	add_child(mesh)
 	if piece_type == "knight":

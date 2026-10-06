@@ -338,6 +338,21 @@ func _check_game_screen() -> void:
 		"pieces receive controlled side materials")
 	_check(white_mesh.material_override != black_mesh.material_override,
 		"white and black pieces use separate shared materials")
+	_check(is_equal_approx(pieces.get_node("White_Pawn_a2/Mesh").scale.x, 16.0),
+		"pieces use the approved board presentation scale")
+	_check(is_equal_approx(pieces.get_node("White_Pawn_a2").position.x, -3.5),
+		"white pawn is centered on the a-file square")
+	_check(is_equal_approx(pieces.get_node("White_Pawn_a2").position.z, 2.5),
+		"white pawn is centered on the second rank")
+	var pawn_mesh := pieces.get_node("White_Pawn_a2/Mesh") as MeshInstance3D
+	_check(is_equal_approx(pawn_mesh.position.y, 0.0),
+		"white pawn mesh is grounded against the board surface (y=%.3f)" % pawn_mesh.position.y)
+	_check(is_equal_approx(pieces.get_node("Black_Pawn_a7").rotation.y, PI),
+		"black pieces face the opposing side")
+	_check(is_equal_approx(pieces.get_node("White_Knight_b1").rotation.y, PI + deg_to_rad(60.0)),
+		"white knight uses the 10 o'clock facing")
+	_check(is_equal_approx(pieces.get_node("Black_Knight_b8").rotation.y, -deg_to_rad(60.0)),
+		"black knight mirrors the 10 o'clock facing")
 	var key_light := game.get_node("World/KeyLight") as DirectionalLight3D
 	_check(is_equal_approx(key_light.rotation_degrees.x, -90.0),
 		"game key light is directly above the board")
