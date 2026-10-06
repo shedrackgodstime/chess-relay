@@ -11,6 +11,7 @@ const PIECE_SCENE: PackedScene = preload("res://src/game/pieces/piece_view.tscn"
 @onready var _camera: Camera3D = %Camera
 @onready var _board_view_button: Button = %BoardViewButton
 
+const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 var _camera_scale := 1.0
 
 
@@ -18,6 +19,7 @@ func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
+	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
 	_build_demo_position()
 

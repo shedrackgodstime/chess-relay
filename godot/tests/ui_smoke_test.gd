@@ -192,6 +192,8 @@ func _check_game_screen() -> void:
 	var key_light := game.get_node("World/KeyLight") as DirectionalLight3D
 	_check(is_equal_approx(key_light.rotation_degrees.x, -90.0),
 		"game key light is directly above the board")
+	_check(is_equal_approx(game._camera.target.y, -0.45),
+		"game camera centers the board in the usable screen area")
 	_check(game.get_node("World/OpponentFillLight") is OmniLight3D,
 		"game has an opponent-side fill light")
 	_check(game.get_node("World/PlayerFillLight") is OmniLight3D,

@@ -60,6 +60,7 @@ omni_range = 18.0
 
 [node name="Camera" type="Camera3D" parent="World"]
 unique_name_in_owner = true
+target = Vector3(0, -0.45, 0)
 position = Vector3(0, 10.8, 10.8)
 rotation_degrees = Vector3(-43, 0, 0)
 current = true
