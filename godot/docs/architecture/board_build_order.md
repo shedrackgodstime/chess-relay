@@ -96,6 +96,17 @@ afterwards. They did not at first, which broke two unrelated checks that share t
 camera; a check that leaves shared state changed is a check that makes the next one
 lie.
 
+## Where this stands
+
+| Stage | State |
+| --- | --- |
+| 1 board shell | Not started. Attempted and reverted; see below |
+| 2 world | Done, including the touch input work |
+| 3 pieces | Next |
+
+The prototype is checked out at `ref/chess-relay` for comparison and `ref/` is
+git-ignored, so it cannot become a runtime dependency.
+
 ## Stage 1: the board shell
 
 Status: **not started. Attempted and reverted.**

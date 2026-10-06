@@ -122,6 +122,36 @@ believed untappable at 45°. It was measured, and the belief was wrong:
 out, and it is written down here so nobody spends it again. It belongs in
 `game_screen_3d.md` beside the board stages.
 
+## What the touch investigation actually established
+
+Recorded because it was got wrong three times and the answer is short.
+
+**Pinch zoom worked and one-finger drag did not.** That pair of facts identifies the
+fault exactly: a two-finger pinch needs `InputEventScreenTouch` and
+`InputEventScreenDrag` to arrive, so both of those were being delivered. A one-finger
+drag went through emulated `InputEventMouseMotion`, and those were not arriving on
+that device.
+
+So a finger rotates the board, and the emulated mouse stands aside whenever **any**
+finger is down rather than only when two are.
+
+Two things that were believed and were not:
+
+- **`Input.is_emulating_mouse_from_touch()` returning `true` proves nothing.** It
+  reports the project setting's value, which defaults to true. It says nothing about
+  whether the events are delivered on a given device. Three attempts reasoned from it.
+- **The check that was supposed to cover this could not have caught it.** It drove
+  `InputEventMouseMotion`, so it passed whether or not the touch path worked at all —
+  it exercised the one thing that turned out not to work. It now drives touch events.
+
+The prototype stands aside only for two fingers, because with one the emulated mouse
+does the rotating. That is the single assumption that does not survive being copied,
+and it is noted in the camera.
+
+The lesson for the next device-only bug: **a setting read back from the engine is not
+evidence that the engine is doing the thing.** Ask what arrived, not what is
+configured — and the cheapest way to ask is to notice which features work.
+
 ## Both scenes are empty shells
 
 ```text
