@@ -1,5 +1,9 @@
 # Chess Relay
 
+> **Starting here?** Read [`docs/HANDOVER.md`](docs/HANDOVER.md) first. It records the
+> project's working laws, the live flags on the current implementation, and the
+> environment quirks that will otherwise cost you an afternoon.
+
 Chess Relay is a UI-led chess experience built with Godot 4.7.2. The current
 foundation focuses on the interface: reusable controls, shared visual styling,
 and a clear screen lifecycle. Game rules and match behavior are intentionally
