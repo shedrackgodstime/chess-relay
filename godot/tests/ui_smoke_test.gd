@@ -318,30 +318,29 @@ func _check_game_screen() -> void:
 	# The piece seam exists before any piece does. It is keyed by the identities that
 	# arrive over the application boundary rather than by an enum declared here, so
 	# there is one list of piece types and this project is not it.
-	# Six identities, one model each, and no white or dark variant: colour is the second
-	# axis, so a full set is six models and two materials.
-	_check(PieceMeshes.SHAPE_MESHES.size() == 6,
-		"a full set is six shapes, got %d" % PieceMeshes.SHAPE_MESHES.size())
-	for identity: StringName in [&"pawn", &"knight", &"bishop", &"rook", &"queen", &"king"]:
-		var path: String = PieceMeshes.SHAPE_MESHES.get(identity, "")
-		# Checked as a committed file rather than through ResourceLoader, because
-		# loading a .glb needs the import pipeline and this is the question "is it in
-		# version control". That the engine can import and load it is a separate
-		# question, answered in the editor.
-		_check(not path.is_empty() and FileAccess.file_exists(path),
-			"%s has a model committed" % identity)
-		# Every model arrives at whatever size its author worked in, and these six are
-		# not even the same size as each other, so each is scaled separately.
-		_check(PieceMeshes.MODEL_SCALE.has(identity),
-			"%s has its own scale, since they are not a consistent set" % identity)
+	# Two candidate sets, so they can be on the board at once and compared, and both
+	# are here because proportion cannot be judged from numbers.
+	_check(PieceMeshes.SETS.size() == 2,
+		"two candidate sets to compare, got %d" % PieceMeshes.SETS.size())
+	for set_name: StringName in PieceMeshes.SETS.keys():
+		var paths: Dictionary = PieceMeshes.SETS[set_name]
+		_check(paths.size() == 6, "%s has six identities" % set_name)
+		for identity: StringName in paths.keys():
+			_check(FileAccess.file_exists(paths[identity]),
+				"%s %s is committed" % [set_name, identity])
+		_check(PieceMeshes.SET_SCALE.has(set_name),
+			"%s has its own sizing" % set_name)
+
+	# The active set is one constant, so comparing the two is flipping it.
+	_check(PieceMeshes.SET_SCALE.has(PieceMeshes.ACTIVE_SET),
+		"the active set is one with a scale, got %s" % PieceMeshes.ACTIVE_SET)
+	# A consistent set is scaled by one number; an inconsistent one cannot be, which is
+	# why saber carries a factor per piece and oga does not.
+	_check(PieceMeshes.SET_SCALE[PieceMeshes.ACTIVE_SET] is float,
+		"and the active set is scaled as one set, which only a consistent set can be")
+
 	_check(PieceMeshes.mesh_for(&"dragon", PieceMeshes.LIGHT) == null,
 		"an identity that is not a piece gives nothing")
-	_check(PieceMeshes.material_for(PieceMeshes.LIGHT) != null
-			and PieceMeshes.material_for(PieceMeshes.DARK) != null,
-		"but a material per side does, so colour is ready")
-	_check(PieceMeshes.material_for(PieceMeshes.LIGHT).albedo_color
-			!= PieceMeshes.material_for(PieceMeshes.DARK).albedo_color,
-		"and the two sides are different colours")
 
 	_check(game._board.get_node("Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")

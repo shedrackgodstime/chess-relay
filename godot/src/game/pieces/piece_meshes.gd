@@ -19,67 +19,73 @@ extends RefCounted
 const LIGHT := &"light"
 const DARK := &"dark"
 
-## Where each shape comes from.
+## Candidate sets, so two can be on the board at once and compared.
 ##
-## Imported models, one per identity, from models/README.md. CSG was tried first and
-## dropped: a solid of revolution cannot express a rook's merlons, a queen's crown or
-## a king's cross, and those details are what make a piece read as itself.
-##
-## The identities here are the point. They are names that arrive over the application
-## boundary, not an enum declared in this project, so there is one list of piece types
-## and it is not this one.
-const SHAPE_MESHES := {
-	&"pawn": "res://src/game/pieces/models/pawn.glb",
-	&"knight": "res://src/game/pieces/models/knight.glb",
-	&"rook": "res://src/game/pieces/models/rook.glb",
-	&"bishop": "res://src/game/pieces/models/bishop.glb",
-	&"queen": "res://src/game/pieces/models/queen.glb",
-	&"king": "res://src/game/pieces/models/king.glb",
+## Both are here because proportion cannot be judged from numbers: a knight that
+## measures the right height can still read as a lump, and that is a thing to look at.
+## Changing `ACTIVE_SET` is the whole comparison.
+const SETS := {
+	&"oga": {
+		&"pawn": "res://src/game/pieces/models/oga/pawn.glb",
+		&"knight": "res://src/game/pieces/models/oga/knight.glb",
+		&"bishop": "res://src/game/pieces/models/oga/bishop.glb",
+		&"rook": "res://src/game/pieces/models/oga/rook.glb",
+		&"queen": "res://src/game/pieces/models/oga/queen.glb",
+		&"king": "res://src/game/pieces/models/oga/king.glb",
+	},
+	&"saber": {
+		&"pawn": "res://src/game/pieces/models/saber/pawn.glb",
+		&"knight": "res://src/game/pieces/models/saber/knight.glb",
+		&"bishop": "res://src/game/pieces/models/saber/bishop.glb",
+		&"rook": "res://src/game/pieces/models/saber/rook.glb",
+		&"queen": "res://src/game/pieces/models/saber/queen.glb",
+		&"king": "res://src/game/pieces/models/saber/king.glb",
+	},
 }
 
-## Every model arrives at whatever size its author worked in, and these six are not
-## even the same size as each other.
+## Which set the game draws with.
+const ACTIVE_SET := &"oga"
+
+## How big each piece ends up.
 ##
-## Measured from the glTF position accessors rather than assumed. The prototype scales
-## every piece by the same `Vector3(10, 10, 10)`, which hides the inconsistency by
-## making it uniformly wrong rather than by removing it.
+## The difference between the two entries is the whole reason they are here.
 ##
-## Measured heights as imported, and what each is scaled to:
+## **OGA** is one number for all six. Its models share a base footprint and their
+## heights are already in tournament proportion — pawn 0.53, rook 0.58, knight 0.63,
+## bishop 0.74, queen 0.89 of the king — so scaling the set as one thing is correct
+## and a single factor is all it takes.
 ##
-## ```text
-##           as imported   scaled to   by
-##   knight      0.58        0.85      1.466
-##   pawn        0.79        0.65      0.823
-##   bishop      1.16        0.92      0.791
-##   rook        0.93        0.84      0.903
-##   queen       1.43        1.00      0.699
-##   king        1.67        1.12      0.671
-## ```
+## **Saber** needs a different factor per piece. Its six models are not a set: their
+## base footprints run from 0.536 to 0.948, and a knight is 0.35 of the king's
+## height, which makes it the smallest piece on the board. Scaling it as one thing is
+## what its original project does, by ten, and that makes the inconsistency uniformly
+## wrong rather than removing it.
 ##
-## The targets are a starting point, not a measurement of how these particular models
-## ought to look. Proportion cannot be judged headlessly: whether a knight reads as a
-## knight is a thing to look at, which is the same lesson as the camera pitch and the
-## square occlusion. So the numbers are here, the reasoning is here, and the last word
-## belongs on the board.
-const MODEL_SCALE := {
-	&"knight": 1.466,
-	&"pawn": 0.823,
-	&"bishop": 0.791,
-	&"rook": 0.903,
-	&"queen": 0.699,
-	&"king": 0.671,
+## The targets are a starting point. Proportion is judged by looking.
+const SET_SCALE := {
+	&"oga": 11.8,
+	&"saber": {
+		&"knight": 1.466,
+		&"pawn": 0.823,
+		&"bishop": 0.791,
+		&"rook": 0.903,
+		&"queen": 0.699,
+		&"king": 0.671,
+	},
 }
 
 ## Loaded once. A dictionary of paths read per instance would be a disk read per piece.
 static var _loaded: Dictionary = {}
 
 
-## The mesh for an identity and a side, or null if the identity has no shape yet.
+## The mesh for an identity and a side in the active set, or null if that identity
+## has no model yet.
 ##
 ## Null rather than a placeholder on purpose. A pawn standing in for a missing king
 ## would look like a bug somewhere else entirely.
 static func mesh_for(identity: StringName, side: StringName) -> Mesh:
-	var path: String = SHAPE_MESHES.get(identity, "")
+	var set_paths: Dictionary = SETS.get(ACTIVE_SET, {})
+	var path: String = set_paths.get(identity, "")
 	if path.is_empty() or not ResourceLoader.exists(path):
 		return null
 	var mesh := _mesh(path)
@@ -90,7 +96,7 @@ static func mesh_for(identity: StringName, side: StringName) -> Mesh:
 	# light pieces turn dark the first time a dark one was drawn.
 	var copy: Mesh = mesh.duplicate()
 	copy.surface_set_material(0, material_for(side))
-	var scale: float = MODEL_SCALE.get(identity, 1.0)
+	var scale: float = _scale_for(identity)
 	if not is_equal_approx(scale, 1.0):
 		copy.scale = Vector3.ONE * scale
 	return copy
@@ -102,6 +108,13 @@ static func material_for(side: StringName) -> StandardMaterial3D:
 	if side == DARK:
 		return _dark()
 	return _light()
+
+
+static func _scale_for(identity: StringName) -> float:
+	var entry = SET_SCALE.get(ACTIVE_SET, 1.0)
+	if entry is Dictionary:
+		return float((entry as Dictionary).get(identity, 1.0))
+	return float(entry)
 
 
 static func _light() -> StandardMaterial3D:
