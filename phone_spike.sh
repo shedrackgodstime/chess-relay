@@ -37,7 +37,9 @@ APKSIGNER="$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
 "$APKSIGNER" verify "$APK" || { echo "EXPORT FAIL: signature invalid"; exit 1; }
 echo "artifact verified"
 
-# 4. Install and run.
+# 4. Install (force-stop first: Android keeps old code running in a
+# backgrounded process across reinstalls) and run.
+"$ADB" shell am force-stop "$PKG"
 "$ADB" install -r "$APK"
 "$ADB" logcat -c
 "$ADB" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 > /dev/null

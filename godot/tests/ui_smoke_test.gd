@@ -293,6 +293,22 @@ func _check_game_screen() -> void:
 		"pawn exposes its core legal move preview")
 	_check(game._board.get_highlighted_square() == "e2",
 		"selecting a piece highlights its source square")
+	# Touch takes the same selection path as the mouse (phones only send
+	# touch); the release must not select anything.
+	var piece_touch := InputEventScreenTouch.new()
+	piece_touch.pressed = true
+	piece_touch.position = Vector2(420.0, 420.0)
+	demo_pawn.get_node("PieceInputSurface").input_event.emit(
+		game._camera, piece_touch, Vector3.ZERO, Vector3.UP, 0)
+	_check(game._board.get_highlighted_square() == "e2",
+		"touch press selects the piece too")
+	var piece_release := InputEventScreenTouch.new()
+	piece_release.pressed = false
+	piece_release.position = Vector2(420.0, 420.0)
+	demo_pawn.get_node("PieceInputSurface").input_event.emit(
+		game._camera, piece_release, Vector3.ZERO, Vector3.UP, 0)
+	_check(game._board.get_highlighted_square() == "e2",
+		"touch release changes nothing")
 	game._on_square_pressed("e4")
 	_check(game._board.get_highlighted_square().is_empty(),
 		"committing the demo move clears selection")

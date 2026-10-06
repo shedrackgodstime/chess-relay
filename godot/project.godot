@@ -12,6 +12,7 @@ config_version=5
 
 config/name="Chess Relay"
 config/description="A UI-led chess experience."
+config/icon="res://icon.svg"
 run/main_scene="res://src/ui/app/app_root.tscn"
 config/features=PackedStringArray("4.7")
 
