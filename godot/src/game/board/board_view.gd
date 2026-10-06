@@ -182,6 +182,7 @@ func _on_board_input(_camera: Node, event: InputEvent, event_position: Vector3, 
 		pressed = event.pressed
 	if pressed:
 		var square := world_to_square(event_position)
+		print("DBG board tap -> '%s'" % square)
 		if not square.is_empty():
 			set_highlight(square)
 			square_pressed.emit(square)

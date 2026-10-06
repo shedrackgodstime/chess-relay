@@ -9,6 +9,10 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+; Full-rect container only: STOP here would swallow every event before
+; viewport physics picking runs, killing all 3D board/piece taps while
+; buttons (deeper STOP controls) keep working.
+mouse_filter = 2
 script = ExtResource("1_app_root")
 
 [node name="ScreenHost" type="Control" parent="." unique_id=1100234751]
@@ -19,3 +23,4 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2

@@ -70,6 +70,7 @@ func _on_piece_input(_camera: Node, event: InputEvent, _position: Vector3, _norm
 	if event is InputEventScreenTouch:
 		pressed = event.pressed
 	if pressed:
+		print("DBG piece tap -> %s" % name)
 		piece_pressed.emit(self)
 		get_viewport().set_input_as_handled()
 

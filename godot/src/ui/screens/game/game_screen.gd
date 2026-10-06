@@ -209,7 +209,9 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 
 
 func _on_square_pressed(square: String) -> void:
+	print("DBG screen square_pressed '%s' selected='%s'" % [square, _selected_piece_square])
 	if _bridge == null:
+		print("DBG screen: bridge missing, ignoring tap")
 		return
 	if not _selected_piece_square.is_empty() and square in _legal_targets:
 		var uci := _selected_piece_square + square

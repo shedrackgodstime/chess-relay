@@ -19,7 +19,7 @@ func _init() -> void:
 
 func _run() -> void:
 	await process_frame
-	_check_scene_contracts()
+	await _check_scene_contracts()
 	await _check_reusable_components()
 	await _check_participant_and_setup_states()
 	await _check_hub_interactions()
@@ -42,6 +42,19 @@ func _check_scene_contracts() -> void:
 	_check(GAME_SCENE != null, "game scene loads")
 	_check(HEADER_SCENE != null, "game header scene loads")
 	_check(CHOICE_SCENE != null, "choice group scene loads")
+	# Full-rect containers above the 3D board must not STOP input: a STOP
+	# ancestor consumes every tap before viewport physics picking runs, so
+	# CollisionObject3D.input_event never fires and no piece or square is
+	# clickable (buttons keep working, which hides it). This is checkable
+	# headless; synthetic clicks are not.
+	var app := APP_SCENE.instantiate() as Control
+	root.add_child(app)
+	await process_frame
+	_check(app.mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"app root lets input through to picking")
+	_check(app.get_node("%ScreenHost").mouse_filter == Control.MOUSE_FILTER_IGNORE,
+		"screen host lets input through to picking")
+	app.queue_free()
 
 
 func _check_reusable_components() -> void:
