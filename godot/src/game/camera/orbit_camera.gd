@@ -16,13 +16,10 @@ extends Camera3D
 ## Two things stay different, because this project's screen needs them and the
 ## prototype's does not:
 ##
-## - Input is read in `_input`, not `_unhandled_input`. The prototype's scene root
-##   is a `Node3D` and cannot swallow anything; this project's game screen root is a
-##   full-rect `Control`, and a Control that stops input ends the event before
-##   `_unhandled_input` would ever see it. `_input` runs first and cannot be blocked.
-##   Because of that, the camera sees presses meant for buttons, so `_dragged_by_gui`
-##   decides whether a press landed on something interactive and refuses to drag if it
-##   did.
+## - Input is read in `_unhandled_input`, matching the prototype and Godot's
+##   gameplay-input guidance. The game screen and HUD roots explicitly use
+##   `MOUSE_FILTER_IGNORE`, while interactive controls keep the default STOP filter,
+##   so buttons receive first refusal and board drags reach the camera.
 ## - The distance and pitch limits are this project's, since they are sized against
 ##   this board and this viewport rather than the prototype's room.
 
@@ -55,10 +52,19 @@ extends Camera3D
 
 var _dragging_mouse := false
 var _touches := {}
+var _last_mouse_position := Vector2.ZERO
+var _polling_mouse_drag := false
 
 
 func _ready() -> void:
 	_apply()
+
+
+func _process(_delta: float) -> void:
+	if not _touches.is_empty():
+		return
+	_update_mouse_drag(get_viewport().get_mouse_position(),
+		Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT))
 
 
 ## Points the camera at the current state.
@@ -99,7 +105,7 @@ func _apply() -> void:
 ##
 ## Nothing here calls `set_input_as_handled`. Events the camera is not interested in
 ## have to keep travelling, or the buttons underneath stop working.
-func _input(event: InputEvent) -> void:
+func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		_mouse_button(event as InputEventMouseButton)
 	elif event is InputEventMouseMotion:
@@ -110,16 +116,21 @@ func _input(event: InputEvent) -> void:
 		_screen_drag(event as InputEventScreenDrag)
 	elif event is InputEventMagnifyGesture:
 		zoom_by(1.0 / (event as InputEventMagnifyGesture).factor)
+	elif event is InputEventPanGesture:
+		var pan := event as InputEventPanGesture
+		if absf(pan.delta.y) > 0.0:
+			zoom_by(1.0 + pan.delta.y * 0.02)
 
 
 func _mouse_button(event: InputEventMouseButton) -> void:
 	if event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			# Only a drag that started on empty space rotates the board. Reading input
-			# before the GUI means this camera also sees presses meant for a button.
-			_dragging_mouse = not _dragged_by_gui(event.position)
+			_last_mouse_position = event.position
+			_dragging_mouse = true
+			_polling_mouse_drag = false
 		else:
 			_dragging_mouse = false
+			_polling_mouse_drag = false
 	elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_UP:
 		zoom_by(1.0 / wheel_zoom_step)
 	elif event.pressed and event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
@@ -136,10 +147,33 @@ func _mouse_motion(event: InputEventMouseMotion) -> void:
 	# themselves are delivered, and dragging does nothing, which proves the mouse ones
 	# are not. So the touch tracker rotates on its own and the mouse stands aside
 	# whenever a finger is down rather than only when two are.
-	if not _dragging_mouse or not _touches.is_empty():
+	if not _dragging_mouse or _polling_mouse_drag:
 		return
 	orbit_by(-event.relative.x * rotate_degrees_per_pixel,
 		-event.relative.y * rotate_degrees_per_pixel)
+
+
+func _update_mouse_drag(position: Vector2, held: bool) -> void:
+	if not held:
+		_dragging_mouse = false
+		_polling_mouse_drag = false
+		_last_mouse_position = position
+		return
+	if not _dragging_mouse:
+		if _dragged_by_gui(position):
+			_last_mouse_position = position
+			return
+		_dragging_mouse = true
+		_polling_mouse_drag = true
+		_last_mouse_position = position
+		return
+	if not _polling_mouse_drag:
+		return
+	var relative := position - _last_mouse_position
+	_last_mouse_position = position
+	if relative.length_squared() > 0.0:
+		orbit_by(-relative.x * rotate_degrees_per_pixel,
+			-relative.y * rotate_degrees_per_pixel)
 
 
 ## A finger drags the board. Two fingers pinch it.
@@ -167,6 +201,7 @@ func _screen_touch(event: InputEventScreenTouch) -> void:
 			remove_meta(&"_pinch_previous")
 		if _touches.is_empty():
 			_dragging_mouse = false
+			_polling_mouse_drag = false
 
 
 func _pinch_zoom() -> void:

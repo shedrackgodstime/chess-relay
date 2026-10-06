@@ -1,14 +1,12 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! Chess Relay application core.
+//!
+//! Rust owns correctness (rules, session, log, contract).
+//! Godot owns presentation. See `docs/architecture/application_core.md`.
+//!
+//! Layout starts flat per the doc ("split only when a real boundary
+//! forces it"). Each module is currently an empty boundary with no logic.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod app;
+pub mod chess_core;
+pub mod protocol;
+pub mod session;
