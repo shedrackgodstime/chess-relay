@@ -15,14 +15,17 @@ signal leave_requested
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
+const FEN_PIECE_TYPES := {"p": "pawn", "n": "knight", "b": "bishop", "r": "rook", "q": "queen", "k": "king"}
 var _camera_scale := 1.0
 var _is_multiplayer := false
 var _active_clock_side := "white"
 var _white_seconds := 600
 var _black_seconds := 598
 var _selected_piece_square := ""
-var _demo_legal_moves: Array[String] = []
+var _selected_piece_type := ""
+var _legal_targets: Array[String] = []
 var _move_number := 1
+var _bridge: Node = null
 
 
 func configure_peer() -> void:
@@ -40,7 +43,8 @@ func _ready() -> void:
 	_update_clock_strip()
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
-	_build_demo_position()
+	_start_bridge()
+	_rebuild_position()
 
 
 func _update_header_visibility() -> void:
@@ -79,16 +83,51 @@ func _format_clock(seconds: int) -> String:
 	return "%02d:%02d" % [seconds / 60, seconds % 60]
 
 
-func _build_demo_position() -> void:
-	var pieces_root := Node3D.new()
-	pieces_root.name = "Pieces"
-	_board.add_child(pieces_root)
-	var back_rank := ["rook", "knight", "bishop", "queen", "king", "bishop", "knight", "rook"]
-	for file in range(8):
-		_add_piece(pieces_root, back_rank[file], "white", "%s1" % char("a".unicode_at(0) + file))
-		_add_piece(pieces_root, "pawn", "white", "%s2" % char("a".unicode_at(0) + file))
-		_add_piece(pieces_root, "pawn", "black", "%s7" % char("a".unicode_at(0) + file))
-		_add_piece(pieces_root, back_rank[file], "black", "%s8" % char("a".unicode_at(0) + file))
+func _start_bridge() -> void:
+	if not ClassDB.class_exists("ChessRelayBridge"):
+		_header.set_center_text("Chess engine unavailable")
+		return
+	_bridge = ClassDB.instantiate("ChessRelayBridge")
+	add_child(_bridge)
+	_bridge.move_applied.connect(_on_core_move_applied)
+	_bridge.bridge_error.connect(_on_bridge_error)
+	_bridge.start()
+
+
+## Position rendering: the board observes the core, never the reverse.
+## Every applied move rebuilds the piece set from the authoritative FEN,
+## so captures, promotions and castling need no special cases here.
+
+func _rebuild_position() -> void:
+	var pieces_root := _board.get_node_or_null("Pieces")
+	if pieces_root == null:
+		pieces_root = Node3D.new()
+		pieces_root.name = "Pieces"
+		_board.add_child(pieces_root)
+	for child in pieces_root.get_children():
+		pieces_root.remove_child(child)
+		child.queue_free()
+	if _bridge == null:
+		return
+	_build_position_from_fen(pieces_root, _bridge.fen())
+
+
+func _build_position_from_fen(pieces_root: Node3D, fen: String) -> void:
+	var placement := fen.split(" ")[0]
+	var rank := 8
+	var file := 0
+	for index in range(placement.length()):
+		var token := placement.substr(index, 1)
+		if token == "/":
+			rank -= 1
+			file = 0
+		elif token.is_valid_int():
+			file += token.to_int()
+		elif FEN_PIECE_TYPES.has(token.to_lower()):
+			var square := "%s%d" % [char("a".unicode_at(0) + file), rank]
+			var side := "white" if token == token.to_upper() else "black"
+			_add_piece(pieces_root, FEN_PIECE_TYPES[token.to_lower()], side, square)
+			file += 1
 
 
 func _add_piece(parent: Node3D, piece_type: String, side: String, square: String) -> void:
@@ -170,45 +209,62 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 
 
 func _on_square_pressed(square: String) -> void:
-	if not _selected_piece_square.is_empty() and square in _demo_legal_moves:
-		_move_demo_piece(_selected_piece_square, square)
-		_board.set_last_move(_selected_piece_square, square)
-		_board.set_highlight("")
-		_board.set_legal_moves([])
-		_selected_piece_square = ""
-		_demo_legal_moves.clear()
-		_move_number += 1
-		_move_number_label.text = "M%d" % _move_number
-		_active_clock_side = "black"
-		_update_clock_strip()
-		_header.set_center_text("Opponent's turn · Move %d" % _move_number)
+	if _bridge == null:
 		return
-	_header.set_center_text("Selected %s" % square.to_upper())
-
-
-func _move_demo_piece(from_square: String, to_square: String) -> void:
-	var piece := _board.get_node_or_null("Pieces/White_Pawn_%s" % from_square)
-	if piece == null:
+	if not _selected_piece_square.is_empty() and square in _legal_targets:
+		var uci := _selected_piece_square + square
+		if _selected_piece_type == "pawn" and (square.right(1) == "8" or square.right(1) == "1"):
+			uci += "q"
+		if _bridge.submit_move(uci):
+			return
+		_header.set_center_text("Illegal move")
 		return
-	piece.name = "White_Pawn_%s" % to_square
-	var destination := _board.square_to_world(to_square, 0.02)
-	piece.create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT) \
-		.tween_property(piece, "position", destination, 0.24)
+	_select_square(square, "", "")
 
 
 func _on_piece_pressed(piece: Node) -> void:
-	_selected_piece_square = piece.name.right(2).to_lower()
-	_demo_legal_moves.clear()
-	if _selected_piece_square == "e2" and piece.get("side") == "white" \
-		and piece.get("piece_type") == "pawn":
-		_demo_legal_moves = ["e3", "e4"]
-		_board.set_highlight(_selected_piece_square)
-		_board.set_legal_moves(_demo_legal_moves)
-		_header.set_center_text("Choose a move")
+	var square: String = piece.name.right(2).to_lower()
+	_select_square(square, str(piece.get("side")), str(piece.get("piece_type")))
+
+
+func _select_square(square: String, side: String, piece_type: String) -> void:
+	_selected_piece_square = square
+	_selected_piece_type = piece_type
+	_legal_targets.clear()
+	if _bridge != null:
+		for target in _bridge.legal_moves_from(square):
+			_legal_targets.append(target)
+	_board.set_highlight(square)
+	_board.set_legal_moves(_legal_targets)
+	if _legal_targets.is_empty():
+		if side.is_empty():
+			_header.set_center_text("Selected %s" % square.to_upper())
+		else:
+			_header.set_center_text("Selected %s" % piece_type.capitalize())
 	else:
-		_board.set_highlight(_selected_piece_square)
-		_board.set_legal_moves([])
-		_header.set_center_text("Selected %s" % piece.name.replace("_", " ").to_upper())
+		_header.set_center_text("Choose a move")
+
+
+func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> void:
+	var from_square := uci.left(2)
+	var to_square := uci.substr(2, 2)
+	_rebuild_position()
+	_board.set_last_move(from_square, to_square)
+	_board.set_highlight("")
+	_board.set_legal_moves([])
+	_selected_piece_square = ""
+	_selected_piece_type = ""
+	_legal_targets.clear()
+	_move_number += 1
+	_move_number_label.text = "M%d" % _move_number
+	if _bridge != null:
+		_active_clock_side = _bridge.turn()
+	_update_clock_strip()
+	_header.set_center_text("Move %d · %s to move" % [_move_number, _active_clock_side.capitalize()])
+
+
+func _on_bridge_error(message: String) -> void:
+	_header.set_center_text(message)
 
 
 func _open_game_menu() -> void:

@@ -14,6 +14,10 @@
 //! sync (offers, resignations over the wire) likewise arrives with the
 //! protocol; [`App::ingest_remote`] accepts moves only.
 //!
+//! Phase 6 additive lesson: [`Query::LegalMoves`] joined the frozen set.
+//! The board must highlight legal targets, and legality lives in the
+//! core, so the query has to exist; it changes nothing already frozen.
+//!
 //! Authority is explicit: the app holds secrets, commands name a peer,
 //! and acting without that peer's secret fails with `NotLocal`. The
 //! production client holds one key; tests admit two to simulate both
@@ -36,7 +40,7 @@
 //! # Ok::<(), chess_relay_core::app::AppError>(())
 //! ```
 
-use crate::chess_core::{Color, Move, Outcome};
+use crate::chess_core::{Color, Move, Outcome, Square};
 use crate::session::{
     FinishReason, LogEntry, LogPayload, PeerId, Session, SessionConfig, SessionError, SessionState,
 };
@@ -118,7 +122,7 @@ pub enum Command {
 }
 
 /// State reads; never mutate.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum Query {
     /// Current position, turn, and rules outcome.
     GameState,
@@ -126,6 +130,11 @@ pub enum Query {
     SessionState,
     /// Full signed log in sequence order.
     MoveLog,
+    /// Legal moves, optionally departing from one square.
+    LegalMoves {
+        /// Departure square filter, if any.
+        from: Option<Square>,
+    },
 }
 
 /// Current position snapshot.
@@ -165,6 +174,8 @@ pub enum QueryResult {
     SessionState(SessionStateView),
     /// Answer to [`Query::MoveLog`].
     MoveLog(Vec<LogEntry>),
+    /// Answer to [`Query::LegalMoves`].
+    LegalMoves(Vec<Move>),
 }
 
 /// Facts that already happened: the only thing clients render.
@@ -549,6 +560,17 @@ impl App {
                 }))
             }
             Query::MoveLog => Ok(QueryResult::MoveLog(session.log().to_vec())),
+            Query::LegalMoves { from } => {
+                let game = session
+                    .game()
+                    .ok_or_else(|| AppError::bad_command("game not started".to_string()))?;
+                let moves = game
+                    .legal_moves()
+                    .into_iter()
+                    .filter(|mv| from.is_none_or(|square| mv.from == square))
+                    .collect();
+                Ok(QueryResult::LegalMoves(moves))
+            }
         }
     }
 

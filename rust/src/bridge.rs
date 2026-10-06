@@ -11,10 +11,11 @@
 //! play replaces the second key with the transport path in Phase 6.
 
 use crate::app::{App, Command, Event, Query, QueryResult};
-use crate::chess_core::{Color as ChessColor, Move};
+use crate::chess_core::{Color as ChessColor, Move, Square};
 use crate::session::PeerId;
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
+use std::str::FromStr;
 
 const LOCAL_SEED: [u8; 32] = [1u8; 32];
 const SPIKE_PEER_SEED: [u8; 32] = [2u8; 32];
@@ -129,7 +130,7 @@ impl ChessRelayBridge {
             self.emit_error("bridge not started");
             return false;
         };
-        let peer = match game_side(app) {
+        let peer = match game_side(Some(app)) {
             Some(ChessColor::White) => self.local,
             Some(ChessColor::Black) => self.peer,
             None => {
@@ -160,6 +161,36 @@ impl ChessRelayBridge {
             Some(QueryResult::GameState(view)) => GString::from(&view.fen),
             _ => GString::from(""),
         }
+    }
+
+    /// Side to move as `"white"`, `"black"`, or `""` before play starts.
+    #[func]
+    fn turn(&self) -> GString {
+        match game_side(self.app.as_ref()) {
+            Some(ChessColor::White) => GString::from("white"),
+            Some(ChessColor::Black) => GString::from("black"),
+            None => GString::from(""),
+        }
+    }
+
+    /// Target squares for legal moves departing `square` (e.g. `"e2"`).
+    ///
+    /// Empty when the square is unparseable, vacant, or the game has not
+    /// started; legality itself stays in the core.
+    #[func]
+    fn legal_moves_from(&self, square: GString) -> Array<GString> {
+        let mut targets = Array::new();
+        let from = Square::from_str(&square.to_string());
+        let moves = self
+            .app
+            .as_ref()
+            .and_then(|app| app.query(&Query::LegalMoves { from: from.ok() }).ok());
+        if let Some(QueryResult::LegalMoves(moves)) = moves {
+            for mv in moves {
+                targets.push(&GString::from(&mv.to.to_string()));
+            }
+        }
+        targets
     }
 }
 
@@ -233,8 +264,8 @@ impl ChessRelayBridge {
     }
 }
 
-fn game_side(app: &App) -> Option<ChessColor> {
-    match app.query(&Query::GameState) {
+fn game_side(app: Option<&App>) -> Option<ChessColor> {
+    match app?.query(&Query::GameState) {
         Ok(QueryResult::GameState(view)) => Some(view.side_to_move),
         _ => None,
     }

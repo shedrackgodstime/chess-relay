@@ -276,8 +276,8 @@ func _check_game_screen() -> void:
 	piece_press.pressed = true
 	demo_pawn.get_node("PieceInputSurface").input_event.emit(
 		game._camera, piece_press, Vector3.ZERO, Vector3.UP, 0)
-	_check(game._demo_legal_moves == ["e3", "e4"],
-		"demo pawn exposes its legal move preview")
+	_check(game._legal_targets == ["e3", "e4"],
+		"pawn exposes its core legal move preview")
 	_check(game._board.get_highlighted_square() == "e2",
 		"selecting a piece highlights its source square")
 	game._on_square_pressed("e4")

@@ -119,6 +119,27 @@ fn moves_flow_both_ways_and_views_converge() {
 }
 
 #[test]
+fn legal_moves_query_comes_from_core() {
+    let (host, _, _, _) = playing_pair();
+    let moves = match host.query(&Query::LegalMoves { from: None }).unwrap() {
+        QueryResult::LegalMoves(moves) => moves,
+        _ => unreachable!(),
+    };
+    assert_eq!(moves.len(), 20);
+    let shown = match host
+        .query(&Query::LegalMoves {
+            from: Some("e2".parse().unwrap()),
+        })
+        .unwrap()
+    {
+        QueryResult::LegalMoves(moves) => moves,
+        _ => unreachable!(),
+    };
+    let targets: Vec<String> = shown.iter().map(|mv| mv.to.to_string()).collect();
+    assert_eq!(targets, vec!["e3".to_string(), "e4".to_string()]);
+}
+
+#[test]
 fn resign_ends_through_contract() {
     let (mut host, _, white, black) = playing_pair();
     host.handle(&Command::SubmitMove {
