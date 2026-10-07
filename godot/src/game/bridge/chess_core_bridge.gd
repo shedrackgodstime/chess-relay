@@ -17,9 +17,9 @@ extends Node
 ##
 ## What is deliberately not here: any chess decision. Legality comes from
 ## `legal_moves_from`; the move string is sent as given; the position comes back
-## as FEN and is rendered. The promotion suffix that used to be appended in
-## `game_screen.gd` is Rust's business, and the Rust side already returns the
-## full move, so this facade passes `uci` straight through.
+## as FEN and is rendered. The promotion suffix travels in the submitted UCI
+## (the core validates but does not choose the piece); until the picker UI
+## exists the screen defaults it to queen, marked at the call site.
 
 ## Emitted when the core accepted and applied a move.
 signal move_applied(sequence: int, uci: String, by: String, agreed: bool)

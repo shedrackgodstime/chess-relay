@@ -88,6 +88,10 @@ func _format_clock(seconds: int) -> String:
 	return "%02d:%02d" % [floori(seconds / 60.0), seconds % 60]
 
 
+## SPIKE-ONLY: the core behind this bridge plays both sides from committed
+## spike keys (see rust/src/bridge.rs). Every local game is a forged
+## opponent until the transport path replaces it in Phase 7. Do not build
+## networked features on local play.
 func _start_bridge() -> void:
 	_bridge = ChessCoreBridge.new()
 	add_child(_bridge)
@@ -219,11 +223,13 @@ func _on_square_pressed(square: String) -> void:
 	if not _bridge.is_available():
 		return
 	if not _selected_piece_square.is_empty() and square in _legal_targets:
-		# No promotion suffix here. Promotion is a chess rule and belongs to
-		# `chess_core`; the client used to append "q" here, which made
-		# underpromotion unreachable. The core already returns the full move,
-		# so this sends the origin and destination and lets it decide.
-		if _bridge.submit_move(_selected_piece_square + square):
+		var uci := _selected_piece_square + square
+		# Placeholder until the promotion picker lands: a pawn reaching the
+		# last rank must name a piece (bare UCI is correctly rejected by the
+		# core), so queen it is, explicitly. The core still validates.
+		if _selected_piece_type == "pawn" and (square.right(1) == "8" or square.right(1) == "1"):
+			uci += "q"
+		if _bridge.submit_move(uci):
 			return
 		_header.set_center_text("Illegal move")
 		return

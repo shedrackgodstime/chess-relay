@@ -60,16 +60,24 @@ func _init() -> void:
 
 
 func _run() -> void:
+	# The facade builds the core in _ready, which runs once the node is in
+	# the tree and frames flow. Checking before that reports the core
+	# missing for a timing reason, which misdiagnoses as an environment
+	# failure, so wait first and assert after.
+	await process_frame
+	await process_frame
 	# A missing extension is the failure this suite was written for, so it is
 	# reported as a check rather than an early return. An early return is what
 	# let this go unnoticed for so long.
+	# Connect before entering the tree: the facade runs its lifecycle in
+	# _ready, so subscribing after add_child misses game_started.
 	var bridge := ChessCoreBridge.new()
-	root.add_child(bridge)
 	bridge.move_applied.connect(
 		func(_sequence: int, uci: String, _by: String, _agreed: bool) -> void:
 			_move_uci = uci)
 	bridge.game_started.connect(func() -> void: _started = true)
 	bridge.bridge_error.connect(_on_bridge_error)
+	root.add_child(bridge)
 
 	_check(bridge.is_available(),
 		"Rust core is loaded (chess_relay.gdextension registers ChessRelayBridge; "
@@ -120,9 +128,16 @@ func _explain_unavailable() -> void:
 			+ "--manifest-path rust/Cargo.toml --lib, then copy "
 			+ "target/debug/libchess_relay_core.so to godot/bin/.")
 		return
-	printerr("BRIDGE: cause = this host cannot dlopen a GDExtension library. "
-		+ "The library is present at res://bin/ but never registered. On this "
-		+ "device that is the Termux glibc sysroot, which ships libdl.so.2 and no "
+	printerr("BRIDGE: cause = core not available after frames elapsed. "
+		+ "Possible causes, in the order to check them: "
+		+ "(1) the game was quit before _ready ran (this suite waits first); "
+		+ "(2) the library is not built - "
+		+ "CARGO_TARGET_DIR=<outside the repo> cargo build "
+		+ "--manifest-path rust/Cargo.toml --lib, then copy "
+		+ "target/debug/libchess_relay_core.so to godot/bin/. "
+		+ "(3) this host cannot dlopen a GDExtension library. "
+		+ "The library is present at res://bin/ but never registered. On Termux "
+		+ "that is the glibc sysroot, which ships libdl.so.2 and no "
 		+ "libdl.so, so Godot's Linux binary run through it cannot load any "
 		+ "extension. Verify on a stock Linux runner or the desktop instead; "
 		+ "CI is the authority for this gate. See "

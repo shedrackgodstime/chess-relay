@@ -592,6 +592,7 @@ func _check_game_screen() -> void:
 	_check(is_equal_approx(game._camera.yaw_degrees, 274.5),
 		"board view controls flip the board")
 	var outside_click := InputEventMouseButton.new()
+	outside_click.button_index = MOUSE_BUTTON_LEFT
 	outside_click.pressed = true
 	game._on_board_view_overlay_input(outside_click, _control(game, "HUD/BoardViewOverlay"))
 	_check(_control(game, "HUD/BoardViewOverlay").is_queued_for_deletion(),
@@ -724,7 +725,7 @@ func _mesh_label_text(parent: Node, path: String) -> String:
 ## The nth action in the board-view menu's action list.
 func _board_view_action(game: Node, index: int) -> Button:
 	var actions := _node(game, "HUD/BoardViewOverlay/BoardViewMenu").get_child(0)
-	return _button(actions, str(index))
+	return actions.get_child(index) as Button
 
 
 ## The mesh of an overlay marker, for asserting which marker was used.

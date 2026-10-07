@@ -109,7 +109,9 @@ for suite in $(find "$root/tests" -maxdepth 1 -name '*_test.gd' -type f | sort);
   # Passed in so the suite can compare declared against executed, which is what
   # catches a truncated run. Counted from source rather than maintained by hand,
   # so it cannot drift.
-  expected="$(grep -c '_check(' "$suite" || true)"
+  # Call sites only: the helper definition itself contains "_check(" and
+  # must not be counted, or no suite can ever reach its expected number.
+  expected="$(grep -cE '^\s*_check\(' "$suite" || true)"
 
   output="$("$GODOT_BIN" --headless --path "$root" --script "$res" \
     -- --expected-checks="$expected" 2>&1)"
