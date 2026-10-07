@@ -43,6 +43,14 @@ impl PeerId {
         Self(VerifyingKey::from(secret).to_bytes())
     }
 
+    /// Identity from raw public-key bytes (network-learned peers).
+    ///
+    /// Untrusted until signatures verify; the log does that on receipt.
+    #[must_use]
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+
     /// Raw public-key bytes.
     #[must_use]
     pub fn bytes(&self) -> [u8; 32] {
