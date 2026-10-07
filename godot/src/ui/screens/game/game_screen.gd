@@ -12,6 +12,7 @@ signal leave_requested
 @onready var _player_clock: Label = $HUD/HUDRoot/ClockStrip/Content/PlayerClock
 @onready var _move_number_label: Label = $HUD/HUDRoot/ClockStrip/Content/MoveNumber
 @onready var _clock_timer: Timer = $ClockTimer
+@onready var _picker: PromotionPicker = %PromotionPicker
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
@@ -26,7 +27,9 @@ var _white_seconds := 600
 var _black_seconds := 598
 var _selected_piece_square := ""
 var _selected_piece_type := ""
+var _selected_piece_side := ""
 var _legal_targets: Array[String] = []
+var _pending_promotion := ""
 var _finished := false
 var _bridge: ChessCoreBridge
 
@@ -103,6 +106,7 @@ func _start_bridge() -> void:
 	_bridge.draw_offered.connect(_on_core_draw_offered)
 	_bridge.draw_answered.connect(_on_core_draw_answered)
 	_bridge.bridge_error.connect(_on_bridge_error)
+	_picker.chosen.connect(_on_promotion_chosen)
 
 
 ## Position rendering: the board observes the core, never the reverse.
@@ -231,13 +235,13 @@ func _on_square_pressed(square: String) -> void:
 	if not _bridge.is_available():
 		return
 	if not _selected_piece_square.is_empty() and square in _legal_targets:
-		var uci := _selected_piece_square + square
-		# Placeholder until the promotion picker lands: a pawn reaching the
-		# last rank must name a piece (bare UCI is correctly rejected by the
-		# core), so queen it is, explicitly. The core still validates.
+		# A pawn reaching the last rank cannot move as two squares: the
+		# promotion piece is the player's call, so ask instead of assuming.
 		if _selected_piece_type == "pawn" and (square.right(1) == "8" or square.right(1) == "1"):
-			uci += "q"
-		if _bridge.submit_move(uci):
+			_pending_promotion = _selected_piece_square + square
+			_picker.open(_selected_piece_side)
+			return
+		if _bridge.submit_move(_selected_piece_square + square):
 			return
 		_header.set_center_text("Illegal move")
 		return
@@ -264,6 +268,7 @@ func _on_piece_pressed(piece: ChessPieceView) -> void:
 func _select_square(square: String, side: String, piece_type: String) -> void:
 	_selected_piece_square = square
 	_selected_piece_type = piece_type
+	_selected_piece_side = side
 	_legal_targets.clear()
 	for target: String in _bridge.legal_moves_from(square):
 		_legal_targets.append(target)
@@ -288,6 +293,8 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 	_board.set_legal_moves([])
 	_selected_piece_square = ""
 	_selected_piece_type = ""
+	_selected_piece_side = ""
+	_pending_promotion = ""
 	_legal_targets.clear()
 	var move_number := _bridge.move_number()
 	_move_number_label.text = "M%d" % move_number
@@ -298,6 +305,8 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 
 func _on_core_game_ended(reason: String) -> void:
 	_finished = true
+	_pending_promotion = ""
+	_picker.close()
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_selected_piece_square = ""
@@ -335,6 +344,16 @@ func _on_core_draw_offered(by: String, seq: int) -> void:
 func _on_core_draw_answered(by: String, accept: bool) -> void:
 	if not accept:
 		_header.set_center_text("Draw declined")
+
+
+func _on_promotion_chosen(piece: String) -> void:
+	if _pending_promotion.is_empty():
+		return
+	var uci := _pending_promotion + PromotionPicker.suffix_for(piece)
+	_pending_promotion = ""
+	if _bridge.submit_move(uci):
+		return
+	_header.set_center_text("Illegal move")
 
 
 func _on_bridge_error(message: String) -> void:

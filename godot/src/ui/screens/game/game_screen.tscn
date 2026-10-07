@@ -1,9 +1,10 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://src/ui/screens/game/game_screen.gd" id="1_game"]
 [ext_resource type="PackedScene" path="res://src/game/board/board_view.tscn" id="2_board"]
 [ext_resource type="PackedScene" path="res://src/ui/components/game_header/game_header.tscn" id="3_header"]
 [ext_resource type="Script" path="res://src/game/camera/orbit_camera.gd" id="4_camera"]
+[ext_resource type="PackedScene" path="res://src/ui/components/promotion_picker/promotion_picker.tscn" id="5_picker"]
 
 [sub_resource type="Environment" id="Environment_game"]
 background_mode = 1
@@ -172,3 +173,7 @@ size_flags_horizontal = 3
 theme_type_variation = &"Caption"
 text = "10:00  YOU"
 vertical_alignment = 1
+
+[node name="PromotionPicker" parent="." instance=ExtResource("5_picker")]
+unique_name_in_owner = true
+visible = false

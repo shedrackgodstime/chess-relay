@@ -32,6 +32,7 @@ func _run() -> void:
 	await _phase("castling", _scenario_castling)
 	await _phase("en_passant", _scenario_en_passant)
 	await _phase("promotion", _scenario_promotion)
+	await _phase("promotion_cancel", _scenario_promotion_cancel)
 	await _phase("checkmate", _scenario_checkmate)
 	await _phase("draw_offer", _scenario_draw_offer)
 	await _phase("resign", _scenario_resign)
@@ -119,7 +120,7 @@ func _fen(game: GameScreen) -> String:
 
 
 func _scenario_captures() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	_play(game, "e2e4")
 	_play(game, "d7d5")
 	# Taps the victim piece itself, the way hands do: the piece surface
@@ -155,7 +156,7 @@ func _scenario_captures() -> void:
 
 
 func _scenario_castling() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	for uci: String in ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"]:
 		_play(game, uci)
 	_play(game, "e1g1")
@@ -169,7 +170,7 @@ func _scenario_castling() -> void:
 
 
 func _scenario_en_passant() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	for uci: String in ["e2e4", "a7a6", "e4e5", "d7d5"]:
 		_play(game, uci)
 	_play(game, "e5d6")
@@ -182,21 +183,59 @@ func _scenario_en_passant() -> void:
 
 
 func _scenario_promotion() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	for uci: String in ["h2h4", "a7a6", "h4h5", "a6a5", "h5h6", "a5a4", "h6g7", "h7h6"]:
 		_play(game, uci)
-	_play(game, "g7h8")
-	_check(_type_at(game, "h8") == "queen"
+	_tap_promotion(game, "g7", "h8")
+	var knight := _picker(game)
+	_check(knight.visible, "promotion opens the picker")
+	_check(knight.option_count() == 4, "picker offers four pieces")
+	_press_picker_option(knight, 3)
+	_check(_type_at(game, "h8") == "knight"
 		and _side_at(game, "h8") == "white",
-		"promotion crowns a queen on h8")
-	_check(_fen(game).begins_with("rnbqkbnQ"),
-		"promotion registers in the position, got %s" % _fen(game))
+		"promotion crowns the chosen knight on h8")
+	_check(_fen(game).begins_with("rnbqkbnN"),
+		"underpromotion registers in the position, got %s" % _fen(game))
 	game.queue_free()
 	_phase_reached_end = true
 
 
+func _scenario_promotion_cancel() -> void:
+	var game: GameScreen = await _new_game()
+	for uci: String in ["h2h4", "a7a6", "h4h5", "a6a5", "h5h6", "a5a4", "h6g7", "h7h6"]:
+		_play(game, uci)
+	_tap_promotion(game, "g7", "h8")
+	var cancel := _picker(game).get_node("Centre/Panel/Column/Cancel") as Button
+	cancel.pressed.emit()
+	await process_frame
+	_check(_type_at(game, "h8") == "queen",
+		"cancel falls back to queen on h8")
+	game.queue_free()
+	_phase_reached_end = true
+
+
+func _picker(game: GameScreen) -> PromotionPicker:
+	return game.get_node("PromotionPicker") as PromotionPicker
+
+
+## Taps a promotion without choosing: the move must wait for the picker.
+func _tap_promotion(game: GameScreen, from_square: String, to_square: String) -> void:
+	var mover := _piece_at(game, from_square)
+	_check(mover != null, "pawn stands on %s" % from_square)
+	if mover == null:
+		return
+	game._on_piece_pressed(mover)
+	game._on_square_pressed(to_square)
+
+
+func _press_picker_option(picker: PromotionPicker, index: int) -> void:
+	var option := picker.get_node("Centre/Panel/Column/PromotionChoices/Options").get_child(index) as Button
+	option.pressed.emit()
+	await process_frame
+
+
 func _scenario_checkmate() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	for uci: String in ["e2e4", "e7e5", "d1h5", "b8c6", "f1c4", "g8f6", "h5f7"]:
 		_play(game, uci)
 	_check(game._header.center_text == "Checkmate · White wins",
@@ -210,7 +249,7 @@ func _scenario_checkmate() -> void:
 
 
 func _scenario_draw_offer() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	_play(game, "e2e4")
 	game._open_game_menu()
 	await process_frame
@@ -241,7 +280,7 @@ func _scenario_draw_offer() -> void:
 
 
 func _scenario_resign() -> void:
-	var game := await _new_game()
+	var game: GameScreen = await _new_game()
 	_play(game, "e2e4")
 	game._open_game_menu()
 	await process_frame

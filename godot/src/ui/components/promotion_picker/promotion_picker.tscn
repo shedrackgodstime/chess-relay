@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://src/ui/components/promotion_picker/promotion_picker.gd" id="1_picker"]
+[ext_resource type="PackedScene" path="res://src/ui/components/choice_group/choice_group.tscn" id="2_choices"]
+
+[node name="PromotionPicker" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+visible = false
+script = ExtResource("1_picker")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.02, 0.018, 0.016, 0.72)
+
+[node name="Centre" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="PanelContainer" parent="Centre"]
+theme_type_variation = &"Card"
+layout_mode = 2
+
+[node name="Column" type="VBoxContainer" parent="Centre/Panel"]
+theme_override_constants/separation = 10
+layout_mode = 2
+
+[node name="PromotionChoices" parent="Centre/Panel/Column" instance=ExtResource("2_choices")]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Cancel" type="Button" parent="Centre/Panel/Column"]
+theme_type_variation = &"QuietButton"
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+text = "Cancel"
