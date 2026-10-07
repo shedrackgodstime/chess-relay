@@ -122,7 +122,14 @@ func _scenario_captures() -> void:
 	var game := await _new_game()
 	_play(game, "e2e4")
 	_play(game, "d7d5")
-	_play(game, "e4d5")
+	# Taps the victim piece itself, the way hands do: the piece surface
+	# fires first, and the screen must read it as a capture, not a
+	# reselection.
+	var attacker := _piece_at(game, "e4")
+	var victim := _piece_at(game, "d5")
+	_check(attacker != null and victim != null, "both pieces stand for the capture")
+	game._on_piece_pressed(attacker)
+	game._on_piece_pressed(victim)
 	_check(_side_at(game, "d5") == "white",
 		"capture lands the white pawn on d5")
 	_check(_piece_at(game, "e4") == null,

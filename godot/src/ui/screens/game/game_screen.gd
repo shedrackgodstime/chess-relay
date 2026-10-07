@@ -245,7 +245,13 @@ func _on_square_pressed(square: String) -> void:
 func _on_piece_pressed(piece: ChessPieceView) -> void:
 	if _finished:
 		return
-	_select_square(piece.square, piece.side, piece.piece_type)
+	var square: String = piece.square
+	# A tap on an occupied target square is a capture, not a new selection:
+	# the piece surface sits above the board surface and fires first.
+	if not _selected_piece_square.is_empty() and square in _legal_targets:
+		_on_square_pressed(square)
+		return
+	_select_square(square, piece.side, piece.piece_type)
 
 
 func _select_square(square: String, side: String, piece_type: String) -> void:
