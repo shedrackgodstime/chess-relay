@@ -1,34 +1,57 @@
 //! Godot bridge: the single `GodotClass` node owning the core.
 //!
-//! Phase 5 spike scope: prove Rust-inside-Godot on a real phone — call
-//! into chess core, get facts back as signals. Threading rule (arch doc
-//! §Godot integration): Rust never calls Godot APIs off-frame. Commands
-//! emit signals immediately; the outbox drains in `process()`.
+//! Threading rule (arch doc §Godot integration): the scene tree is
+//! single-threaded and Rust threads must never call Godot APIs. All
+//! shared state lives in [`CoreState`] behind one mutex. Every `#[func]`
+//! locks, operates, drops the guard, and only then emits signals —
+//! otherwise a GDScript handler calling back into the bridge would
+//! deadlock on the held lock. Async network tasks (slice B) follow the
+//! same rule: they push facts into the outbox and never touch Godot.
 //!
 //! Spike shortcut, documented honestly: the bridge admits a second,
 //! spike-only key so one phone can play both sides with authority
 //! intact (every action is still signed by its side's key). Networked
-//! play replaces the second key with the transport path in Phase 6.
+//! play replaces the second key with the transport path.
 
 use crate::app::{App, Command, Event, Query, QueryResult};
 use crate::chess_core::{Color as ChessColor, Move, Square};
 use crate::session::{LogStore, PeerId};
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
+use std::collections::VecDeque;
 use std::str::FromStr;
+use std::sync::{Mutex, MutexGuard};
 
 const LOCAL_SEED: [u8; 32] = [1u8; 32];
 const SPIKE_PEER_SEED: [u8; 32] = [2u8; 32];
 
-#[derive(GodotClass)]
-#[class(base = Node, init)]
-pub struct ChessRelayBridge {
-    base: Base<Node>,
+/// Everything the bridge shares between the scene thread and (later)
+/// network tasks. Always accessed through [`ChessRelayBridge::lock`],
+/// never held across signal emission or `.await`.
+#[derive(Default)]
+struct CoreState {
     app: Option<App>,
     local: PeerId,
     peer: PeerId,
     offer_by: Option<PeerId>,
     save_path: Option<String>,
+    outbox: VecDeque<Event>,
+}
+
+#[derive(GodotClass)]
+#[class(base = Node, init)]
+pub struct ChessRelayBridge {
+    base: Base<Node>,
+    #[init(val = std::sync::Arc::new(std::sync::Mutex::new(CoreState::default())))]
+    core: std::sync::Arc<Mutex<CoreState>>,
+}
+
+impl ChessRelayBridge {
+    /// Locks the shared core. Never panics on poison: a dead network
+    /// task must not wedge the game, so its writes are kept.
+    fn lock(&self) -> MutexGuard<'_, CoreState> {
+        self.core.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 }
 
 #[godot_api]
@@ -57,12 +80,19 @@ impl ChessRelayBridge {
     /// Joins the spike peer (co-signing genesis with its admitted key)
     /// and marks both sides ready, so one phone demonstrates the full
     /// path to a playable game. Networked play replaces the peer side
-    /// with the transport path in Phase 6.
+    /// with the transport path.
     #[func]
     fn start(&mut self) {
         let local_key = SigningKey::from_bytes(&LOCAL_SEED);
         let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
-        self.start_fresh(local_key, peer_key);
+        let (events, errors) = {
+            let mut core = self.lock();
+            start_fresh(&mut core, local_key, peer_key)
+        };
+        self.emit_all(&events);
+        for message in &errors {
+            self.emit_error(message);
+        }
     }
 
     /// Starts with a persistent identity, resuming the saved game if any.
@@ -85,27 +115,36 @@ impl ChessRelayBridge {
         // until transport arrives. Only the local identity persists.
         let local_key = SigningKey::from_bytes(&seed);
         let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
-        self.save_path = Some(save_path.clone());
-        let mut app = App::with_local(local_key.clone());
-        app.admit(peer_key.clone());
-        let restored = match crate::session::FileStore::new(std::path::Path::new(&save_path)).load()
-        {
-            Ok(entries) if !entries.is_empty() => match app.restore(entries) {
-                Ok(events) => {
-                    self.app = Some(app);
-                    self.local = PeerId::of(&local_key);
-                    self.peer = PeerId::of(&peer_key);
-                    self.emit_all(&events);
-                    true
-                }
-                Err(_) => false,
-            },
-            _ => false,
+        let (restored, events) = {
+            let mut core = self.lock();
+            core.save_path = Some(save_path.clone());
+            let mut app = App::with_local(local_key.clone());
+            app.admit(peer_key.clone());
+            match crate::session::FileStore::new(std::path::Path::new(&save_path)).load() {
+                Ok(entries) if !entries.is_empty() => match app.restore(entries) {
+                    Ok(events) => {
+                        core.app = Some(app);
+                        core.local = PeerId::of(&local_key);
+                        core.peer = PeerId::of(&peer_key);
+                        (true, events)
+                    }
+                    Err(_) => (false, Vec::new()),
+                },
+                _ => (false, Vec::new()),
+            }
         };
         if restored {
+            self.emit_all(&events);
             return true;
         }
-        self.start_fresh(local_key, peer_key);
+        let (events, errors) = {
+            let mut core = self.lock();
+            start_fresh(&mut core, local_key, peer_key)
+        };
+        self.emit_all(&events);
+        for message in &errors {
+            self.emit_error(message);
+        }
         false
     }
 
@@ -115,14 +154,18 @@ impl ChessRelayBridge {
     /// after every applied move and game end.
     #[func]
     fn save_game(&mut self) -> bool {
-        let (Some(path), Some(app)) = (self.save_path.clone(), self.app.as_ref()) else {
-            return false;
+        let result = {
+            let core = self.lock();
+            let (Some(path), Some(app)) = (core.save_path.clone(), core.app.as_ref()) else {
+                return false;
+            };
+            let entries = match app.query(&Query::MoveLog) {
+                Ok(QueryResult::MoveLog(entries)) => entries,
+                _ => return false,
+            };
+            crate::session::FileStore::new(std::path::Path::new(&path)).save(&entries)
         };
-        let entries = match app.query(&Query::MoveLog) {
-            Ok(QueryResult::MoveLog(entries)) => entries,
-            _ => return false,
-        };
-        match crate::session::FileStore::new(std::path::Path::new(&path)).save(&entries) {
+        match result {
             Ok(()) => true,
             Err(err) => {
                 self.emit_error(&err.to_string());
@@ -131,64 +174,32 @@ impl ChessRelayBridge {
         }
     }
 
-    fn start_fresh(&mut self, local_key: SigningKey, peer_key: SigningKey) {
-        let (white, black) = (PeerId::of(&local_key), PeerId::of(&peer_key));
-        let mut app = App::with_local(local_key);
-        app.admit(peer_key.clone());
-        match app.handle(&Command::StartGame { white, black }) {
-            Ok(events) => self.emit_all(&events),
-            Err(err) => {
-                self.emit_error(&err.to_string());
-                return;
-            }
-        }
-        let genesis_hash = match app.query(&Query::MoveLog) {
-            Ok(QueryResult::MoveLog(entries)) => entries[0].hash(),
-            _ => {
-                self.emit_error("genesis missing");
-                return;
-            }
-        };
-        let co_sig = peer_key.sign(&genesis_hash).to_bytes();
-        self.app = Some(app);
-        self.local = white;
-        self.peer = black;
-        // Each step emits; failures surface as `bridge_error`.
-        let steps = [
-            Command::NotePeerJoined {
-                peer: black,
-                co_sig,
-            },
-            Command::SetReady { peer: white },
-            Command::SetReady { peer: black },
-        ];
-        for command in steps {
-            let result = self
-                .app
-                .as_mut()
-                .map(|app| app.handle(&command))
-                .expect("app just stored");
-            match result {
-                Ok(events) => self.emit_all(&events),
-                Err(err) => self.emit_error(&err.to_string()),
-            }
-        }
-    }
-
     /// Marks a side ready (`"white"` or `"black"`); second starts play.
     #[func]
     fn set_ready(&mut self, side: GString) {
-        let Some(app) = self.app.as_mut() else {
+        let peer = {
+            let core = self.lock();
+            core.app.as_ref().map(|_| match side.to_string().as_str() {
+                "white" => core.local,
+                _ => core.peer,
+            })
+        };
+        let Some(peer) = peer else {
             self.emit_error("bridge not started");
             return;
         };
-        let peer = match side.to_string().as_str() {
-            "white" => self.local,
-            _ => self.peer,
+        let events = {
+            let mut core = self.lock();
+            match core.app.as_mut() {
+                Some(app) => {
+                    app.handle(&Command::SetReady { peer }).map_err(|err| err.to_string())
+                }
+                None => Err("bridge not started".to_string()),
+            }
         };
-        match app.handle(&Command::SetReady { peer }) {
+        match events {
             Ok(events) => self.emit_all(&events),
-            Err(err) => self.emit_error(&err.to_string()),
+            Err(message) => self.emit_error(&message),
         }
     }
 
@@ -202,34 +213,33 @@ impl ChessRelayBridge {
                 return false;
             }
         };
-        let Some(app) = self.app.as_mut() else {
-            self.emit_error("bridge not started");
-            return false;
-        };
-        let peer = match game_side(Some(app)) {
-            Some(ChessColor::White) => self.local,
-            Some(ChessColor::Black) => self.peer,
-            None => {
-                self.emit_error("game not started");
+        let events = {
+            let mut core = self.lock();
+            let peer = match turn_peer(&core) {
+                Some(peer) => peer,
+                None => return false,
+            };
+            let Some(app) = core.app.as_mut() else {
                 return false;
+            };
+            match app.handle(&Command::SubmitMove { peer, mv }) {
+                Ok(events) => events,
+                Err(err) => {
+                    drop(core);
+                    self.emit_error(&err.to_string());
+                    return false;
+                }
             }
         };
-        match app.handle(&Command::SubmitMove { peer, mv }) {
-            Ok(events) => {
-                self.emit_all(&events);
-                true
-            }
-            Err(err) => {
-                self.emit_error(&err.to_string());
-                false
-            }
-        }
+        self.emit_all(&events);
+        true
     }
 
     /// Current position in FEN (observation, never authority).
     #[func]
     fn fen(&self) -> GString {
         match self
+            .lock()
             .app
             .as_ref()
             .and_then(|app| app.query(&Query::GameState).ok())
@@ -242,9 +252,10 @@ impl ChessRelayBridge {
     /// Side to move as `"white"`, `"black"`, or `""` before play starts.
     #[func]
     fn turn(&self) -> GString {
-        match game_side(self.app.as_ref()) {
-            Some(ChessColor::White) => GString::from("white"),
-            Some(ChessColor::Black) => GString::from("black"),
+        let core = self.lock();
+        match turn_peer(&core) {
+            Some(peer) if peer == core.local => GString::from("white"),
+            Some(_) => GString::from("black"),
             None => GString::from(""),
         }
     }
@@ -253,6 +264,7 @@ impl ChessRelayBridge {
     #[func]
     fn check_square(&self) -> GString {
         match self
+            .lock()
             .app
             .as_ref()
             .and_then(|app| app.query(&Query::GameState).ok())
@@ -266,6 +278,7 @@ impl ChessRelayBridge {
     #[func]
     fn move_number(&self) -> i64 {
         match self
+            .lock()
             .app
             .as_ref()
             .and_then(|app| app.query(&Query::MoveLog).ok())
@@ -286,44 +299,53 @@ impl ChessRelayBridge {
     /// Resigns the side to move (hotseat: the human giving up).
     #[func]
     fn resign(&mut self) -> bool {
-        let peer = match self.turn_peer() {
-            Some(peer) => peer,
-            None => return false,
+        let command = {
+            let core = self.lock();
+            match turn_peer(&core) {
+                Some(peer) => Command::Resign { peer },
+                None => return false,
+            }
         };
-        self.run_command(Command::Resign { peer })
+        self.run_command(command)
     }
 
     /// Offers a draw for the side to move; records the offerer.
     #[func]
     fn offer_draw(&mut self) -> bool {
-        let peer = match self.turn_peer() {
-            Some(peer) => peer,
-            None => return false,
+        let peer = {
+            let core = self.lock();
+            match turn_peer(&core) {
+                Some(peer) => peer,
+                None => return false,
+            }
         };
         if !self.run_command(Command::OfferDraw { peer }) {
             return false;
         }
-        self.offer_by = Some(peer);
+        self.lock().offer_by = Some(peer);
         true
     }
 
     /// Answers the open offer as the other side.
     #[func]
     fn answer_draw(&mut self, accept: bool) -> bool {
-        let peer = match self.offer_by {
-            Some(offerer) => {
-                let (white, black) = match self.sides() {
-                    Some(sides) => sides,
-                    None => return false,
-                };
-                if offerer == white { black } else { white }
-            }
-            None => return false,
+        let command = {
+            let core = self.lock();
+            let offerer = match core.offer_by {
+                Some(offerer) => offerer,
+                None => return false,
+            };
+            let sides = match sides(&core) {
+                Some(sides) => sides,
+                None => return false,
+            };
+            let peer = if offerer == sides.0 { sides.1 } else { sides.0 };
+            Command::AnswerDraw { peer, accept }
         };
-        if !self.run_command(Command::AnswerDraw { peer, accept }) {
+        if !self.run_command(command) {
             return false;
         }
-        self.offer_by = None;
+        self.lock().offer_by = None;
         true
     }
 
@@ -335,10 +357,9 @@ impl ChessRelayBridge {
     fn legal_moves_from(&self, square: GString) -> Array<GString> {
         let mut targets = Array::new();
         let from = Square::from_str(&square.to_string());
-        let moves = self
-            .app
-            .as_ref()
-            .and_then(|app| app.query(&Query::LegalMoves { from: from.ok() }).ok());
+        let moves = self.lock().app.as_ref().and_then(|app| {
+            app.query(&Query::LegalMoves { from: from.ok() }).ok()
+        });
         if let Some(QueryResult::LegalMoves(moves)) = moves {
             for mv in moves {
                 targets.push(&GString::from(&mv.to.to_string()));
@@ -352,8 +373,17 @@ impl ChessRelayBridge {
 impl INode for ChessRelayBridge {
     fn process(&mut self, _delta: f64) {
         // Drain off-frame events first so a handler calling back into the
-        // bridge never meets a held borrow: take, then emit.
-        let queued = self.app.as_mut().map(App::drain).unwrap_or_default();
+        // bridge never meets a held lock: take, then emit.
+        let queued: Vec<Event> = {
+            let mut core = self.lock();
+            let mut drained = core
+                .app
+                .as_mut()
+                .map(App::drain)
+                .unwrap_or_default();
+            drained.extend(core.outbox.drain(..));
+            drained
+        };
         for event in &queued {
             self.emit_one(event);
         }
@@ -369,37 +399,24 @@ impl ChessRelayBridge {
 
     /// Runs a command, emitting its events; errors surface as `bridge_error`.
     fn run_command(&mut self, command: Command) -> bool {
-        let events = match self.app.as_mut().map(|app| app.handle(&command)) {
-            Some(Ok(events)) => events,
-            Some(Err(err)) => {
-                self.emit_error(&err.to_string());
-                return false;
-            }
-            None => {
-                self.emit_error("bridge not started");
-                return false;
+        let events = {
+            let mut core = self.lock();
+            match core.app.as_mut().map(|app| app.handle(&command)) {
+                Some(Ok(events)) => events,
+                Some(Err(err)) => {
+                    drop(core);
+                    self.emit_error(&err.to_string());
+                    return false;
+                }
+                None => {
+                    drop(core);
+                    self.emit_error("bridge not started");
+                    return false;
+                }
             }
         };
         self.emit_all(&events);
         true
-    }
-
-    /// Peer pair of the session, if any.
-    fn sides(&self) -> Option<(PeerId, PeerId)> {
-        match self.app.as_ref()?.query(&Query::SessionState).ok()? {
-            QueryResult::SessionState(view) => Some((view.white, view.black)),
-            _ => None,
-        }
-    }
-
-    /// Peer owning the side to move, if play started.
-    fn turn_peer(&self) -> Option<PeerId> {
-        let (white, black) = self.sides()?;
-        match game_side(self.app.as_ref()) {
-            Some(ChessColor::White) => Some(white),
-            Some(ChessColor::Black) => Some(black),
-            None => None,
-        }
     }
 
     fn emit_one(&mut self, event: &Event) {
@@ -457,6 +474,74 @@ impl ChessRelayBridge {
 
     fn emit_error(&mut self, message: &str) {
         self.signals().bridge_error().emit(message);
+    }
+}
+
+/// Runs the spike lifecycle for a fresh local game: create, join the
+/// admitted peer, mark both ready. Returns emitted events plus error
+/// messages (the caller emits both after the lock drops).
+fn start_fresh(
+    core: &mut CoreState,
+    local_key: SigningKey,
+    peer_key: SigningKey,
+) -> (Vec<Event>, Vec<String>) {
+    let mut events = Vec::new();
+    let mut errors = Vec::new();
+    let (white, black) = (PeerId::of(&local_key), PeerId::of(&peer_key));
+    let mut app = App::with_local(local_key);
+    app.admit(peer_key.clone());
+    match app.handle(&Command::StartGame { white, black }) {
+        Ok(step) => events.extend(step),
+        Err(err) => {
+            errors.push(err.to_string());
+            return (events, errors);
+        }
+    }
+    let genesis_hash = match app.query(&Query::MoveLog) {
+        Ok(QueryResult::MoveLog(entries)) => entries[0].hash(),
+        _ => {
+            errors.push("genesis missing".to_string());
+            return (events, errors);
+        }
+    };
+    let co_sig = peer_key.sign(&genesis_hash).to_bytes();
+    core.app = Some(app);
+    core.local = white;
+    core.peer = black;
+    for command in [
+        Command::NotePeerJoined {
+            peer: black,
+            co_sig,
+        },
+        Command::SetReady { peer: white },
+        Command::SetReady { peer: black },
+    ] {
+        let result = core
+            .app
+            .as_mut()
+            .map(|app| app.handle(&command))
+            .expect("app just stored");
+        match result {
+            Ok(step) => events.extend(step),
+            Err(err) => errors.push(err.to_string()),
+        }
+    }
+    (events, errors)
+}
+
+fn turn_peer(core: &CoreState) -> Option<PeerId> {
+    let (white, black) = sides(core)?;
+    match game_side(core.app.as_ref()) {
+        Some(ChessColor::White) => Some(white),
+        Some(ChessColor::Black) => Some(black),
+        None => None,
+    }
+}
+
+fn sides(core: &CoreState) -> Option<(PeerId, PeerId)> {
+    match core.app.as_ref()?.query(&Query::SessionState).ok()? {
+        QueryResult::SessionState(view) => Some((view.white, view.black)),
+        _ => None,
     }
 }
 
