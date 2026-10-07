@@ -16,6 +16,8 @@ signal leave_requested
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
+const IDENTITY_FILE := "user://chess_relay_identity.key"
+const SAVE_FILE := "user://chess_relay_save.bin"
 const FEN_PIECE_TYPES := {"p": "pawn", "n": "knight", "b": "bishop", "r": "rook", "q": "queen", "k": "king"}
 var _camera_scale := 1.0
 var _is_multiplayer := false
@@ -109,6 +111,15 @@ func _start_bridge() -> void:
 	_bridge.draw_answered.connect(_on_core_draw_answered)
 	_bridge.bridge_error.connect(_on_bridge_error)
 	_picker.chosen.connect(_on_promotion_chosen)
+	if _bridge.start_resumable(_abs(IDENTITY_FILE), _abs(SAVE_FILE)):
+		_header.set_center_text("Game restored")
+
+
+## Platform paths stay platform business: Godot resolves `user://` per
+## OS (desktop profile, app-private storage on Android) and Rust only
+## ever sees absolute paths it reads and writes blindly.
+func _abs(path: String) -> String:
+	return ProjectSettings.globalize_path(path)
 
 
 ## Position rendering: the board observes the core, never the reverse.
@@ -369,12 +380,14 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 	_active_clock_side = _bridge.turn()
 	_update_clock_strip()
 	_header.set_center_text("Move %d · %s to move" % [move_number, _active_clock_side.capitalize()])
+	_bridge.save_game()
 
 
 func _on_core_game_ended(reason: String) -> void:
 	_finished = true
 	_pending_promotion = ""
 	_picker.close()
+	_bridge.save_game()
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_board.set_capture_moves([])

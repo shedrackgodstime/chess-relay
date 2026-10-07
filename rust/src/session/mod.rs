@@ -33,9 +33,12 @@
 //! ```
 
 pub(crate) mod log;
+pub(crate) mod store;
 
 #[doc(inline)]
 pub use log::{LogEntry, LogPayload, PeerId};
+#[doc(inline)]
+pub use store::{FileStore, LogStore, MemoryStore, StoreError};
 
 use crate::chess_core::{Color, DrawReason, Game, IllegalMove, Move, Outcome};
 use ed25519_dalek::{Signer, SigningKey};
@@ -754,6 +757,98 @@ impl Session {
         other.verify(&hash, &co_sig)?;
         self.log[seq as usize].co_sig = Some(co_sig);
         Ok(())
+    }
+
+    /// Rebuilds a session from saved entries (restart recovery).
+    ///
+    /// Validates the full chain exactly like [`Session::verify`], replays
+    /// moves into a game, and derives lifecycle state: a terminal entry or
+    /// decisive position finishes, anything playable resumes `Playing`.
+    /// Readiness is not logged, so a pre-game save resumes `SettingUp`
+    /// and both sides ready again. Genesis alone is not resumable.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SessionError`] on empty logs, genesis mismatch, any
+    /// validation failure, or nothing worth resuming.
+    pub fn resume(entries: Vec<LogEntry>) -> Result<Self, SessionError> {
+        let genesis = entries.first().ok_or_else(|| SessionError::log_mismatch("empty log".to_string()))?;
+        let LogPayload::Genesis {
+            version,
+            white,
+            black,
+            host,
+        } = genesis.payload
+        else {
+            return Err(SessionError::log_mismatch(
+                "first entry is not genesis".to_string(),
+            ));
+        };
+        if version != PROTOCOL_VERSION {
+            return Err(SessionError::log_mismatch(
+                "genesis version mismatch".to_string(),
+            ));
+        }
+        let config = SessionConfig {
+            white,
+            black,
+            host,
+            clock: None,
+        };
+        let playable = entries.iter().any(|entry| {
+            matches!(
+                entry.payload,
+                LogPayload::Move { .. }
+                    | LogPayload::Resign
+                    | LogPayload::Abort
+                    | LogPayload::DrawAccept { .. }
+            )
+        });
+        if !playable {
+            return Err(SessionError::log_mismatch("nothing to resume".to_string()));
+        }
+        let mut session = Self {
+            config,
+            state: SessionState::SettingUp,
+            white_ready: false,
+            black_ready: false,
+            game: None,
+            log: entries,
+            open_offer: None,
+        };
+        session.verify()?;
+        let mut game = Game::from_startpos();
+        let mut finished = None;
+        for entry in &session.log {
+            match entry.payload {
+                LogPayload::Genesis { .. } | LogPayload::DrawOffer => {}
+                LogPayload::Move { mv } => {
+                    game.play(&mv).map_err(|_| {
+                        SessionError::log_mismatch("replay hit illegal move".to_string())
+                    })?;
+                }
+                LogPayload::Resign => {
+                    finished = Some(FinishReason::Resignation { by: entry.mover })
+                }
+                LogPayload::Abort => finished = Some(FinishReason::Abort { by: entry.mover }),
+                LogPayload::DrawAccept { .. } => finished = Some(FinishReason::AgreedDraw),
+            }
+            if let LogPayload::DrawOffer = entry.payload {
+                session.open_offer = Some(entry.seq);
+            }
+            if matches!(entry.payload, LogPayload::DrawAccept { .. }) {
+                session.open_offer = None;
+            }
+        }
+        session.game = Some(game);
+        session.state = match finished {
+            Some(reason) => SessionState::Finished(reason),
+            None => match session.game.as_ref().expect("game rebuilt").outcome() {
+                Outcome::Ongoing => SessionState::Playing,
+                outcome => SessionState::Finished(FinishReason::Rules(outcome)),
+            },
+        };
+        Ok(session)
     }
 
     /// Ingests an entry from the other peer (transport receive path).

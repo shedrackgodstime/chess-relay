@@ -12,7 +12,7 @@
 
 use crate::app::{App, Command, Event, Query, QueryResult};
 use crate::chess_core::{Color as ChessColor, Move, Square};
-use crate::session::PeerId;
+use crate::session::{LogStore, PeerId};
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
 use std::str::FromStr;
@@ -28,6 +28,7 @@ pub struct ChessRelayBridge {
     local: PeerId,
     peer: PeerId,
     offer_by: Option<PeerId>,
+    save_path: Option<String>,
 }
 
 #[godot_api]
@@ -61,6 +62,76 @@ impl ChessRelayBridge {
     fn start(&mut self) {
         let local_key = SigningKey::from_bytes(&LOCAL_SEED);
         let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
+        self.start_fresh(local_key, peer_key);
+    }
+
+    /// Starts with a persistent identity, resuming the saved game if any.
+    ///
+    /// Loads the local seed from `identity_path` (generating and saving
+    /// one on first run), then restores the log at `save_path` when it
+    /// holds a playable or finished session. Returns true when a saved
+    /// game resumed. Paths come from the platform (`user://` resolved by
+    /// Godot); this layer only reads and writes bytes.
+    #[func]
+    fn start_resumable(&mut self, identity_path: String, save_path: String) -> bool {
+        let seed = match load_or_create_seed(&identity_path) {
+            Ok(seed) => seed,
+            Err(err) => {
+                self.emit_error(&err.to_string());
+                return false;
+            }
+        };
+        // Same spike peer model as start(): one device plays both sides
+        // until transport arrives. Only the local identity persists.
+        let local_key = SigningKey::from_bytes(&seed);
+        let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
+        self.save_path = Some(save_path.clone());
+        let mut app = App::with_local(local_key.clone());
+        app.admit(peer_key.clone());
+        let restored = match crate::session::FileStore::new(std::path::Path::new(&save_path)).load()
+        {
+            Ok(entries) if !entries.is_empty() => match app.restore(entries) {
+                Ok(events) => {
+                    self.app = Some(app);
+                    self.local = PeerId::of(&local_key);
+                    self.peer = PeerId::of(&peer_key);
+                    self.emit_all(&events);
+                    true
+                }
+                Err(_) => false,
+            },
+            _ => false,
+        };
+        if restored {
+            return true;
+        }
+        self.start_fresh(local_key, peer_key);
+        false
+    }
+
+    /// Persists the current move log to the configured save path.
+    ///
+    /// No-op (false) without a path or session; the screen calls this
+    /// after every applied move and game end.
+    #[func]
+    fn save_game(&mut self) -> bool {
+        let (Some(path), Some(app)) = (self.save_path.clone(), self.app.as_ref()) else {
+            return false;
+        };
+        let entries = match app.query(&Query::MoveLog) {
+            Ok(QueryResult::MoveLog(entries)) => entries,
+            _ => return false,
+        };
+        match crate::session::FileStore::new(std::path::Path::new(&path)).save(&entries) {
+            Ok(()) => true,
+            Err(err) => {
+                self.emit_error(&err.to_string());
+                false
+            }
+        }
+    }
+
+    fn start_fresh(&mut self, local_key: SigningKey, peer_key: SigningKey) {
         let (white, black) = (PeerId::of(&local_key), PeerId::of(&peer_key));
         let mut app = App::with_local(local_key);
         app.admit(peer_key.clone());
@@ -394,6 +465,29 @@ fn game_side(app: Option<&App>) -> Option<ChessColor> {
         Ok(QueryResult::GameState(view)) => Some(view.side_to_move),
         _ => None,
     }
+}
+
+/// Loads the 32-byte local seed, generating and saving one on first run.
+fn load_or_create_seed(path: &str) -> Result<[u8; 32], crate::session::StoreError> {
+    use crate::session::StoreError;
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+            let mut seed = [0u8; 32];
+            getrandom::getrandom(&mut seed).map_err(|err| StoreError::io(err.to_string()))?;
+            std::fs::write(path, seed).map_err(StoreError::from)?;
+            return Ok(seed);
+        }
+        Err(err) => return Err(err.into()),
+    };
+    if bytes.len() != 32 {
+        return Err(StoreError::decode(
+            "identity seed must be 32 bytes".to_string(),
+        ));
+    }
+    let mut seed = [0u8; 32];
+    seed.copy_from_slice(&bytes);
+    Ok(seed)
 }
 
 struct ChessRelayExtension;

@@ -157,7 +157,7 @@ Gates: swap-in-memory-transport test proves session/app never knew Iroh
 existed; protocol fuzz (malformed bytes → `InvalidProtocolMessage`, never
 panic).
 
-## Phase 8 — Local persistence
+## Phase 8 — Local persistence ✅ DONE
 
 Goal: games survive app restart, nothing more.
 

@@ -335,6 +335,7 @@ func _check_responsive_layouts() -> void:
 
 
 func _check_game_screen() -> void:
+	_clear_saves()
 	var game := GAME_SCENE.instantiate() as GameScreen
 	root.add_child(game)
 	await process_frame
@@ -353,6 +354,7 @@ func _check_game_screen() -> void:
 		"computer game keeps network status hidden")
 	var peer_game := GAME_SCENE.instantiate() as GameScreen
 	peer_game.configure_peer()
+	_clear_saves()
 	root.add_child(peer_game)
 	await process_frame
 	_check(_control(peer_game, "HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
@@ -641,6 +643,7 @@ func _check_theme_contracts() -> void:
 
 
 func _check_app_lifecycle() -> void:
+	_clear_saves()
 	var app := APP_SCENE.instantiate() as AppRoot
 	root.add_child(app)
 	await process_frame
@@ -695,6 +698,15 @@ func _label(parent: Node, path: String) -> Label:
 
 func _button(parent: Node, path: String) -> Button:
 	return parent.get_node(path) as Button
+
+
+## Save and identity files live across runs in user://; every game-owning
+## phase starts hermetic so one finished game cannot haunt the next.
+func _clear_saves() -> void:
+	for path: String in ["user://chess_relay_identity.key", "user://chess_relay_save.bin"]:
+		var absolute := ProjectSettings.globalize_path(path)
+		if FileAccess.file_exists(absolute):
+			DirAccess.remove_absolute(absolute)
 
 
 func _node3d(parent: Node, path: String) -> Node3D:

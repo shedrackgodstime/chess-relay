@@ -62,7 +62,30 @@ func _ready() -> void:
 	_core.connect(&"draw_offered", func(by: String, seq: int) -> void: draw_offered.emit(by, seq))
 	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
-	_core.call(&"start")
+
+
+## Starts a fresh ephemeral session (tests and spike flows).
+func start() -> void:
+	if _core != null:
+		_core.call(&"start")
+
+
+## Starts with a persistent identity, resuming the saved game if any.
+## Returns true when a saved game resumed. Paths are absolute platform
+## paths (Godot resolves `user://` before calling).
+func start_resumable(identity_path: String, save_path: String) -> bool:
+	if _core == null:
+		return false
+	var restored: bool = _core.call(&"start_resumable", identity_path, save_path)
+	return restored
+
+
+## Persists the current move log. Returns false with no session.
+func save_game() -> bool:
+	if _core == null:
+		return false
+	var saved: bool = _core.call(&"save_game")
+	return saved
 
 
 ## Whether the Rust core is loaded and holding a session.

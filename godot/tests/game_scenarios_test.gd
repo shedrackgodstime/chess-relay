@@ -38,6 +38,7 @@ func _run() -> void:
 	await _phase("checkmate", _scenario_checkmate)
 	await _phase("draw_offer", _scenario_draw_offer)
 	await _phase("resign", _scenario_resign)
+	await _phase("resume", _scenario_resume)
 	_report()
 
 
@@ -80,12 +81,24 @@ func _check(condition: bool, description: String) -> void:
 		printerr("FAIL: ", description)
 
 
-func _new_game() -> GameScreen:
+func _new_game(clear_saves := true) -> GameScreen:
+	if clear_saves:
+		_clear_saves()
 	var game := GAME_SCENE.instantiate() as GameScreen
 	root.add_child(game)
 	await process_frame
 	await process_frame
 	return game
+
+
+## Save and identity files live across runs in user://; each game starts
+## hermetic unless the scenario is the reboot itself. Without this, one
+## scenario resumes another's finished game.
+func _clear_saves() -> void:
+	for path: String in ["user://chess_relay_identity.key", "user://chess_relay_save.bin"]:
+		var absolute := ProjectSettings.globalize_path(path)
+		if FileAccess.file_exists(absolute):
+			DirAccess.remove_absolute(absolute)
 
 
 func _piece_at(game: GameScreen, square: String) -> ChessPieceView:
@@ -314,6 +327,24 @@ func _scenario_draw_offer() -> void:
 		"accepted draw banners, got '%s'" % game._header.center_text)
 	_check(game._finished, "agreed draw finishes the game")
 	game.queue_free()
+	_phase_reached_end = true
+
+
+func _scenario_resume() -> void:
+	var game := await _new_game()
+	_play(game, "e2e4")
+	_check(game._bridge.save_game(), "applied move persists")
+	# A second screen is an app restart: no fresh game, same files.
+	var reboot := await _new_game(false)
+	_check(_fen(reboot) == _fen(game),
+		"reboot restores the position, got %s" % _fen(reboot))
+	_check("restored" in reboot._header.center_text.to_lower(),
+		"reboot says so, got '%s'" % reboot._header.center_text)
+	_play(reboot, "e7e5")
+	_check(_fen(reboot).begins_with("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR"),
+		"restored game accepts moves")
+	game.queue_free()
+	reboot.queue_free()
 	_phase_reached_end = true
 
 

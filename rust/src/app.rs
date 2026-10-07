@@ -531,6 +531,27 @@ impl App {
         }
     }
 
+    /// Restores a session from saved entries (restart recovery).
+    ///
+    /// Replaces any current session. Emits `GameStarted` when play resumes
+    /// or `GameEnded` when the log already finished; a pre-game save
+    /// restores silently for readiness to complete.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppError`] when the log fails validation; the current
+    /// session, if any, is left untouched.
+    pub fn restore(&mut self, entries: Vec<LogEntry>) -> Result<Vec<Event>, AppError> {
+        let session = Session::resume(entries)?;
+        self.session = Some(session);
+        let session = self.session()?;
+        match session.state() {
+            SessionState::Playing => Ok(vec![Event::GameStarted]),
+            SessionState::Finished(reason) => Ok(vec![Event::GameEnded { reason }]),
+            _ => Ok(Vec::new()),
+        }
+    }
+
     /// Reads state without changing it.
     ///
     /// # Errors

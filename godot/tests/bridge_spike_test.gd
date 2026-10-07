@@ -78,6 +78,8 @@ func _run() -> void:
 	bridge.game_started.connect(func() -> void: _started = true)
 	bridge.bridge_error.connect(_on_bridge_error)
 	root.add_child(bridge)
+	await process_frame
+	bridge.start()
 
 	_check(bridge.is_available(),
 		"Rust core is loaded (chess_relay.gdextension registers ChessRelayBridge; "
