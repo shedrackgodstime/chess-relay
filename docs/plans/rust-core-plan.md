@@ -88,7 +88,10 @@ Verdicts (arch doc step 4 demands):
 - Contract survived unchanged: everything ran through frozen commands
   plus the three Phase 3 `note_*` methods. No fixes needed.
 - Joining: ticket fallback works (initial dial and redial). Short
-  human-readable code stays open; nothing blocks on it.- Transport shape for Phase 7: one endpoint, game + voice ALPNs, one
+  codes answered via `transport_rendezvous` (pkarr wormhole pattern:
+  code-derived keys, TTL-bound tickets, tombstone cleanup; proven live
+  against real relays). Codes are enumerable by design — the signed log
+  plus host accept/decline stays the real gate, tickets stay the fallback.- Transport shape for Phase 7: one endpoint, game + voice ALPNs, one
   uni stream per message, tip-compare + replay-from-log resume.
 
 ## Phase 5 — Mobile spike ✅ DONE (gate passed on real hardware)
