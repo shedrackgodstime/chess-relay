@@ -30,6 +30,7 @@ var _selected_piece_type := ""
 var _selected_piece_side := ""
 var _legal_targets: Array[String] = []
 var _capture_targets: Array[String] = []
+var _castle_targets: Array[String] = []
 var _pending_promotion := ""
 var _finished := false
 var _bridge: ChessCoreBridge
@@ -272,17 +273,20 @@ func _select_square(square: String, side: String, piece_type: String) -> void:
 	_selected_piece_side = side
 	_legal_targets.clear()
 	_capture_targets.clear()
+	_castle_targets.clear()
 	for target: String in _bridge.legal_moves_from(square):
 		if not target in _legal_targets:
 			_legal_targets.append(target)
 	_capture_targets = _capture_squares(square, _legal_targets)
+	_castle_targets = _castle_squares(square, piece_type, _legal_targets)
 	var quiet: Array[String] = []
 	for target: String in _legal_targets:
-		if not target in _capture_targets:
+		if not target in _capture_targets and not target in _castle_targets:
 			quiet.append(target)
 	_board.set_highlight(square)
 	_board.set_legal_moves(quiet)
 	_board.set_capture_moves(_capture_targets)
+	_board.set_castle_moves(_castle_targets)
 	if _legal_targets.is_empty():
 		if side.is_empty():
 			_header.set_center_text("Selected %s" % square.to_upper())
@@ -310,6 +314,18 @@ func _capture_squares(from_square: String, targets: Array[String]) -> Array[Stri
 			if not target in captures:
 				captures.append(target)
 	return captures
+
+
+## Castling destinations: the king sidestepping two files. Read off the
+## visible geometry of the move, like captures; legality stays in the core.
+func _castle_squares(from_square: String, piece_type: String, targets: Array[String]) -> Array[String]:
+	var castles: Array[String] = []
+	if piece_type != "king" or from_square.length() != 2:
+		return castles
+	for target in targets:
+		if target.length() == 2 and abs(target.unicode_at(0) - from_square.unicode_at(0)) == 2:
+			castles.append(target)
+	return castles
 
 
 ## Maps board squares to "white"/"black" from a FEN placement field.
@@ -340,12 +356,14 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_board.set_capture_moves([])
+	_board.set_castle_moves([])
 	_selected_piece_square = ""
 	_selected_piece_type = ""
 	_selected_piece_side = ""
 	_pending_promotion = ""
 	_legal_targets.clear()
 	_capture_targets.clear()
+	_castle_targets.clear()
 	var move_number := _bridge.move_number()
 	_move_number_label.text = "M%d" % move_number
 	_active_clock_side = _bridge.turn()
@@ -360,9 +378,11 @@ func _on_core_game_ended(reason: String) -> void:
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_board.set_capture_moves([])
+	_board.set_castle_moves([])
 	_selected_piece_square = ""
 	_legal_targets.clear()
 	_capture_targets.clear()
+	_castle_targets.clear()
 	_header.set_center_text(_end_text(reason))
 
 

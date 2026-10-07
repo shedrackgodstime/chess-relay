@@ -159,6 +159,12 @@ func _scenario_castling() -> void:
 	var game: GameScreen = await _new_game()
 	for uci: String in ["e2e4", "e7e5", "g1f3", "b8c6", "f1c4", "g8f6"]:
 		_play(game, uci)
+	var king := _piece_at(game, "e1")
+	game._on_piece_pressed(king)
+	_check(game._castle_targets == ["g1"],
+		"castling destination splits out, got %s" % [game._castle_targets])
+	_check(game._board.get_node("CastleMoves").get_child_count() == 1,
+		"castling destination draws its own marker")
 	_play(game, "e1g1")
 	_check(_type_at(game, "g1") == "king",
 		"castling lands the king on g1")
