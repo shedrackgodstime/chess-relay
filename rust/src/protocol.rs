@@ -60,8 +60,12 @@ pub enum Msg {
         /// Ready peer.
         peer: PeerId,
     },
-    /// A signed log entry (moves today; offers later).
-    Move(LogEntry),
+    /// A signed log entry of any kind: moves today, and offers, answers,
+    /// resignations and aborts as sessions use them. The payload already
+    /// distinguishes kinds; the protocol never interprets them, it only
+    /// carries them (arch doc §Offers: the request/answer exchange rides
+    /// here, while answering stays a session action).
+    Entry(LogEntry),
     /// Opponent co-signature on entry `seq`.
     Agreed {
         /// Entry sequence.
@@ -223,7 +227,7 @@ mod tests {
         let peer = PeerId::of(&guest_secret());
         let messages = [
             Msg::Ready { peer },
-            Msg::Move(genesis),
+            Msg::Entry(genesis),
             Msg::Agreed {
                 seq: 3,
                 sig: [9u8; 64],

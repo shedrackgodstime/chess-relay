@@ -1,16 +1,15 @@
 #!/usr/bin/env sh
-# Ship the real game to the attached Android device: fresh release .so
-# for both ABIs, headless export, artifact verify, force-stop, install,
-# launch. The human verdict happens on glass; logcat follows for errors.
-# Usage: ./phone_spike.sh   (from the workspace root)
+# One script, single run: rebuild release .so files, export the APK,
+# verify it, overwrite-install on the attached device, launch.
+# Usage: ./scripts/android.sh   (from the workspace root)
 # Requires: Godot 4.7.2, 4.7.2 export templates, debug keystore,
-#           one adb device.
+#           one adb device. ANDROID_HOME and ADB may override defaults.
 set -eu
-ROOT="$(dirname "$0")"
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GODOT="$ROOT/godot"
 APK=/tmp/opencode/chess-relay-spike.apk
 PKG=org.chessrelay.spike
-ADB=/opt/android-sdk/platform-tools/adb
+ADB="${ADB:-/opt/android-sdk/platform-tools/adb}"
 export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="${GODOT_ANDROID_KEYSTORE_DEBUG_PATH:-$HOME/.android/debug.keystore}"
 export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
 export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
