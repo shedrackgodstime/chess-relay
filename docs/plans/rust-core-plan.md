@@ -134,9 +134,15 @@ captures, both castles, en passant, promotion (+picker), mate banner,
 draw and resign flows through the live screen; highlight vocabulary
 covers selection, quiet, capture rings, castle rings, last move, check.
 
-## Phase 7 — Protocol and transport cleanup
+## Phase 7 — Protocol and transport cleanup ✅ DONE (2026-10-07)
 
-Goal: abstractions extracted from two working spikes, not before.
+Abstractions pulled from the working spike, per the doc: `protocol::Msg`
+(version-first Hello, postcard codec, malformed input is `ProtocolError`),
+`transport` trait (connections/delivery/lifecycle/errors) with an
+in-memory fake, `IrohEndpoint`/`IrohConnection` behind it, and
+`src/bin/chess_relay.rs` playing full sessions across processes with
+fresh keys per run (endpoint identity asserted equal to peer identity).
+The spike example retired.
 
 - `serde` + compact binary (postcard-grade) frozen with version field;
   version-bump path demonstrated (v1 message rejected-or-migrated, not
