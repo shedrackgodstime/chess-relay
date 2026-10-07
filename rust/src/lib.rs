@@ -13,6 +13,11 @@ pub mod protocol;
 pub mod session;
 pub mod transport;
 pub(crate) mod transport_iroh;
+pub(crate) mod transport_rendezvous;
 
 #[doc(inline)]
 pub use transport_iroh::{GAME_ALPN, IrohConnection, IrohEndpoint, VOICE_ALPN, ticket_peer_id};
+#[doc(inline)]
+pub use transport_rendezvous::{
+    derive_keypair, publish_loop, publish_once, resolve_ticket, unpublish,
+};

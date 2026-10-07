@@ -13,6 +13,7 @@ getrandom = "0.2"
 godot = { version = "0.5.5", features = ["experimental-threads", "api-4-7"] }
 iroh = "1.3.0"
 iroh-tickets = "1"
+pkarr = { version = "8", features = ["relays", "dht"] }
 postcard = "1"
 serde = { version = "1", features = ["derive"] }
 serde_bytes = "0.11"

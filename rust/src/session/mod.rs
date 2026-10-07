@@ -772,7 +772,9 @@ impl Session {
     /// Returns [`SessionError`] on empty logs, genesis mismatch, any
     /// validation failure, or nothing worth resuming.
     pub fn resume(entries: Vec<LogEntry>) -> Result<Self, SessionError> {
-        let genesis = entries.first().ok_or_else(|| SessionError::log_mismatch("empty log".to_string()))?;
+        let genesis = entries
+            .first()
+            .ok_or_else(|| SessionError::log_mismatch("empty log".to_string()))?;
         let LogPayload::Genesis {
             version,
             white,
