@@ -171,6 +171,9 @@ func _capture_side(side: String) -> void:
 	viewport.transparent_bg = true
 	viewport.own_world_3d = true
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	# No MSAA: on tile-based mobile GPUs the multisampled resolve is what
+	# comes back black on readback. Snapshots are scaled down 2x anyway.
+	viewport.msaa_3d = Viewport.MSAA_DISABLED
 	viewport.size = Vector2i(160, 168)
 	add_child(viewport)
 	var light := DirectionalLight3D.new()
@@ -227,13 +230,17 @@ func _snapshot_piece(viewport: SubViewport, piece: String, side: String) -> Text
 	return ImageTexture.create_from_image(image)
 
 
-## Whether the capture holds drawn pixels (alpha anywhere above noise).
+## Whether the capture holds drawn pixels (color content anywhere).
+##
+## Checks color channels, not alpha: a failed mobile readback can come
+## back opaque black, which alpha alone would misread as content.
 static func _has_content(image: Image) -> bool:
 	if image == null or image.is_empty():
 		return false
 	for y in range(0, image.get_height(), 7):
 		for x in range(0, image.get_width(), 7):
-			if image.get_pixel(x, y).a > 0.05:
+			var pixel := image.get_pixel(x, y)
+			if maxf(pixel.r, maxf(pixel.g, pixel.b)) > 0.03:
 				return true
 	return false
 
