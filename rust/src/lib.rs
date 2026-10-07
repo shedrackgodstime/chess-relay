@@ -11,3 +11,4 @@ pub mod bridge;
 pub mod chess_core;
 pub mod protocol;
 pub mod session;
+pub mod transport;

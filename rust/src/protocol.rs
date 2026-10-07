@@ -9,7 +9,7 @@
 //! meaning, the version gate, and malformed-input rejection.
 //!
 //! Versioning: the first message of every connection is a [`Msg::Hello`]
-//! carrying [`VERSION`]. Anything else first, or a version mismatch, is
+//! carrying [`PROTOCOL_VERSION`]. Anything else first, or a version mismatch, is
 //! [`ProtocolError`], never a panic.
 //!
 //! # Examples
