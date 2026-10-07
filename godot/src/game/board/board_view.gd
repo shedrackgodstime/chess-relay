@@ -23,12 +23,14 @@ const FRAME_COLOR := Color(0.12, 0.08, 0.05, 1.0)
 const HIGHLIGHT_COLOR := Color(0.95, 0.72, 0.24, 0.72)
 const LAST_MOVE_COLOR := Color(0.92, 0.74, 0.28, 0.34)
 const LEGAL_MOVE_COLOR := Color(0.32, 0.86, 0.55, 0.72)
+const LEGAL_CAPTURE_COLOR := Color(0.66, 0.88, 1.0, 0.78)
 const CHECK_COLOR := Color(0.92, 0.24, 0.2, 0.68)
 
 var _squares_root: Node3D
 var _highlights_root: Node3D
 var _last_move_root: Node3D
 var _legal_moves_root: Node3D
+var _capture_moves_root: Node3D
 var _check_root: Node3D
 var _coordinates_root: Node3D
 var _highlighted_square := ""
@@ -93,6 +95,15 @@ func set_legal_moves(squares: Array[String]) -> void:
 			_legal_moves_root.add_child(_legal_move_marker(square))
 
 
+## Ring markers for capture targets. Kept separate from quiet dots so the
+## two read differently at a glance; cleared together with them.
+func set_capture_moves(squares: Array[String]) -> void:
+	_clear_root(_capture_moves_root)
+	for square: String in squares:
+		if not square.is_empty():
+			_capture_moves_root.add_child(_capture_move_marker(square))
+
+
 func set_check_square(square: String) -> void:
 	_clear_root(_check_root)
 	if not square.is_empty():
@@ -108,6 +119,7 @@ func _build_board() -> void:
 	add_child(_highlights_root)
 	_last_move_root = _new_overlay_root("LastMove")
 	_legal_moves_root = _new_overlay_root("LegalMoves")
+	_capture_moves_root = _new_overlay_root("CaptureMoves")
 	_check_root = _new_overlay_root("Check")
 	_square_colors = [LIGHT_SQUARE, DARK_SQUARE]
 	_build_render_mesh()
@@ -255,6 +267,14 @@ func _legal_move_marker(square: String) -> MeshInstance3D:
 	return SQUARE_MARKER_SCRIPT.create_dot(
 		LEGAL_MOVE_COLOR,
 		"LegalMove_%s" % square,
+		square_to_world(square, BOARD_SURFACE_Y + 0.018)
+	)
+
+
+func _capture_move_marker(square: String) -> MeshInstance3D:
+	return SQUARE_MARKER_SCRIPT.create_ring(
+		LEGAL_CAPTURE_COLOR,
+		"CaptureMove_%s" % square,
 		square_to_world(square, BOARD_SURFACE_Y + 0.018)
 	)
 

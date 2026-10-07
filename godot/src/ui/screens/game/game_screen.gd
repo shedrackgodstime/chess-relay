@@ -29,6 +29,7 @@ var _selected_piece_square := ""
 var _selected_piece_type := ""
 var _selected_piece_side := ""
 var _legal_targets: Array[String] = []
+var _capture_targets: Array[String] = []
 var _pending_promotion := ""
 var _finished := false
 var _bridge: ChessCoreBridge
@@ -270,10 +271,18 @@ func _select_square(square: String, side: String, piece_type: String) -> void:
 	_selected_piece_type = piece_type
 	_selected_piece_side = side
 	_legal_targets.clear()
+	_capture_targets.clear()
 	for target: String in _bridge.legal_moves_from(square):
-		_legal_targets.append(target)
+		if not target in _legal_targets:
+			_legal_targets.append(target)
+	_capture_targets = _capture_squares(square, _legal_targets)
+	var quiet: Array[String] = []
+	for target: String in _legal_targets:
+		if not target in _capture_targets:
+			quiet.append(target)
 	_board.set_highlight(square)
-	_board.set_legal_moves(_legal_targets)
+	_board.set_legal_moves(quiet)
+	_board.set_capture_moves(_capture_targets)
 	if _legal_targets.is_empty():
 		if side.is_empty():
 			_header.set_center_text("Selected %s" % square.to_upper())
@@ -281,6 +290,45 @@ func _select_square(square: String, side: String, piece_type: String) -> void:
 			_header.set_center_text("Selected %s" % piece_type.capitalize())
 	else:
 		_header.set_center_text("Choose a move")
+
+
+## Targets holding an enemy piece (or the en-passant square) read as
+## captures. Presentation only: the core already decided legality, this
+## only chooses the marker from the observed position.
+func _capture_squares(from_square: String, targets: Array[String]) -> Array[String]:
+	var captures: Array[String] = []
+	if _bridge == null:
+		return captures
+	var fen := _bridge.fen()
+	var fields := fen.split(" ")
+	if fields.size() < 4:
+		return captures
+	var occupants := _position_sides(fields[0])
+	var mover_side := str(occupants.get(from_square, ""))
+	for target in targets:
+		if target == fields[3] or str(occupants.get(target, "")) != "" and str(occupants.get(target, "")) != mover_side:
+			if not target in captures:
+				captures.append(target)
+	return captures
+
+
+## Maps board squares to "white"/"black" from a FEN placement field.
+func _position_sides(placement: String) -> Dictionary:
+	var occupants := {}
+	var rank := 8
+	var file := 0
+	for index in range(placement.length()):
+		var token := placement.substr(index, 1)
+		if token == "/":
+			rank -= 1
+			file = 0
+		elif token.is_valid_int():
+			file += token.to_int()
+		elif FEN_PIECE_TYPES.has(token.to_lower()):
+			var square := "%s%d" % [char("a".unicode_at(0) + file), rank]
+			occupants[square] = "white" if token == token.to_upper() else "black"
+			file += 1
+	return occupants
 
 
 func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> void:
@@ -291,11 +339,13 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 	_board.set_check_square(_bridge.check_square())
 	_board.set_highlight("")
 	_board.set_legal_moves([])
+	_board.set_capture_moves([])
 	_selected_piece_square = ""
 	_selected_piece_type = ""
 	_selected_piece_side = ""
 	_pending_promotion = ""
 	_legal_targets.clear()
+	_capture_targets.clear()
 	var move_number := _bridge.move_number()
 	_move_number_label.text = "M%d" % move_number
 	_active_clock_side = _bridge.turn()
@@ -309,8 +359,10 @@ func _on_core_game_ended(reason: String) -> void:
 	_picker.close()
 	_board.set_highlight("")
 	_board.set_legal_moves([])
+	_board.set_capture_moves([])
 	_selected_piece_square = ""
 	_legal_targets.clear()
+	_capture_targets.clear()
 	_header.set_center_text(_end_text(reason))
 
 

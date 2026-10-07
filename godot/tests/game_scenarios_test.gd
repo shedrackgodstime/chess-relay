@@ -29,7 +29,9 @@ func _init() -> void:
 func _run() -> void:
 	await process_frame
 	await _phase("captures", _scenario_captures)
+	await _phase("capture_rings", _scenario_capture_rings)
 	await _phase("castling", _scenario_castling)
+	await _phase("castling_queenside", _scenario_castling_queenside)
 	await _phase("en_passant", _scenario_en_passant)
 	await _phase("promotion", _scenario_promotion)
 	await _phase("promotion_cancel", _scenario_promotion_cancel)
@@ -141,8 +143,6 @@ func _scenario_captures() -> void:
 		game._camera, capture, Vector3.ZERO, Vector3.UP, 0)
 	_check(_side_at(game, "d5") == "white",
 		"capture lands the white pawn on d5")
-	_check(_side_at(game, "d5") == "white",
-		"capture lands the white pawn on d5")
 	_check(_piece_at(game, "e4") == null,
 		"capture vacates the departure square")
 	var black_pawns := 0
@@ -165,6 +165,38 @@ func _scenario_castling() -> void:
 	_check(_type_at(game, "f1") == "rook",
 		"castling lands the rook on f1")
 	_check(_piece_at(game, "e1") == null, "castling vacates e1")
+	game.queue_free()
+	_phase_reached_end = true
+
+
+func _scenario_castling_queenside() -> void:
+	var game: GameScreen = await _new_game()
+	for uci: String in ["d2d4", "h7h6", "b1c3", "g7g6", "c1f4", "a7a6", "d1d2", "b7b6"]:
+		_play(game, uci)
+	_play(game, "e1c1")
+	_check(_type_at(game, "c1") == "king",
+		"queenside castling lands the king on c1")
+	_check(_type_at(game, "d1") == "rook",
+		"queenside castling lands the rook on d1")
+	game.queue_free()
+	_phase_reached_end = true
+
+
+func _scenario_capture_rings() -> void:
+	var game: GameScreen = await _new_game()
+	_play(game, "e2e4")
+	_play(game, "d7d5")
+	var pawn := _piece_at(game, "e4")
+	game._on_piece_pressed(pawn)
+	_check(game._capture_targets == ["d5"],
+		"capture target splits from quiet moves, got %s" % [game._capture_targets])
+	_check(game._board.get_node("CaptureMoves").get_child_count() == 1,
+		"capture target draws a ring")
+	_check(game._board.get_node("LegalMoves").get_child_count() == 1,
+		"quiet e5 keeps its dot beside the ring")
+	_play(game, "e4d5")
+	_check(game._board.get_node("CaptureMoves").get_child_count() == 0,
+		"rings clear with the applied move")
 	game.queue_free()
 	_phase_reached_end = true
 
