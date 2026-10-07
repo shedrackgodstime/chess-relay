@@ -11,27 +11,93 @@ const PARTICIPANT_SCENE: PackedScene = preload("res://src/ui/components/particip
 const THEME: Theme = preload("res://src/ui/theme/chess_relay_theme.tres")
 
 var _failures := 0
+var _checks_run := 0
+var _phase_announced := ""
+var _phase_reached_end := false
 
 
 func _init() -> void:
 	call_deferred("_run")
 
 
+## Phases run through here rather than being awaited inline.
+##
+## A GDScript runtime error does not propagate: it prints and the function
+## simply stops, and an `await` on a coroutine that died resumes the caller as
+## if it had returned normally. Verified against 4.7.2. That is the whole reason
+## this suite used to report success while 68 of its 146 checks had never run.
+##
+## So each phase announces itself, and every phase calls `_phase_done()` as its
+## last statement. If the phase did not reach that line, the error was printed
+## to stderr and the run fails here instead of continuing.
+func _phase(name: String) -> void:
+	_phase_announced = name
+	_phase_reached_end = false
+
+
+func _phase_done() -> void:
+	_phase_reached_end = true
+
+
+func _require_phase_completed(name: String) -> void:
+	_check(_phase_reached_end,
+		"phase %s ran to completion (a GDScript error skips the rest of a phase silently)" % name)
+
+
 func _run() -> void:
 	await process_frame
-	await _check_scene_contracts()
-	await _check_reusable_components()
-	await _check_participant_and_setup_states()
-	await _check_hub_interactions()
-	await _check_responsive_layouts()
-	await _check_game_screen()
-	_check_theme_contracts()
-	await _check_app_lifecycle()
+	await _phase_run(_check_scene_contracts, "scene_contracts")
+	await _phase_run(_check_reusable_components, "reusable_components")
+	await _phase_run(_check_participant_and_setup_states, "participant_and_setup_states")
+	await _phase_run(_check_hub_interactions, "hub_interactions")
+	await _phase_run(_check_responsive_layouts, "responsive_layouts")
+	await _phase_run(_check_game_screen, "game_screen")
+	await _phase_run(_check_theme_contracts, "theme_contracts")
+	await _phase_run(_check_app_lifecycle, "app_lifecycle")
+	_report()
+
+
+## Runs one phase and then proves it finished.
+##
+## `Callable` rather than a bare `await phase()` because the completion check has
+## to happen after the await, and that is only observable here.
+func _phase_run(phase: Callable, name: String) -> void:
+	_phase(name)
+	await phase.call()
+	_require_phase_completed(name)
+
+
+## Prints the summary and the one number that catches a truncated run.
+##
+## `run_all_checks.sh` counts the `_check(` call sites in this file and passes
+## that count in as the expected total, so the expected count follows the source
+## instead of drifting from a hand-maintained number. When they disagree, checks
+## were skipped, and that is a failure in its own right.
+func _report() -> void:
+	var expected := _expected_check_count()
+	print("UI SMOKE: %d of %d checks ran, %d failed"
+		% [_checks_run, expected, _failures])
+	if _checks_run < expected:
+		push_error("UI SMOKE: only %d of %d checks ran. %d checks never executed. "
+			% [_checks_run, expected, expected - _checks_run]
+				+ "A phase crashed partway; read the SCRIPT ERROR above for where.")
+		_failures += 1
 	if _failures == 0:
 		print("UI smoke checks passed")
 	else:
 		push_error("UI smoke checks failed: %d" % _failures)
 	quit(1 if _failures > 0 else 0)
+
+
+## Expected total, passed in by `run_all_checks.sh` as `--expected-checks=N`.
+##
+## Defaults to 0 when run directly, which turns the count check into a no-op
+## rather than a false failure. The script is the supported entry point.
+func _expected_check_count() -> int:
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--expected-checks="):
+			return int(argument.split("=")[1])
+	return 0
 
 
 func _check_scene_contracts() -> void:
@@ -47,14 +113,15 @@ func _check_scene_contracts() -> void:
 	# CollisionObject3D.input_event never fires and no piece or square is
 	# clickable (buttons keep working, which hides it). This is checkable
 	# headless; synthetic clicks are not.
-	var app := APP_SCENE.instantiate() as Control
+	var app := APP_SCENE.instantiate() as AppRoot
 	root.add_child(app)
 	await process_frame
 	_check(app.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"app root lets input through to picking")
-	_check(app.get_node("%ScreenHost").mouse_filter == Control.MOUSE_FILTER_IGNORE,
+	_check(_control(app, "%ScreenHost").mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"screen host lets input through to picking")
 	app.queue_free()
+	_phase_done()
 
 
 func _check_reusable_components() -> void:
@@ -62,10 +129,10 @@ func _check_reusable_components() -> void:
 	root.add_child(header)
 	await process_frame
 	header.set_visibility(false, false, true, true)
-	_check(not header.get_node("NetworkIndicator").visible, "header hides network indicator")
-	_check(not header.get_node("VoiceCluster").visible, "header hides voice control")
+	_check(not _control(header, "NetworkIndicator").visible, "header hides network indicator")
+	_check(not _control(header, "VoiceCluster").visible, "header hides voice control")
 	header.set_visibility(true, true, true, true)
-	_check(header.get_node("NetworkIndicator").visible, "header shows network indicator")
+	_check(_control(header, "NetworkIndicator").visible, "header shows network indicator")
 	header.queue_free()
 
 	var choices := CHOICE_SCENE.instantiate() as ChoiceGroup
@@ -77,6 +144,7 @@ func _check_reusable_components() -> void:
 	choices.set_selection(2)
 	_check(choices.get_selected_choice() == "Random", "choice group changes selection")
 	choices.queue_free()
+	_phase_done()
 
 
 func _check_participant_and_setup_states() -> void:
@@ -84,12 +152,12 @@ func _check_participant_and_setup_states() -> void:
 	root.add_child(participant)
 	await process_frame
 	participant.set_side("Black")
-	_check(participant.get_node("Content/Info/SideRow/SideValue").text == "Black",
+	_check(_label(participant, "Content/Info/SideRow/SideValue").text == "Black",
 		"participant card updates black side")
-	_check(participant.get_node("Content/Info/SideRow/SideValue").theme_type_variation == &"SetupDarkSideBadge",
+	_check(_label(participant, "Content/Info/SideRow/SideValue").theme_type_variation == &"SetupDarkSideBadge",
 		"participant card applies black badge style")
 	participant.set_side("Random")
-	_check(participant.get_node("Content/Info/SideRow/SideValue").theme_type_variation == &"SetupNeutralSideBadge",
+	_check(_label(participant, "Content/Info/SideRow/SideValue").theme_type_variation == &"SetupNeutralSideBadge",
 		"participant card applies neutral badge style")
 
 	# A theme item name the engine does not know is ignored without complaint, so a
@@ -101,7 +169,7 @@ func _check_participant_and_setup_states() -> void:
 	rival.is_opponent = true
 	root.add_child(rival)
 	await process_frame
-	var icon := rival.get_node("Content/Avatar/PieceIcon") as TextureRect
+	var icon := _node(rival, "Content/Avatar/PieceIcon") as TextureRect
 	_check(icon.theme_type_variation == &"MutedPieceIcon",
 		"opponent piece uses the muted variation")
 	_check(icon.get_theme_color("modulate", "TextureRect") == muted,
@@ -114,9 +182,11 @@ func _check_participant_and_setup_states() -> void:
 	root.add_child(backdrop)
 	await process_frame
 	var wash := backdrop.get_theme_stylebox("panel") as StyleBoxFlat
+	# Read as a String: a ternary between String and Color is not mutually
+	# compatible, and the message is for a human anyway.
+	var wash_text := "null" if wash == null else str(wash.bg_color)
 	_check(wash != null and wash.bg_color == Color(0.05, 0.04, 0.03, 0.72),
-		"modal backdrop wash comes from the theme, got %s"
-			% ("null" if wash == null else wash.bg_color))
+		"modal backdrop wash comes from the theme, got %s" % wash_text)
 	backdrop.queue_free()
 
 	# The meter draws its own bars, so its colours come from a custom theme type read by
@@ -134,10 +204,10 @@ func _check_participant_and_setup_states() -> void:
 	var setup := SETUP_SCENE.instantiate() as GameSetupScreen
 	root.add_child(setup)
 	await process_frame
-	setup._side_choice.get_node("Options").get_child(1).pressed.emit()
+	_press_choice(setup._side_choice, 1)
 	_check(setup._player_card.side == "Black", "setup updates local participant side")
 	_check(setup._opponent_card.side == "White", "setup updates opponent participant side")
-	setup._time_choice.get_node("Options").get_child(5).pressed.emit()
+	_press_choice(setup._time_choice, 5)
 	_check(setup._custom_time_controls.visible, "setup shows custom time controls")
 	setup._custom_minutes.value = 10
 	setup._custom_increment.value = 5
@@ -171,6 +241,7 @@ func _check_participant_and_setup_states() -> void:
 			"leave confirmation uses secondary action style")
 		confirmation.queue_free()
 	setup.queue_free()
+	_phase_done()
 
 
 func _check_hub_interactions() -> void:
@@ -209,6 +280,7 @@ func _check_hub_interactions() -> void:
 	_check(hub._active_invite_flow.is_empty(), "hub restores state after join cancel")
 	await process_frame
 	hub.queue_free()
+	_phase_done()
 
 
 func _check_responsive_layouts() -> void:
@@ -219,7 +291,12 @@ func _check_responsive_layouts() -> void:
 	# the alternative was copying two booleans in on every opening.
 	var dialog := hub._discovery_dialog
 	_check(dialog != null, "hub holds a discovery dialog")
-	_check(dialog.get_script().resource_path
+	# Read the script off the scene rather than asserting on a type: the point is
+	# that the hub reuses the component scene, and a type check would pass for a
+	# hand-built dialog that happened to be typed the same way.
+	var dialog_script: Script = dialog.get_script()
+	_check(dialog_script != null
+			and dialog_script.resource_path
 			== "res://src/ui/components/discovery_dialog/discovery_dialog.gd",
 		"and it is the shared component scene")
 	hub._discoverable_nearby = false
@@ -228,14 +305,15 @@ func _check_responsive_layouts() -> void:
 	_check(dialog.visible, "opening the dialog shows it")
 	_check(dialog.discoverable_nearby == false,
 		"and it opens on the answers in force, not its own defaults")
-	_check(not dialog.get_node("Options/Nearby").button_pressed,
+	_check(not _button(dialog, "Options/Nearby").button_pressed,
 		"with the control showing that answer")
-	var changes := {"count": 0}
-	dialog.discovery_changed.connect(
-		func(_nearby: bool, _online: bool) -> void: changes["count"] += 1)
-	dialog.get_node("Options/Online").button_pressed = true
+	# A typed counter rather than a Dictionary: an int in a Dictionary is a
+	# Variant, and reading it needs a cast the escalating gate refuses.
+	_change_count = 0
+	dialog.discovery_changed.connect(_on_discovery_changed)
+	_button(dialog, "Options/Online").button_pressed = true
 	await process_frame
-	_check(int(changes["count"]) == 1, "the dialog reports a change")
+	_check(_change_count == 1, "the dialog reports a change")
 	_check(hub._discoverable_online, "and the hub takes it")
 	hub._update_responsive_layout(800.0)
 	_check(hub._invite_grid.columns == 1, "hub stacks invite cards at narrow width")
@@ -253,6 +331,7 @@ func _check_responsive_layouts() -> void:
 	_check(setup._players_grid.columns == 2, "setup uses two player columns at wide width")
 	_check(setup._settings_grid.columns == 3, "setup uses three setting columns at wide width")
 	setup.queue_free()
+	_phase_done()
 
 
 func _check_game_screen() -> void:
@@ -261,33 +340,33 @@ func _check_game_screen() -> void:
 	await process_frame
 	var clock_strip := game.get_node("HUD/HUDRoot/ClockStrip") as PanelContainer
 	_check(clock_strip != null, "game screen has a compact clock strip")
-	_check(clock_strip.get_node("Content/OpponentClock").text == "MORGAN  09:58",
+	_check(_label(clock_strip, "Content/OpponentClock").text == "MORGAN  09:58",
 		"clock strip shows the opponent clock")
-	_check(clock_strip.get_node("Content/PlayerClock").text == "10:00  YOU",
+	_check(_label(clock_strip, "Content/PlayerClock").text == "10:00  YOU",
 		"clock strip shows the local clock")
-	_check(clock_strip.get_node("Content/MoveNumber").text == "M1",
+	_check(_label(clock_strip, "Content/MoveNumber").text == "M1",
 		"clock strip shows the current move number")
 	game._on_clock_tick()
-	_check(clock_strip.get_node("Content/PlayerClock").text == "09:59  YOU",
+	_check(_label(clock_strip, "Content/PlayerClock").text == "09:59  YOU",
 		"active clock ticks in the game UI")
-	_check(not game.get_node("HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
+	_check(not _control(game, "HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
 		"computer game keeps network status hidden")
 	var peer_game := GAME_SCENE.instantiate() as GameScreen
 	peer_game.configure_peer()
 	root.add_child(peer_game)
 	await process_frame
-	_check(peer_game.get_node("HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
+	_check(_control(peer_game, "HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
 		"peer game restores network status in the header")
-	_check(peer_game.get_node("HUD/HUDRoot/GameHeader/VoiceCluster").visible,
+	_check(_control(peer_game, "HUD/HUDRoot/GameHeader/VoiceCluster").visible,
 		"peer game restores voice control in the header")
 	peer_game.queue_free()
 	var demo_pawn: Node = game.get_node("World/Board/Pieces/White_Pawn_e2")
-	_check(demo_pawn.get_node("PieceInputSurface") is Area3D,
+	_check(_input_surface(demo_pawn) != null,
 		"pieces expose a controlled input surface")
 	var piece_press := InputEventMouseButton.new()
 	piece_press.button_index = MOUSE_BUTTON_LEFT
 	piece_press.pressed = true
-	demo_pawn.get_node("PieceInputSurface").input_event.emit(
+	_input_surface(demo_pawn).input_event.emit(
 		game._camera, piece_press, Vector3.ZERO, Vector3.UP, 0)
 	_check(game._legal_targets == ["e3", "e4"],
 		"pawn exposes its core legal move preview")
@@ -298,14 +377,14 @@ func _check_game_screen() -> void:
 	var piece_touch := InputEventScreenTouch.new()
 	piece_touch.pressed = true
 	piece_touch.position = Vector2(420.0, 420.0)
-	demo_pawn.get_node("PieceInputSurface").input_event.emit(
+	_input_surface(demo_pawn).input_event.emit(
 		game._camera, piece_touch, Vector3.ZERO, Vector3.UP, 0)
 	_check(game._board.get_highlighted_square() == "e2",
 		"touch press selects the piece too")
 	var piece_release := InputEventScreenTouch.new()
 	piece_release.pressed = false
 	piece_release.position = Vector2(420.0, 420.0)
-	demo_pawn.get_node("PieceInputSurface").input_event.emit(
+	_input_surface(demo_pawn).input_event.emit(
 		game._camera, piece_release, Vector3.ZERO, Vector3.UP, 0)
 	_check(game._board.get_highlighted_square() == "e2",
 		"touch release changes nothing")
@@ -313,10 +392,10 @@ func _check_game_screen() -> void:
 	_check(game._board.get_highlighted_square().is_empty(),
 		"committing the demo move clears selection")
 	await game.get_tree().create_timer(0.3).timeout
-	_check(game.get_node("World/Board/Pieces/White_Pawn_e4").position
+	_check(_node3d(game, "World/Board/Pieces/White_Pawn_e4").position
 		== game._board.square_to_world("e4", 0.02),
 		"committing the demo move repositions the piece")
-	_check(clock_strip.get_node("Content/MoveNumber").text == "M2",
+	_check(_label(clock_strip, "Content/MoveNumber").text == "M2",
 		"committing the demo move advances the move number")
 	_check(game._active_clock_side == "black",
 		"committing the demo move switches the active clock")
@@ -336,7 +415,7 @@ func _check_game_screen() -> void:
 	# event reaches the camera at all.
 	_check(game.mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"the game screen root lets input through, got %d" % game.mouse_filter)
-	_check(game.get_node("HUD/HUDRoot").mouse_filter == Control.MOUSE_FILTER_IGNORE,
+	_check(_control(game, "HUD/HUDRoot").mouse_filter == Control.MOUSE_FILTER_IGNORE,
 		"and so does the HUD root")
 
 	# The camera reads input before the GUI, so it must refuse a drag that began on
@@ -345,10 +424,10 @@ func _check_game_screen() -> void:
 	var free_press := Vector2(400.0, 520.0)
 	_check(not game._camera._dragged_by_gui(free_press),
 		"a press on empty board space is free to drag")
-	var header_pos: Vector2 = game.get_node("HUD/HUDRoot/GameHeader").get_global_rect().get_center()
+	var header_pos: Vector2 = _control(game, "HUD/HUDRoot/GameHeader").get_global_rect().get_center()
 	_check(game._camera._dragged_by_gui(header_pos),
 		"a press on the header is not, so the header keeps its clicks")
-	var view_button := game.get_node("HUD/HUDRoot/BoardViewButton") as Button
+	var view_button := _button(game, "HUD/HUDRoot/BoardViewButton")
 	_check(game._camera._dragged_by_gui(view_button.get_global_rect().get_center()),
 		"and neither is one on the board view button")
 
@@ -403,26 +482,26 @@ func _check_game_screen() -> void:
 	# The piece seam exists before any piece does. It is keyed by the identities that
 	# arrive over the application boundary rather than by an enum declared here, so
 	# there is one list of piece types and this project is not it.
-	_check(game._board.get_node("Coordinates").get_child_count() == 32,
+	_check(_node(game._board, "Coordinates").get_child_count() == 32,
 		"game board builds reusable labels on all four frame sides")
-	_check(game._board.get_node("Coordinates/FileFront_a").mesh.text == "a",
+	_check(_mesh_label_text(game._board, "Coordinates/FileFront_a") == "a",
 		"board exposes file coordinate labels")
 	var board_surface := game._board.get_node("BoardSurface") as MeshInstance3D
 	_check(board_surface.mesh is ArrayMesh, "board uses one procedural ArrayMesh surface")
 	_check((board_surface.mesh as ArrayMesh).get_surface_count() == 3,
 		"board mesh separates light, dark, and frame materials")
-	_check(game._board.get_node("Squares/Square_a1").get_child_count() == 0,
+	_check(_node(game._board, "Squares/Square_a1").get_child_count() == 0,
 		"square markers carry no duplicate render geometry")
 	var board_aabb := (board_surface.mesh as ArrayMesh).get_aabb()
 	_check(board_aabb.size.x > 8.7 and board_aabb.size.z > 8.7 and board_aabb.size.y > 0.3,
 		"board mesh includes the full frame and plinth bounds")
-	_check(game._board.get_node("Coordinates/RankLeft_1").mesh.text == "1",
+	_check(_mesh_label_text(game._board, "Coordinates/RankLeft_1") == "1",
 		"board exposes rank coordinate labels")
-	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.z, 4.19),
+	_check(is_equal_approx(_node3d(game._board, "Coordinates/FileFront_a").position.z, 4.19),
 		"file labels are pinned to the frame midpoint")
-	_check(is_equal_approx(game._board.get_node("Coordinates/RankLeft_1").position.x, -4.19),
+	_check(is_equal_approx(_node3d(game._board, "Coordinates/RankLeft_1").position.x, -4.19),
 		"rank labels are pinned to the frame midpoint")
-	_check(is_equal_approx(game._board.get_node("Coordinates/FileFront_a").position.y, 0.029),
+	_check(is_equal_approx(_node3d(game._board, "Coordinates/FileFront_a").position.y, 0.029),
 		"coordinate markings sit on the frame top surface")
 	var pieces := game._board.get_node("Pieces")
 	_check(pieces.get_child_count() == 32, "game builds the reusable starting piece position")
@@ -432,20 +511,20 @@ func _check_game_screen() -> void:
 		"pieces receive controlled side materials")
 	_check(white_mesh.material_override != black_mesh.material_override,
 		"white and black pieces use separate shared materials")
-	_check(is_equal_approx(pieces.get_node("White_Pawn_a2/Mesh").scale.x, 16.0),
+	_check(is_equal_approx(_node3d(pieces, "White_Pawn_a2/Mesh").scale.x, 16.0),
 		"pieces use the approved board presentation scale")
-	_check(is_equal_approx(pieces.get_node("White_Pawn_a2").position.x, -3.5),
+	_check(is_equal_approx(_node3d(pieces, "White_Pawn_a2").position.x, -3.5),
 		"white pawn is centered on the a-file square")
-	_check(is_equal_approx(pieces.get_node("White_Pawn_a2").position.z, 2.5),
+	_check(is_equal_approx(_node3d(pieces, "White_Pawn_a2").position.z, 2.5),
 		"white pawn is centered on the second rank")
 	var pawn_mesh := pieces.get_node("White_Pawn_a2/Mesh") as MeshInstance3D
 	_check(is_equal_approx(pawn_mesh.position.y, 0.0),
 		"white pawn mesh is grounded against the board surface (y=%.3f)" % pawn_mesh.position.y)
-	_check(is_equal_approx(pieces.get_node("Black_Pawn_a7").rotation.y, PI),
+	_check(is_equal_approx(_node3d(pieces, "Black_Pawn_a7").rotation.y, PI),
 		"black pieces face the opposing side")
-	_check(is_equal_approx(pieces.get_node("White_Knight_b1").rotation.y, PI + deg_to_rad(60.0)),
+	_check(is_equal_approx(_node3d(pieces, "White_Knight_b1").rotation.y, PI + deg_to_rad(60.0)),
 		"white knight uses the 10 o'clock facing")
-	_check(is_equal_approx(pieces.get_node("Black_Knight_b8").rotation.y, -deg_to_rad(60.0)),
+	_check(is_equal_approx(_node3d(pieces, "Black_Knight_b8").rotation.y, -deg_to_rad(60.0)),
 		"black knight mirrors the 10 o'clock facing")
 	var key_light := game.get_node("World/KeyLight") as DirectionalLight3D
 	_check(is_equal_approx(key_light.rotation_degrees.x, -90.0),
@@ -502,23 +581,22 @@ func _check_game_screen() -> void:
 	_check(game._camera.distance > camera_distance,
 		"game camera zooms out within its distance contract")
 	game._board_view_button.pressed.emit()
-	_check(game.get_node_or_null("HUD/BoardViewOverlay/BoardViewMenu") != null,
+	_check(_node_or_null(game, "HUD/BoardViewOverlay/BoardViewMenu") != null,
 		"game opens board view controls")
-	game.get_node("HUD/BoardViewOverlay/BoardViewMenu").get_child(0).get_child(1).pressed.emit()
+	_board_view_action(game, 1).pressed.emit()
 	_check(is_equal_approx(game._camera.yaw_degrees, 94.5),
 		"board view controls rotate by the prototype step")
-	_check(game.get_node_or_null("HUD/BoardViewOverlay/BoardViewMenu") != null,
+	_check(_node_or_null(game, "HUD/BoardViewOverlay/BoardViewMenu") != null,
 		"board view stays open after an internal action")
-	game.get_node("HUD/BoardViewOverlay/BoardViewMenu").get_child(0).get_child(2).pressed.emit()
+	_board_view_action(game, 2).pressed.emit()
 	_check(is_equal_approx(game._camera.yaw_degrees, 274.5),
 		"board view controls flip the board")
 	var outside_click := InputEventMouseButton.new()
 	outside_click.pressed = true
-	game._on_board_view_overlay_input(outside_click,
-		game.get_node("HUD/BoardViewOverlay"))
-	_check(game.get_node("HUD/BoardViewOverlay").is_queued_for_deletion(),
+	game._on_board_view_overlay_input(outside_click, _control(game, "HUD/BoardViewOverlay"))
+	_check(_control(game, "HUD/BoardViewOverlay").is_queued_for_deletion(),
 		"board view closes from an outside click")
-	for square in ["a1", "e4", "h8"]:
+	for square: String in ["a1", "e4", "h8"]:
 		_check(game._board.world_to_square(game._board.square_to_world(square)) == square,
 			"board coordinate round trip works for %s" % square)
 	game._board.set_highlight("e4")
@@ -526,7 +604,7 @@ func _check_game_screen() -> void:
 		"board exposes selected square state")
 	_check(game._board.get_node("Highlights").get_child_count() == 1,
 		"board renders selected square highlight")
-	_check(game._board.get_node("Highlights/SelectedSquare").mesh is BoxMesh,
+	_check(_overlay_mesh(game._board, "Highlights/SelectedSquare") is BoxMesh,
 		"selection uses the reusable square marker")
 	game._board.set_last_move("e2", "e4")
 	_check(game._board.get_node("LastMove").get_child_count() == 2,
@@ -534,7 +612,7 @@ func _check_game_screen() -> void:
 	game._board.set_legal_moves(["e5", "f5"])
 	_check(game._board.get_node("LegalMoves").get_child_count() == 2,
 		"board renders legal move previews")
-	_check(game._board.get_node("LegalMoves/LegalMove_e5").mesh is CylinderMesh,
+	_check(_overlay_mesh(game._board, "LegalMoves/LegalMove_e5") is CylinderMesh,
 		"legal move previews use reusable centered dots")
 	game._board.set_check_square("e8")
 	_check(game._board.get_node("Check").get_child_count() == 1,
@@ -542,6 +620,7 @@ func _check_game_screen() -> void:
 	game._on_square_pressed("e4")
 	_check("E4" in game._header.center_text, "header responds to square selection")
 	game.queue_free()
+	_phase_done()
 
 
 func _check_theme_contracts() -> void:
@@ -549,13 +628,14 @@ func _check_theme_contracts() -> void:
 	_check(THEME.has_stylebox("normal", &"SetupSideBadge"), "theme defines white side badge style")
 	_check(THEME.has_stylebox("normal", &"SetupDarkSideBadge"), "theme defines black side badge style")
 	_check(THEME.has_stylebox("normal", &"SetupNeutralSideBadge"), "theme defines neutral side badge style")
+	_phase_done()
 
 
 func _check_app_lifecycle() -> void:
-	var app := APP_SCENE.instantiate()
+	var app := APP_SCENE.instantiate() as AppRoot
 	root.add_child(app)
 	await process_frame
-	_check(app.get_node("ScreenHost").get_child_count() == 1, "app starts with one screen")
+	_check(_node(app, "ScreenHost").get_child_count() == 1, "app starts with one screen")
 	_check(app._current_screen is HomeScreen, "app starts on home screen")
 	app._on_play_computer_requested()
 	await process_frame
@@ -570,11 +650,110 @@ func _check_app_lifecycle() -> void:
 	await process_frame
 	_check(app._current_screen is MultiplayerHubScreen, "home enters multiplayer hub")
 	app.queue_free()
+	_phase_done()
 
 
 func _check(condition: bool, description: String) -> void:
+	_checks_run += 1
 	if condition:
 		print("PASS: ", description)
 	else:
 		_failures += 1
 		push_error("FAIL: %s" % description)
+
+
+## Typed node lookups.
+##
+## `get_node` and `$` return Variant, so every member read through them is
+## untyped. In a test that is the worst place for it: a renamed node would
+## produce a Variant-level failure instead of a named one, which is precisely
+## how the previous version of this suite reported a missing node as a null
+## dereference several checks into a function.
+##
+## These four cover what the suite actually reaches for.
+
+func _node(parent: Node, path: String) -> Node:
+	return parent.get_node(path)
+
+
+func _control(parent: Node, path: String) -> Control:
+	return parent.get_node(path) as Control
+
+
+func _label(parent: Node, path: String) -> Label:
+	return parent.get_node(path) as Label
+
+
+func _button(parent: Node, path: String) -> Button:
+	return parent.get_node(path) as Button
+
+
+func _node3d(parent: Node, path: String) -> Node3D:
+	return parent.get_node(path) as Node3D
+
+
+## The pickable surface on a piece or the board.
+##
+## `input_event` is emitted directly rather than synthesising a click at a
+## screen position: the input arrives through the physics server, which a
+## synthetic viewport click does not exercise. The handover records a camera
+## check that drove `InputEventMouseMotion` and so passed whether or not the
+## touch path worked at all.
+func _input_surface(parent: Node) -> Area3D:
+	return parent.get_node("PieceInputSurface") as Area3D \
+		if parent.has_node("PieceInputSurface") \
+		else parent.get_node("BoardInputSurface") as Area3D
+
+
+func _node_or_null(parent: Node, path: String) -> Node:
+	return parent.get_node_or_null(path)
+
+
+## A coordinate label's text.
+##
+## The label is a MeshInstance3D carrying a TextMesh, so both hops are cast
+## explicitly rather than assumed.
+func _mesh_label_text(parent: Node, path: String) -> String:
+	var label := parent.get_node(path) as MeshInstance3D
+	if label == null:
+		return ""
+	var text_mesh := label.mesh as TextMesh
+	return "" if text_mesh == null else text_mesh.text
+
+
+## The nth action in the board-view menu's action list.
+func _board_view_action(game: Node, index: int) -> Button:
+	var actions := _node(game, "HUD/BoardViewOverlay/BoardViewMenu").get_child(0)
+	return _button(actions, str(index))
+
+
+## The mesh of an overlay marker, for asserting which marker was used.
+func _overlay_mesh(board: ChessBoardView, path: String) -> Mesh:
+	var marker := board.get_node(path) as MeshInstance3D
+	return marker.mesh if marker != null else null
+
+
+## Counter for the discovery-dialog signal check.
+##
+## A member rather than a local, because reassigning a lambda's captured local
+## does not modify the outer variable -- a check that counted nothing would have
+## passed. GDScript reports this as a warning; the escalating gate is what turns
+## it into an error.
+var _change_count := 0
+
+
+func _on_discovery_changed(_nearby: bool, _online: bool) -> void:
+	_change_count += 1
+
+
+## Presses the nth option of a choice group the way a player would.
+##
+## Pressing the Button rather than calling `set_selection` on purpose: the
+## handover records a `PLAY` button whose `pressed` signal nothing was
+## connected to, which every check that called the method behind it missed.
+##
+## Indexed through `get_child`, not a node name: the options are generated from
+## the array the screen configures, so there is no stable name to address.
+func _press_choice(choice: ChoiceGroup, index: int) -> void:
+	var option := _node(choice, "Options").get_child(index) as Button
+	option.pressed.emit()

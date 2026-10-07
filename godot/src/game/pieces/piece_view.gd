@@ -5,19 +5,36 @@ signal piece_pressed(piece: ChessPieceView)
 
 const PIECE_SCALE := 16.0
 const KNIGHT_FACING_OFFSET := deg_to_rad(60.0)
-const CATALOG_SCRIPT := preload("res://src/game/pieces/piece_catalog.gd")
 const WHITE_MATERIAL := preload("res://src/game/pieces/piece_white_material.tres")
 const BLACK_MATERIAL := preload("res://src/game/pieces/piece_black_material.tres")
 
-@export_enum("pawn", "rook", "knight", "bishop", "queen", "king") var piece_type := "pawn"
-@export_enum("white", "black") var side := "white"
+## Which shape to draw, as an identity that arrived over the bridge.
+##
+## Deliberately a plain String rather than `@export_enum`. An enum would be a
+## second list of piece types in GDScript, beside the one in Rust's
+## `chess_core`, and it would show an editor dropdown implying this project is
+## the authority on which pieces exist. `board_build_order.md` argues this at
+## length ("No piece enum in GDScript"); this is that decision, made. The
+## identity is whatever the core sends, and an identity with no shape here is
+## refused by `configure` rather than approximated.
+var piece_type := "pawn"
+var side := "white"
+
+## The square this piece stands on, set when the position is built from the
+## core's FEN.
+##
+## Carried as data rather than parsed back out of the node name, which is what
+## `_on_piece_pressed` used to do and which broke the moment a piece name was
+## formatted differently.
+var square := ""
+
 
 func _ready() -> void:
 	if get_child_count() == 0:
 		configure(piece_type, side)
 
-func configure(type: String, piece_side: String) -> void:
-	if not CATALOG_SCRIPT.contains(type):
+func configure(type: String, piece_side: String, at_square := "") -> void:
+	if not ChessPieceCatalog.contains(type):
 		push_error("Unknown chess piece type: %s" % type)
 		return
 	if piece_side != "white" and piece_side != "black":
@@ -25,9 +42,10 @@ func configure(type: String, piece_side: String) -> void:
 		return
 	piece_type = type
 	side = piece_side
+	square = at_square
 	for child in get_children():
 		child.free()
-	var source = CATALOG_SCRIPT.scene_for(piece_type).instantiate()
+	var source: Node = ChessPieceCatalog.scene_for(piece_type).instantiate()
 	var mesh := _find_mesh(source)
 	if mesh == null:
 		push_error("Piece scene has no mesh: %s" % piece_type)
@@ -65,12 +83,7 @@ func _build_input_surface(mesh: MeshInstance3D) -> void:
 
 func _on_piece_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3,
 		_shape_idx: int) -> void:
-	var pressed: bool = event is InputEventMouseButton and event.pressed \
-		and event.button_index == MOUSE_BUTTON_LEFT
-	if event is InputEventScreenTouch:
-		pressed = event.pressed
-	if pressed:
-		print("DBG piece tap -> %s" % name)
+	if ChessBoardView.is_selecting_press(event):
 		piece_pressed.emit(self)
 		get_viewport().set_input_as_handled()
 

@@ -1,0 +1,226 @@
+name: gates
+
+# One required check: "Gates OK".
+#
+# Every other job is a leg of it. A required check pinned to an individual job
+# breaks whenever that job is retuned or renamed; a single stable aggregate
+# name does not. `gates-ok` uses `if: always()` and asserts on the *results* of
+# its dependencies rather than inheriting their status, so a leg that is skipped
+# or cancelled is caught instead of quietly passing.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # RUSTFLAGS is global so every Rust leg denies warnings, including doctests and
+  # build scripts. The Cargo book's own CI guidance: projects want "warnings
+  # clean" on official branches while staying lax locally.
+  RUSTFLAGS: -D warnings
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Rust
+  # ---------------------------------------------------------------------------
+
+  rust-fmt:
+    name: Rust format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --manifest-path rust/Cargo.toml --check
+
+  rust-clippy:
+    name: Rust clippy
+    runs-on: ubuntu-latest
+    needs: rust-fmt
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - run: cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
+
+  rust-test:
+    name: Rust test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: rust-fmt
+    timeout-minutes: 20
+    strategy:
+      # One broken OS still reports the others.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest@0.9.100
+      # --locked: without it CI silently accepts a Cargo.lock update, which is
+      # how a breaking dependency arrives in a commit that looks small.
+      - run: cargo nextest run --manifest-path rust/Cargo.toml --locked --no-fail-fast
+        env:
+          NEXTEST_PROFILE: ci
+      # Doctests are excluded from nextest, and this crate has 17 of them which
+      # are the executable form of its documentation standard (C-EXAMPLE).
+      - run: cargo test --manifest-path rust/Cargo.toml --locked --doc
+
+  rust-doc:
+    name: Rust docs
+    runs-on: ubuntu-latest
+    needs: rust-fmt
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      # The standard requires every public item documented. This turns a missing
+      # # Errors section into a build failure rather than a review comment.
+      - run: cargo doc --manifest-path rust/Cargo.toml --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # ---------------------------------------------------------------------------
+  # Supply chain
+  # ---------------------------------------------------------------------------
+
+  supply-chain:
+    name: Supply chain (${{ matrix.check }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        check: [advisories, "bans licenses sources"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: rust/Cargo.toml
+          command: check
+          # Advisories move on their own schedule. A pull request must not go red
+          # for something its author did not do, so that leg is advisory; bans,
+          # licences and sources are hard failures because each is a decision a
+          # human has to make.
+          continue-on-error: ${{ matrix.check == 'advisories' }}
+          arguments: ${{ matrix.check }}
+
+  # ---------------------------------------------------------------------------
+  # Godot
+  # ---------------------------------------------------------------------------
+
+  godot-checks:
+    name: Godot gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned to a tag, never @main (R8): a CI gate that changes under you
+      # stops being a gate.
+      - name: Setup Godot
+        uses: chickensoft-games/setup-godot@v2.4.1
+        with:
+          version: 4.7.2
+          use-dotnet: false
+          include-templates: false
+
+      - uses: actions/cache@v4
+        with:
+          path: godot/.godot/imported
+          key: godot-import-${{ hashFiles('godot/**/*.import') }}
+          restore-keys: godot-import-
+
+      # The Rust core, so the GDExtension can actually load. This is the step
+      # whose absence let the bridge go unverified for months: on a runner with
+      # no built library, chess_relay.gdextension registers nothing and every
+      # bridge-dependent check is skipped.
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - name: Build the Rust core library
+        run: |
+          cargo build --manifest-path rust/Cargo.toml --lib --locked
+          mkdir -p godot/bin
+          cp rust/target/debug/libchess_relay_core.so godot/bin/
+          ls -l godot/bin/
+
+      # `.godot/` is gitignored, and extension_list.cfg is the file that tells
+      # Godot which .gdextension files exist. Without it the extension is never
+      # considered, which looks exactly like a missing library entry.
+      - name: Register the GDExtension
+        run: |
+          mkdir -p godot/.godot
+          echo "res://chess_relay.gdextension" > godot/.godot/extension_list.cfg
+          python3 godot/tools/build_class_cache.py
+
+      # Every Godot gate in one command: per-file parse with the project's
+      # warnings-as-errors, the warning-key drift check, and every SceneTree
+      # suite with stderr treated as a failure.
+      - name: Run all Godot gates
+        run: bash godot/tests/run_all_checks.sh
+
+  # ---------------------------------------------------------------------------
+  # Aggregate
+  # ---------------------------------------------------------------------------
+
+  gates-ok:
+    name: Gates OK
+    needs:
+      - rust-fmt
+      - rust-clippy
+      - rust-test
+      - rust-doc
+      - supply-chain
+      - godot-checks
+    # always() so this runs even when a leg fails or is cancelled, and so the
+    # assertion below is the thing that decides. Inheriting `needs` status
+    # would make this job itself "skipped", which reads as a pass on a PR.
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Assert every leg succeeded
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          failed='${{ join(needs.*.result, ' ') }}'
+          echo "leg results: $failed"
+          for result in $failed; do
+            case "$result" in
+              success) ;;
+              skipped)
+                echo "::error::a gate leg was SKIPPED, not run. A skipped leg cannot be evidence of anything."
+                exit 1
+                ;;
+              *)
+                echo "::error::gate leg did not succeed: $result"
+                exit 1
+                ;;
+            esac
+          done
+          echo "All gate legs succeeded."

@@ -54,7 +54,12 @@ extends Camera3D
 @export var wheel_zoom_step := 1.12
 
 var _dragging_mouse := false
-var _touches := {}
+## Finger index to last known screen position.
+##
+## Typed, so `_pinch_zoom` reads Vector2 rather than Variant. An untyped
+## dictionary put two unsafe casts in the pinch path, and the type there is the
+## whole point: the distance between two fingers.
+var _touches: Dictionary[int, Vector2] = {}
 
 
 func _ready() -> void:
@@ -170,14 +175,14 @@ func _screen_touch(event: InputEventScreenTouch) -> void:
 
 
 func _pinch_zoom() -> void:
-	var points := _touches.values()
-	var current: float = (points[0] as Vector2).distance_to(points[1] as Vector2)
+	var points: Array[Vector2] = _touches.values()
+	var current: float = points[0].distance_to(points[1])
 	if current <= 0.0:
 		return
 	if not has_meta(&"_pinch_previous"):
 		set_meta(&"_pinch_previous", current)
 		return
-	var previous := float(get_meta(&"_pinch_previous"))
+	var previous: float = get_meta(&"_pinch_previous")
 	if previous > 0.0:
 		zoom_by(previous / current)
 	set_meta(&"_pinch_previous", current)

@@ -155,16 +155,34 @@ It is applied uniformly to all six pieces, which is right *only because* the set
 consistent. A different set needs per-piece factors. Not a bug — a thing to know before
 adding a model.
 
-### Warnings-as-errors is set but unverified
+### Warnings-as-errors was a dead key for its whole life
 
-`project.godot` sets `debug/gdscript/warnings/treat_warnings_as_errors = true` and the
-engine reports it as true. **A deliberately unused signal and a deliberately unused local
-both compiled clean** under `--script --check-only`, while a syntax error in the same file
-failed correctly.
+**Corrected 2026-10-07.** The section this replaces said the setting was "set but
+unverified", and suggested confirming it in the editor. It was not unverified. It
+**did not exist.**
 
-So the setting is valid and the harness works, but warnings did not escalate in a
-headless script run. **Confirm in the editor** before relying on it. This is item 1 of
-`foundation_tightening.md` and it is the only item there not finished.
+`debug/gdscript/warnings/treat_warnings_as_errors` was removed from Godot in
+upstream PR #73032 (2023) and replaced by per-warning enum levels (`0` Ignore /
+`1` Warn / `2` Error) from PR #59943. Dumping every registered project setting from
+the 4.7.2 binary on this machine returns `debug/shader_language/warnings/treat_warnings_as_errors`
+and no GDScript counterpart.
+
+An unknown key still reads back as whatever string is in the file, which is exactly
+why the engine "reported it as true" and why a deliberately unused local compiled
+clean. The setting could never have worked, so no amount of confirming in the editor
+would have found it.
+
+The replacement does work, and was verified both ways: at level `2` Godot prints
+`SCRIPT ERROR: ... (Warning treated as error.)` **and exits 1**; at level `1` it
+prints nothing and exits 0. `project.godot` now sets 38 keys to `2`, the parse gate
+runs per file, and `tools/check_warning_drift.py` fails on a key the project has
+neither set nor recorded in `tools/warning_baseline.txt` — which is the check that
+catches a dead key now.
+
+**The lesson, and it belongs next to the ones above:** a setting that reports a
+value is not a setting that is read. I read the resolved value back for theme items
+and declared victory; I did not do it for a project setting. See
+`docs/standards/quality-gates.md` and `docs/audits/foundation_audit.md`.
 
 ### Squares are still built in code
 
@@ -208,12 +226,33 @@ moves as rails.
 ### Running things
 
 ```sh
-bash godot/tests/run_ui_checks.sh          # the whole suite, non-zero on failure
+bash godot/tests/run_all_checks.sh         # every gate, non-zero on failure
 python3 godot/tools/build_class_cache.py  # after adding a class_name
 ```
 
-`tools/runall.sh` from the earlier prototype is **gone** — the temp directory was wiped
-mid-session and it was never tracked. `run_ui_checks.sh` replaced it.
+`tools/runall.sh` from the earlier prototype is **gone** — the temp directory was
+wiped mid-session and it was never tracked. `run_ui_checks.sh` replaced it, and
+`run_all_checks.sh` replaced that.
+
+**`run_all_checks.sh` is the only supported way to run the Godot gates.** It does
+three things: parses every `.gd` individually with the project's warnings-as-errors,
+runs the warning-key drift check, and runs every `*_test.gd` with stderr treated as
+a failure. It replaced `run_ui_checks.sh`, which ran one suite and could report
+success while half of it had never executed — see
+`docs/audits/foundation_audit.md` finding 1.
+
+Two things it needs that are not obvious:
+
+- **The Rust core library must be built and copied to `godot/bin/`.** Without it,
+  `chess_relay.gdextension` registers nothing, the board renders no pieces, and
+  every bridge-dependent check fails. The runner says which of the three causes it
+  is. On this device it is *always* the third one: Termux's glibc sysroot has
+  `libdl.so.2` but no `libdl.so`, so the Linux Godot binary run through the
+  `godot-headless` wrapper cannot `dlopen` any extension. Verify that gate on a
+  desktop or in CI.
+- **`.godot/extension_list.cfg` must list the extension.** It is git-ignored with
+  the rest of `.godot/`, and without it Godot never considers the
+  `.gdextension` file at all — which looks exactly like a missing library entry.
 
 ### Reference material
 

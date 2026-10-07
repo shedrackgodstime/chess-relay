@@ -1,0 +1,16 @@
+# nextest configuration. Workspace root is `rust/`, so this file lives there.
+
+[profile.default]
+# No retries. A flaky test is a defect, and retrying hides it: with retries, a
+# gate that passes does not mean the code works, only that it works most of the
+# time. The handover records four occasions where a green run meant nothing;
+# retrying is how you guarantee an eleventh.
+retries = 0
+# Anything over this is worth knowing about even when it passes.
+slow-timeout = { period = "30s" }
+
+[profile.ci]
+# Run everything even after one fails, so a single run shows the whole picture.
+fail-fast = false
+# JUnit XML for the GitHub UI via dorny/test-reporter.
+junit = { path = "results.xml" }

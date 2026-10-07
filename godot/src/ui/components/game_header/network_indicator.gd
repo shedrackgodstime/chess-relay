@@ -6,8 +6,12 @@ enum State { IDLE, CONNECTING, DEGRADED, GOOD, LOST }
 ## here rather than held as constants. The control draws its own bars, so it cannot
 ## take them from a built-in type the way a themed Label would.
 const BARS := &"NetworkBars"
-const BAR_TOPS := [24.0, 18.0, 12.0, 6.0]
-const BAR_CENTERS := [10.5, 18.0, 25.5, 33.0]
+const BAR_COUNT := 4
+## Array constants are typed explicitly. A plain `[24.0, ...]` is an untyped
+## Array, so every read is a Variant, and the arithmetic below then needs a cast
+## that the escalating warning gate correctly refuses.
+const BAR_TOPS: Array[float] = [24.0, 18.0, 12.0, 6.0]
+const BAR_CENTERS: Array[float] = [10.5, 18.0, 25.5, 33.0]
 const BAR_BASELINE := 30.0
 const BAR_WIDTH := 3.9
 
@@ -55,10 +59,11 @@ func _draw() -> void:
 		(size.y - 36.0 * scale_factor) * 0.5)
 	draw_circle(origin + Vector2(3.0, BAR_BASELINE) * scale_factor,
 		1.5 * scale_factor, _ghost_color)
-	for index in range(BAR_TOPS.size()):
+	for index in range(BAR_COUNT):
 		var top: float = BAR_TOPS[index] * scale_factor
+		var centre_x: float = BAR_CENTERS[index]
 		var rect := Rect2(
-			origin + Vector2(BAR_CENTERS[index] - BAR_WIDTH * 0.5, top),
+			origin + Vector2(centre_x - BAR_WIDTH * 0.5, top),
 			Vector2(BAR_WIDTH * scale_factor,
 				(BAR_BASELINE - BAR_TOPS[index]) * scale_factor)
 		)

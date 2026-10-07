@@ -6,7 +6,7 @@ signal leave_requested
 
 @onready var _board: ChessBoardView = %Board
 @onready var _header: GameHeader = %GameHeader
-@onready var _camera: Camera3D = %Camera
+@onready var _camera: GameOrbitCamera = %Camera
 @onready var _board_view_button: Button = %BoardViewButton
 @onready var _opponent_clock: Label = $HUD/HUDRoot/ClockStrip/Content/OpponentClock
 @onready var _player_clock: Label = $HUD/HUDRoot/ClockStrip/Content/PlayerClock
@@ -25,7 +25,7 @@ var _selected_piece_square := ""
 var _selected_piece_type := ""
 var _legal_targets: Array[String] = []
 var _move_number := 1
-var _bridge: Node = null
+var _bridge: ChessCoreBridge
 
 
 func configure_peer() -> void:
@@ -79,19 +79,20 @@ func _update_clock_strip() -> void:
 		"font_color", player_color)
 
 
+## Whole minutes and seconds.
+##
+## `floori` rather than `/`: integer division silently truncates, which is right
+## for a clock by accident and wrong the moment the value is negative or
+## fractional. See `game_screen.gd` integer division in the quality gates doc.
 func _format_clock(seconds: int) -> String:
-	return "%02d:%02d" % [seconds / 60, seconds % 60]
+	return "%02d:%02d" % [floori(seconds / 60.0), seconds % 60]
 
 
 func _start_bridge() -> void:
-	if not ClassDB.class_exists("ChessRelayBridge"):
-		_header.set_center_text("Chess engine unavailable")
-		return
-	_bridge = ClassDB.instantiate("ChessRelayBridge")
+	_bridge = ChessCoreBridge.new()
 	add_child(_bridge)
 	_bridge.move_applied.connect(_on_core_move_applied)
 	_bridge.bridge_error.connect(_on_bridge_error)
-	_bridge.start()
 
 
 ## Position rendering: the board observes the core, never the reverse.
@@ -99,15 +100,21 @@ func _start_bridge() -> void:
 ## so captures, promotions and castling need no special cases here.
 
 func _rebuild_position() -> void:
-	var pieces_root := _board.get_node_or_null("Pieces")
-	if pieces_root == null:
+	var pieces_root: Node3D
+	var existing := _board.get_node_or_null("Pieces")
+	if existing == null:
 		pieces_root = Node3D.new()
 		pieces_root.name = "Pieces"
 		_board.add_child(pieces_root)
+	else:
+		pieces_root = existing as Node3D
+	# Removed and freed in one step. Removing after queue_free leaves both sets
+	# parented for a frame, which the foundation audit found had already been
+	# fixed in the UI flow card and reintroduced here.
 	for child in pieces_root.get_children():
 		pieces_root.remove_child(child)
-		child.queue_free()
-	if _bridge == null:
+		child.free()
+	if not _bridge.is_available():
 		return
 	_build_position_from_fen(pieces_root, _bridge.fen())
 
@@ -126,15 +133,17 @@ func _build_position_from_fen(pieces_root: Node3D, fen: String) -> void:
 		elif FEN_PIECE_TYPES.has(token.to_lower()):
 			var square := "%s%d" % [char("a".unicode_at(0) + file), rank]
 			var side := "white" if token == token.to_upper() else "black"
-			_add_piece(pieces_root, FEN_PIECE_TYPES[token.to_lower()], side, square)
+			_add_piece(pieces_root, str(FEN_PIECE_TYPES[token.to_lower()]), side, square)
 			file += 1
 
 
 func _add_piece(parent: Node3D, piece_type: String, side: String, square: String) -> void:
-	var piece = PIECE_VIEW_SCENE.instantiate()
+	var piece := PIECE_VIEW_SCENE.instantiate() as ChessPieceView
+	# The name carries the square, which is also how a press reads it back in
+	# `_on_piece_pressed`. See that function for why that is fragile.
 	piece.name = "%s_%s_%s" % [side.capitalize(), piece_type.capitalize(), square]
 	piece.piece_pressed.connect(_on_piece_pressed)
-	piece.configure(piece_type, side)
+	piece.configure(piece_type, side, square)
 	piece.position = _board.square_to_world(square, 0.02)
 	parent.add_child(piece)
 
@@ -171,7 +180,7 @@ func _toggle_board_view_menu() -> void:
 	reset.text = "Reset view"
 	reset.custom_minimum_size.y = 42.0
 	reset.theme_type_variation = &"QuietButton"
-	reset.pressed.connect(func():
+	reset.pressed.connect(func() -> void:
 		_camera.reset_view()
 	)
 	actions.add_child(reset)
@@ -182,19 +191,17 @@ func _board_view_action(label: String, degrees: float, menu: Control) -> Button:
 	action.text = label
 	action.custom_minimum_size.y = 42.0
 	action.theme_type_variation = &"QuietButton"
-	action.pressed.connect(func():
+	action.pressed.connect(func() -> void:
 		_camera.orbit_by(degrees)
 	)
 	return action
 
 
 func _on_board_view_overlay_input(event: InputEvent, overlay: Control) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		overlay.queue_free()
-		get_viewport().set_input_as_handled()
-	elif event is InputEventScreenTouch and event.pressed:
-		overlay.queue_free()
-		get_viewport().set_input_as_handled()
+	if not ChessBoardView.is_selecting_press(event):
+		return
+	overlay.queue_free()
+	get_viewport().set_input_as_handled()
 
 
 func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
@@ -209,33 +216,30 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 
 
 func _on_square_pressed(square: String) -> void:
-	print("DBG screen square_pressed '%s' selected='%s'" % [square, _selected_piece_square])
-	if _bridge == null:
-		print("DBG screen: bridge missing, ignoring tap")
+	if not _bridge.is_available():
 		return
 	if not _selected_piece_square.is_empty() and square in _legal_targets:
-		var uci := _selected_piece_square + square
-		if _selected_piece_type == "pawn" and (square.right(1) == "8" or square.right(1) == "1"):
-			uci += "q"
-		if _bridge.submit_move(uci):
+		# No promotion suffix here. Promotion is a chess rule and belongs to
+		# `chess_core`; the client used to append "q" here, which made
+		# underpromotion unreachable. The core already returns the full move,
+		# so this sends the origin and destination and lets it decide.
+		if _bridge.submit_move(_selected_piece_square + square):
 			return
 		_header.set_center_text("Illegal move")
 		return
 	_select_square(square, "", "")
 
 
-func _on_piece_pressed(piece: Node) -> void:
-	var square: String = piece.name.right(2).to_lower()
-	_select_square(square, str(piece.get("side")), str(piece.get("piece_type")))
+func _on_piece_pressed(piece: ChessPieceView) -> void:
+	_select_square(piece.square, piece.side, piece.piece_type)
 
 
 func _select_square(square: String, side: String, piece_type: String) -> void:
 	_selected_piece_square = square
 	_selected_piece_type = piece_type
 	_legal_targets.clear()
-	if _bridge != null:
-		for target in _bridge.legal_moves_from(square):
-			_legal_targets.append(target)
+	for target: String in _bridge.legal_moves_from(square):
+		_legal_targets.append(target)
 	_board.set_highlight(square)
 	_board.set_legal_moves(_legal_targets)
 	if _legal_targets.is_empty():
@@ -281,7 +285,7 @@ func _open_game_menu() -> void:
 	confirmation.cancel_button_text = "Stay"
 	confirmation.get_ok_button().theme_type_variation = &"ModalDangerButton"
 	confirmation.get_cancel_button().theme_type_variation = &"ModalSecondaryButton"
-	confirmation.confirmed.connect(func():
+	confirmation.confirmed.connect(func() -> void:
 		leave_requested.emit()
 		confirmation.queue_free()
 	)

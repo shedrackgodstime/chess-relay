@@ -194,19 +194,18 @@ func _header_menu_item(label: String, action: Callable) -> Button:
 
 
 func _on_header_menu_backdrop_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		_close_header_menu()
-		get_viewport().set_input_as_handled()
-	elif event is InputEventScreenTouch and event.pressed:
-		_close_header_menu()
-		get_viewport().set_input_as_handled()
+	if not ChessBoardView.is_selecting_press(event):
+		return
+	_close_header_menu()
+	get_viewport().set_input_as_handled()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE \
-		and _header_menu_layer != null:
-		_close_header_menu()
-		get_viewport().set_input_as_handled()
+	if event is InputEventKey and _header_menu_layer != null:
+		var key := event as InputEventKey
+		if key.pressed and key.keycode == KEY_ESCAPE:
+			_close_header_menu()
+			get_viewport().set_input_as_handled()
 
 
 func _close_header_menu() -> void:
@@ -241,7 +240,7 @@ func _on_leave_setup_pressed() -> void:
 	var stay_button := confirmation.get_cancel_button()
 	stay_button.accessibility_name = "Stay in the game"
 	stay_button.theme_type_variation = &"ModalSecondaryButton"
-	confirmation.confirmed.connect(func():
+	confirmation.confirmed.connect(func() -> void:
 		leave_requested.emit(true)
 		confirmation.queue_free()
 	)

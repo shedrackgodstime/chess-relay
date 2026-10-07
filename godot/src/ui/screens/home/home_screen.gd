@@ -11,7 +11,10 @@ func _on_play_computer_pressed() -> void:
 
 
 func _ready() -> void:
-	$Center/Content/PlayComputerButton.grab_focus.call_deferred()
+	# Deferred so focus lands after the layout settles, and typed explicitly
+	# because `$` returns Variant and `grab_focus` is not on Variant.
+	var play_button := $Center/Content/PlayComputerButton as Button
+	play_button.grab_focus.call_deferred()
 
 
 func _on_p2p_pressed() -> void:

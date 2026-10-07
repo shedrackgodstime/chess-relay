@@ -15,24 +15,44 @@ out rather than only pointing at a path.
 
 ## 1. Warnings are a convention with nothing behind them
 
-Status: **done.**
+Status: **done, and the setting it used was a dead key.**
 
 `project_structure.md` says to "treat engine warnings as issues to resolve,
-not noise to suppress project-wide." `project.godot` has no `[debug]` section,
-so nothing enforces it.
+not noise to suppress project-wide." `project.godot` had no `[debug]` section,
+so nothing enforced it.
 
-The setting is `debug/gdscript/warnings/treat_warnings_as_errors`, a boolean
-that defaults to `false` (ProjectSettings class reference).
+**The obvious fix was wrong.** The setting looked like
+`debug/gdscript/warnings/treat_warnings_as_errors`, and this document previously
+recorded it as "set but unverified". It was set and it was *inert*: upstream PR
+#73032 removed that boolean from Godot in 2023, replacing it with per-warning
+enum levels (`0` Ignore / `1` Warn / `2` Error) from PR #59943. Dumping every
+registered project setting from the 4.7.2 binary on this machine returns the
+shader equivalent and no GDScript one. An unknown key still reads back as
+whatever string is in the file, which is why it "reported as true" and why a
+deliberately unused local compiled clean.
 
-Enabling it turns the stated convention into a property of the project rather
-than a property of whoever is reading it.
+What actually works, verified both ways on 4.7.2:
 
-It is set, and the engine reports it as `true`, but it is **not verified**. A
-deliberately unused signal and a deliberately unused local both compiled clean
-under `--script --check-only`, while a syntax error in the same file failed as
-expected. So the harness works and the setting is valid, but warnings did not
-escalate in a headless script run. The editor is where warnings surface, and this
-has to be confirmed there before the project relies on it.
+| Level | Headless output | Exit code |
+| --- | --- | --- |
+| `1` (warn) | nothing | 0 |
+| `2` (error) | `SCRIPT ERROR: ... (Warning treated as error.)` | **1** |
+
+So `project.godot` now sets 38 keys to `2` and the convention is a property of the
+project rather than of whoever is reading it. Two supporting pieces:
+
+- **`tools/run_all_checks.sh`** parses each `.gd` individually so a failure names
+  a file, and fails on any `SCRIPT ERROR` regardless of exit code.
+- **`tools/check_warning_drift.py`** fails if Godot registers a warning key that
+  is neither set in `project.godot` nor recorded in
+  `tools/warning_baseline.txt` with a reason — and fails on a key the project sets
+  that Godot does not register. The second direction is the one that would have
+  caught this.
+
+Which keys are escalated, and why the noisy ones are not, is in
+[`docs/standards/quality-gates.md`](../../docs/standards/quality-gates.md). Tier 2
+of that escalation (~820 `inferred_declaration` findings) is deliberately not
+started.
 
 ## 2. The multiplayer hub builds its UI in script
 

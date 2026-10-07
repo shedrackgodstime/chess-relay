@@ -31,11 +31,11 @@ const CODE_LENGTH := 6
 ## because five flows in this screen want the same card and none of them want a
 ## different kind of one.
 @onready var _flow: InviteFlowCard = %InviteFlowCard
-@onready var _player_list: ScrollContainer = %PlayerList
 @onready var _player_rows: VBoxContainer = %PlayerRows
 @onready var _profile_status: Label = %ProfileStatus
 @onready var _create_invite_button: Button = %CreateInviteButton
 @onready var _join_game_button: Button = %JoinGameButton
+@onready var _discovery_settings_button: Button = %DiscoverySettingsButton
 @onready var _back_button: Button = %BackButton
 var _create_code_label: Label
 var _create_status: Label
@@ -61,10 +61,10 @@ var _discovery_dialog: DiscoverySettingsDialog = null
 
 
 func _ready() -> void:
-	_back_button.pressed.connect(func(): back_requested.emit())
+	_back_button.pressed.connect(func() -> void: back_requested.emit())
 	_create_invite_button.pressed.connect(_on_create_invite)
 	_join_game_button.pressed.connect(_begin_join_flow)
-	%DiscoverySettingsButton.pressed.connect(_show_discovery_settings)
+	(_discovery_settings_button).pressed.connect(_show_discovery_settings)
 	_build_discovery_dialog()
 	_populate_mock_players()
 	get_viewport().size_changed.connect(_update_responsive_layout)
@@ -239,7 +239,7 @@ func _on_copy_code() -> void:
 	DisplayServer.clipboard_set(_create_code_label.text)
 	_copy_button.text = "Copied"
 	_create_status.text = "Waiting for opponent..."
-	get_tree().create_timer(1.6).timeout.connect(func():
+	get_tree().create_timer(1.6).timeout.connect(func() -> void:
 		if is_instance_valid(_copy_button):
 			_copy_button.text = "Copy code"
 	)

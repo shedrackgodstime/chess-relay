@@ -9,8 +9,14 @@ ios_minimum_version = "17.0"
 
 [libraries]
 
+; Every platform we build for needs an entry. `linux.arm64` was missing, so on an
+; arm64 machine the class never registered, the game screen silently rendered no
+; pieces, and every bridge-dependent check was skipped while the suites reported
+; success. See docs/audits/foundation_audit.md finding 2.
 linux.debug.x86_64 = "res://bin/libchess_relay_core.so"
 linux.release.x86_64 = "res://bin/libchess_relay_core.so"
+linux.debug.arm64 = "res://bin/libchess_relay_core.so"
+linux.release.arm64 = "res://bin/libchess_relay_core.so"
 windows.debug.x86_64 = "res://bin/chess_relay_core.dll"
 windows.release.x86_64 = "res://bin/chess_relay_core.dll"
 macos.debug = "res://bin/libchess_relay_core.dylib"

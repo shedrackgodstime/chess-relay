@@ -18,7 +18,63 @@ config/features=PackedStringArray("4.7")
 
 [debug]
 
-gdscript/warnings/treat_warnings_as_errors=true
+; GDScript warnings, per-key. Godot removed the old
+; `debug/gdscript/warnings/treat_warnings_as_errors` boolean in upstream PR
+; #73032 (superseded by per-warning enum levels), so a single "everything is an
+; error" switch no longer exists and this project was carrying a dead key.
+;
+; Level 2 is what makes a warning real: Godot prints it to stderr AND exits
+; non-zero from `--check-only`, which is what lets the parse gate read an exit
+; code instead of grepping text. At level 1 warnings are invisible headless.
+;
+; Escalated keys are the defect classes, not the noisy ones. Left at the engine
+; default on purpose: `return_value_discarded` (fires on every `connect()`,
+; 222 findings), `missing_await` (double-reports `redundant_await`), and
+; `unused_parameter` (mostly fixed signatures on `_on_` callbacks). A gate red
+; for unactionable reasons is a gate that gets disabled.
+;
+; Rationale and measurements: docs/standards/quality-gates.md
+;
+; Drift gate: godot/tools/check_warning_drift.py fails if Godot registers a
+; warning key that is neither set here nor recorded in warning_baseline.txt.
+gdscript/warnings/enable=true
+gdscript/warnings/unused_variable=2
+gdscript/warnings/unused_local_constant=2
+gdscript/warnings/unused_signal=2
+gdscript/warnings/unused_private_class_variable=2
+gdscript/warnings/unsafe_property_access=2
+gdscript/warnings/unsafe_method_access=2
+gdscript/warnings/unsafe_cast=2
+gdscript/warnings/unsafe_call_argument=2
+gdscript/warnings/untyped_declaration=2
+gdscript/warnings/unassigned_variable=2
+gdscript/warnings/unassigned_variable_op_assign=2
+gdscript/warnings/unreachable_code=2
+gdscript/warnings/unreachable_pattern=2
+gdscript/warnings/incompatible_ternary=2
+gdscript/warnings/int_as_enum_without_cast=2
+gdscript/warnings/int_as_enum_without_match=2
+gdscript/warnings/enum_variable_without_default=2
+gdscript/warnings/deprecated_keyword=2
+gdscript/warnings/confusable_identifier=2
+gdscript/warnings/confusable_local_declaration=2
+gdscript/warnings/confusable_local_usage=2
+gdscript/warnings/confusable_capture_reassignment=2
+gdscript/warnings/confusable_temporary_modification=2
+gdscript/warnings/inference_on_variant=2
+gdscript/warnings/native_method_override=2
+gdscript/warnings/get_node_default_without_onready=2
+gdscript/warnings/onready_with_export=2
+gdscript/warnings/property_used_as_function=2
+gdscript/warnings/constant_used_as_function=2
+gdscript/warnings/function_used_as_property=2
+gdscript/warnings/integer_division=2
+gdscript/warnings/narrowing_conversion=2
+gdscript/warnings/redundant_await=2
+gdscript/warnings/shadowed_variable=2
+gdscript/warnings/shadowed_global_identifier=2
+gdscript/warnings/standalone_expression=2
+gdscript/warnings/standalone_ternary=2
 
 [display]
 

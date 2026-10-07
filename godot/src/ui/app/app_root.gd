@@ -1,4 +1,11 @@
+class_name AppRoot
 extends Control
+
+## Application UI root: owns screen transitions and shared UI coordination.
+##
+## Named so the checks can hold a typed reference. It had no `class_name`, so
+## every `APP_SCENE.instantiate()` in the suite was a Variant and reaching a
+## method on it produced eight findings in the test file alone.
 
 const MIN_WINDOW_SIZE := Vector2i(960, 640)
 
@@ -14,7 +21,7 @@ const GAME_SETUP_SCREEN: PackedScene = preload(
 const MULTIPLAYER_HUB_SCREEN: PackedScene = preload(
 	"res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.tscn")
 const GAME_SCREEN: PackedScene = preload("res://src/ui/screens/game/game_screen.tscn")
-const MOCK_MULTIPLAYER_SERVICE_SCRIPT: Script = preload(
+const MockMultiplayerServiceScript := preload(
 	"res://src/ui/multiplayer/mock_multiplayer_service.gd")
 
 @onready var _screen_host: Control = %ScreenHost
@@ -25,7 +32,7 @@ var _mock_multiplayer: MockMultiplayerService
 
 func _ready() -> void:
 	get_window().min_size = MIN_WINDOW_SIZE
-	_mock_multiplayer = MOCK_MULTIPLAYER_SERVICE_SCRIPT.new() as MockMultiplayerService
+	_mock_multiplayer = MockMultiplayerServiceScript.new()
 	add_child(_mock_multiplayer)
 	_mock_multiplayer.hosted_opponent_joined.connect(notify_invite_opponent_connected)
 	_mock_multiplayer.join_succeeded.connect(notify_join_connected)

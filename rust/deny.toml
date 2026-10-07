@@ -1,0 +1,70 @@
+# Supply-chain policy for chess-relay-core.
+#
+# Enforced by CI (`supply-chain` job). Each axis below is a decision, and the
+# rationale is the project's own standard, not a house style.
+#
+# The licence axis is the interesting one: `rust-standards.md` says the crate
+# stays MIT/Apache-compatible because `ref/shakmaty` is GPL-3.0 and we learn from
+# it without depending on it. A CI rule enforces that sentence; a sentence does
+# not.
+
+[advisories]
+# A known vulnerability in the resolved graph is a hard failure.
+vulnerability = "deny"
+# A yanked release is a hard failure: it can be pulled from the registry, so the
+# lockfile would stop being reproducible.
+yanked = "deny"
+# Unmaintained crates are a judgement call, not a defect. Warn.
+unmaintained = "warn"
+# Informational notices are noise. Warn.
+notice = "warn"
+# No ignored advisories. If one has to be added it needs an inline comment
+# saying why it does not apply and what would remove it; a bare RUSTSEC id is
+# how a real vulnerability hides in plain sight.
+
+[licenses]
+# Permissive only. Anything not listed is denied, so a new dependency with an
+# unusual licence has to be a deliberate decision rather than a default.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "0BSD",
+    "BSL-1.0",
+    "Unicode-DFS-2016",
+]
+# Hard, not warn. The standard is explicit that depending on GPL-3.0 shakmaty
+# would infect the crate; this is the line that says so in a way that runs.
+copyleft = "deny"
+default = "deny"
+confidence-threshold = 0.8
+# A licence we do not recognise should be surfaced rather than denied outright,
+# so the failure message is informative instead of a bare "unknown".
+exceptions = []
+
+[bans]
+# Duplicate versions cost compile time and binary size, not correctness. Warn,
+# because failing on them produces noise nobody can act on in a tree this
+# dependency-heavy (gdext + iroh pull in a lot of versions).
+multiple-versions = "warn"
+# No loose version requirements: "1.0" in a dependency is a range, not a pin.
+wildcards = "deny"
+# A dependency must declare its licence rather than inferring one.
+allow-wildcard-paths = false
+deny = [
+    # No native-tls / OpenSSL. rustls only, everywhere including Android.
+    # Keeps the Android and iOS builds free of an NDK OpenSSL dependency.
+    { name = "openssl-sys" },
+    { name = "native-tls" },
+]
+
+[sources]
+# crates.io only. No git dependencies, no alternative registries.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

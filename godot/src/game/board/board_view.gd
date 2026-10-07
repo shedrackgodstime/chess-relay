@@ -81,14 +81,14 @@ func get_highlighted_square() -> String:
 
 func set_last_move(from_square: String, to_square: String) -> void:
 	_clear_root(_last_move_root)
-	for square in [from_square, to_square]:
+	for square: String in [from_square, to_square]:
 		if not square.is_empty():
 			_last_move_root.add_child(_square_overlay(square, LAST_MOVE_COLOR, "LastMove"))
 
 
 func set_legal_moves(squares: Array[String]) -> void:
 	_clear_root(_legal_moves_root)
-	for square in squares:
+	for square: String in squares:
 		if not square.is_empty():
 			_legal_moves_root.add_child(_legal_move_marker(square))
 
@@ -176,17 +176,32 @@ func _add_coordinate(text: String, position: Vector3, node_name: String) -> void
 
 
 func _on_board_input(_camera: Node, event: InputEvent, event_position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
-	var pressed: bool = event is InputEventMouseButton and event.pressed \
-		and event.button_index == MOUSE_BUTTON_LEFT
+	if not is_selecting_press(event):
+		return
+	var square := world_to_square(event_position)
+	if not square.is_empty():
+		set_highlight(square)
+		square_pressed.emit(square)
+		get_viewport().set_input_as_handled()
+
+
+## Whether `event` is a press that should select a square.
+##
+## Mouse and touch are both accepted because a phone sends `InputEventScreenTouch`
+## and may or may not also send emulated mouse events; a desktop sends the
+## reverse. Narrowing to the concrete type happens here rather than at each
+## `is` check, because `event` is statically `InputEvent` and `.pressed` on that
+## type is a member the engine cannot prove exists.
+##
+## The board and the pieces both use this, so a tap behaves the same whether it
+## lands on a piece or on the square behind it.
+static func is_selecting_press(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var button := event as InputEventMouseButton
+		return button.pressed and button.button_index == MOUSE_BUTTON_LEFT
 	if event is InputEventScreenTouch:
-		pressed = event.pressed
-	if pressed:
-		var square := world_to_square(event_position)
-		print("DBG board tap -> '%s'" % square)
-		if not square.is_empty():
-			set_highlight(square)
-			square_pressed.emit(square)
-			get_viewport().set_input_as_handled()
+		return (event as InputEventScreenTouch).pressed
+	return false
 
 
 func _clear_highlights() -> void:

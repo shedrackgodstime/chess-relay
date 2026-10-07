@@ -1,0 +1,53 @@
+# Deliberately left at Godot's default level, or raised to Warn.
+#
+# Format: one key per line, `#` starts a comment. A key listed here is a key
+# someone looked at and decided not to escalate to level 2.
+# `check_warning_drift.py` treats a key as decided if it appears either here or
+# in project.godot, and fails on keys that appear in neither.
+#
+# Rationale for the whole policy: docs/standards/quality-gates.md section 1.
+#
+# The test for whether a key belongs here is simple: would a finding on it tell
+# a developer something they can act on? If yes, it belongs in project.godot at
+# level 2. If no, it belongs here. A gate that is red for unactionable reasons
+# is a gate that gets switched off, and then it protects nothing.
+
+# 222 findings measured, almost all of them `connect()`, which returns an Error
+# that nobody checks. Godot offers no way to say "this one I did check".
+return_value_discarded
+
+# Double-reports `redundant_await` on the same five lines, and the engine's own
+# flow analysis is ambiguous here -- it fires on both "awaited when you should
+# not have" and cases that are correct.
+missing_await
+
+# 12 findings, mostly `_on_*` callbacks whose parameter list is fixed by the
+# signal they answer. Renaming to `_unused` is correct but is noise, not safety.
+unused_parameter
+
+# Engine default is already Ignore (0). Raising it to Error would mean
+# annotating `var x := f()` as `var x: float = f()` on 593 sites, all of which
+# already infer a concrete type. The inference is the point of `:=`; the
+# finding would be a large diff with no defect behind it. Tier 2 in the quality
+# gates doc, to be taken as a deliberate mechanical pass, not smuggled in here.
+inferred_declaration
+
+# 0 findings in the measurement, and the engine maintainers flag this one as
+# high false-positive for general use (see godotengine/godot-proposals#12922).
+unsafe_void_return
+
+# 0 findings. Style rather than correctness.
+static_called_on_instance
+redundant_static_unload
+missing_tool
+
+# 0 findings.
+shadowed_variable_base_class
+
+# Fires on `assert(true)`-shaped helpers, and on control flow the engine
+# mis-analyses. Zero findings here, and deliberately so.
+assert_always_true
+assert_always_false
+
+# 0 findings. Worth knowing about, not worth a red build.
+empty_file
