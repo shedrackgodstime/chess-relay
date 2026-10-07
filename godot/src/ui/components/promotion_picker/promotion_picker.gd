@@ -7,14 +7,16 @@ extends Control
 ## not a dead end: it falls back to a queen, so the player can always
 ## finish the move.
 ##
-## The previews are snapshots of the actual catalog meshes, rendered once per
-## side into plain textures and shown in TextureRects. No live viewports, no
-## per-frame 3D cost: after the one-time capture the picker is pure 2D.
-## Presentation only: nothing here decides legality; the screen opens it
-## solely for legal targets.
+## The previews are baked snapshots of the actual catalog meshes
+## (`tests/bake_previews.gd`), shown as plain textures. Runtime GPU capture
+## was tried first and abandoned: tile-based mobile GPUs hand back blank
+## frames with no error, which the content check could not distinguish from
+## slow first renders. Baked art is identical on every device and costs
+## nothing at runtime.
 ##
 ## Built in code: no subscene instances, no overrides, nothing for export
-## conversion to drop.
+## conversion to drop. Presentation only: nothing here decides legality;
+## the screen opens it solely for legal targets.
 ##
 ## Emitted with "queen", "rook", "bishop" or "knight".
 
@@ -22,17 +24,16 @@ signal chosen(piece: String)
 
 const PIECES: Array[String] = ["Queen", "Rook", "Bishop", "Knight"]
 const SUFFIXES := {"queen": "q", "rook": "r", "bishop": "b", "knight": "n"}
-const CATALOG := preload("res://src/game/pieces/piece_catalog.gd")
-const WHITE_MATERIAL := preload("res://src/game/pieces/piece_white_material.tres")
-const BLACK_MATERIAL := preload("res://src/game/pieces/piece_black_material.tres")
-const PIECE_SCALE := 16.0
-const KNIGHT_FACING := deg_to_rad(60.0)
+const PREVIEW_QUEEN_WHITE: Texture2D = preload("res://assets/chess/pieces/preview_queen_white.png")
+const PREVIEW_ROOK_WHITE: Texture2D = preload("res://assets/chess/pieces/preview_rook_white.png")
+const PREVIEW_BISHOP_WHITE: Texture2D = preload("res://assets/chess/pieces/preview_bishop_white.png")
+const PREVIEW_KNIGHT_WHITE: Texture2D = preload("res://assets/chess/pieces/preview_knight_white.png")
+const PREVIEW_QUEEN_BLACK: Texture2D = preload("res://assets/chess/pieces/preview_queen_black.png")
+const PREVIEW_ROOK_BLACK: Texture2D = preload("res://assets/chess/pieces/preview_rook_black.png")
+const PREVIEW_BISHOP_BLACK: Texture2D = preload("res://assets/chess/pieces/preview_bishop_black.png")
+const PREVIEW_KNIGHT_BLACK: Texture2D = preload("res://assets/chess/pieces/preview_knight_black.png")
 const OPTION_SIZE := Vector2(96.0, 112.0)
 const PREVIEW_SIZE := Vector2(80.0, 84.0)
-
-## Side to rendered preview textures, filled once in the background.
-var _textures: Array[Texture2D] = []
-var _textured_side := ""
 
 
 static func suffix_for(piece: String) -> String:
@@ -50,13 +51,11 @@ func _ready() -> void:
 
 
 ## Shows the picker for a pawn of the given side ("white"/"black").
-## Previews fill in when their one-time capture finishes.
 func open(side: String) -> void:
 	_side = side
 	_rebuild_options()
 	_title.text = "%s pawn promotes to" % side.capitalize()
 	visible = true
-	_fill_previews()
 
 
 func close() -> void:
@@ -124,11 +123,35 @@ func _rebuild_options() -> void:
 		_options.remove_child(child)
 		child.queue_free()
 	for piece in PIECES:
-		_options.add_child(_make_option(piece))
+		_options.add_child(_make_option(piece, _preview_for(piece.to_lower(), _side)))
 
 
-## A tappable button holding a 2D snapshot of the real piece.
-func _make_option(piece: String) -> Button:
+## Baked preview art by piece and side. Match arms, not a Dictionary:
+## untyped lookups return Variant, which the escalating gate refuses.
+static func _preview_for(piece: String, side: String) -> Texture2D:
+	if side == "black":
+		match piece:
+			"queen":
+				return PREVIEW_QUEEN_BLACK
+			"rook":
+				return PREVIEW_ROOK_BLACK
+			"bishop":
+				return PREVIEW_BISHOP_BLACK
+			_:
+				return PREVIEW_KNIGHT_BLACK
+	match piece:
+		"queen":
+			return PREVIEW_QUEEN_WHITE
+		"rook":
+			return PREVIEW_ROOK_WHITE
+		"bishop":
+			return PREVIEW_BISHOP_WHITE
+		_:
+			return PREVIEW_KNIGHT_WHITE
+
+
+## A tappable button holding the baked piece preview.
+func _make_option(piece: String, texture: Texture2D) -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = OPTION_SIZE
 	button.tooltip_text = piece
@@ -138,132 +161,12 @@ func _make_option(piece: String) -> Button:
 	var preview := TextureRect.new()
 	preview.name = "Preview"
 	preview.custom_minimum_size = PREVIEW_SIZE
+	preview.texture = texture
 	preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.add_child(preview)
 	return button
-
-
-## Renders each catalog mesh once per side, then frees the 3D machinery.
-func _fill_previews() -> void:
-	if _textured_side == _side and _textures.size() == PIECES.size():
-		_apply_previews()
-		return
-	await _capture_side(_side)
-	_apply_previews()
-
-
-func _apply_previews() -> void:
-	if _options == null or _textures.size() != PIECES.size():
-		return
-	var buttons := _options.get_children()
-	for index in range(mini(buttons.size(), PIECES.size())):
-		var preview := (buttons[index] as Button).get_node_or_null("Preview") as TextureRect
-		if preview != null:
-			preview.texture = _textures[index]
-
-
-func _capture_side(side: String) -> void:
-	_textures.clear()
-	_textured_side = ""
-	var viewport := SubViewport.new()
-	viewport.transparent_bg = true
-	viewport.own_world_3d = true
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	# No MSAA: on tile-based mobile GPUs the multisampled resolve is what
-	# comes back black on readback. Snapshots are scaled down 2x anyway.
-	viewport.msaa_3d = Viewport.MSAA_DISABLED
-	viewport.size = Vector2i(160, 168)
-	add_child(viewport)
-	var light := DirectionalLight3D.new()
-	light.rotation_degrees = Vector3(-34.0, 28.0, 0.0)
-	light.light_energy = 1.7
-	light.light_color = Color(1.0, 0.955, 0.885)
-	viewport.add_child(light)
-	for piece in PIECES:
-		_textures.append(await _snapshot_piece(viewport, piece.to_lower(), side))
-	viewport.queue_free()
-	_textured_side = side
-
-
-func _snapshot_piece(viewport: SubViewport, piece: String, side: String) -> Texture2D:
-	var source := CATALOG.scene_for(piece).instantiate()
-	var mesh := _find_mesh(source)
-	if mesh == null:
-		push_error("Promotion preview has no mesh: %s" % piece)
-		source.free()
-		return null
-	source.remove_child(mesh)
-	source.free()
-	mesh.scale = Vector3.ONE * PIECE_SCALE
-	var bounds := mesh.get_aabb()
-	mesh.position.y = -bounds.position.y * PIECE_SCALE
-	mesh.material_override = WHITE_MATERIAL if side == "white" else BLACK_MATERIAL
-	if piece == "knight":
-		mesh.rotation.y = PI + KNIGHT_FACING if side == "white" else -KNIGHT_FACING
-	viewport.add_child(mesh)
-	var height: float = maxf(bounds.size.y * PIECE_SCALE, 0.2)
-	var centre_y: float = (bounds.get_center().y - bounds.position.y) * PIECE_SCALE
-	var camera := Camera3D.new()
-	camera.position = Vector3(0.0, centre_y + height * 0.12, height * 1.35)
-	_aim_at(camera, Vector3(0.0, centre_y, 0.0))
-	viewport.add_child(camera)
-	camera.current = true
-	# First render can lag frames behind on mobile (shader warmup), so wait
-	# for drawn pixels rather than a fixed frame count. A blank viewport
-	# reads back transparent everywhere; anything alpha means a piece.
-	var image: Image = null
-	for _attempt in range(60):
-		await get_tree().process_frame
-		await get_tree().process_frame
-		image = viewport.get_texture().get_image()
-		if _has_content(image):
-			break
-	viewport.remove_child(mesh)
-	viewport.remove_child(camera)
-	mesh.queue_free()
-	camera.queue_free()
-	if not _has_content(image):
-		push_warning("Promotion preview captured blank: %s %s" % [side, piece])
-		return null
-	return ImageTexture.create_from_image(image)
-
-
-## Whether the capture holds drawn pixels (color content anywhere).
-##
-## Checks color channels, not alpha: a failed mobile readback can come
-## back opaque black, which alpha alone would misread as content.
-static func _has_content(image: Image) -> bool:
-	if image == null or image.is_empty():
-		return false
-	for y in range(0, image.get_height(), 7):
-		for x in range(0, image.get_width(), 7):
-			var pixel := image.get_pixel(x, y)
-			if maxf(pixel.r, maxf(pixel.g, pixel.b)) > 0.03:
-				return true
-	return false
-
-
-func _find_mesh(node: Node) -> MeshInstance3D:
-	if node is MeshInstance3D:
-		return node as MeshInstance3D
-	for child in node.get_children():
-		var found := _find_mesh(child)
-		if found != null:
-			return found
-	return null
-
-
-## Rotates a camera to look at a point without needing a tree.
-func _aim_at(camera: Camera3D, target: Vector3) -> void:
-	var forward := (target - camera.position).normalized()
-	var axis_z := -forward
-	var up := Vector3.UP
-	if absf(axis_z.dot(up)) > 0.999:
-		up = Vector3.FORWARD
-	var axis_x := up.cross(axis_z).normalized()
-	camera.basis = Basis(axis_x, axis_z.cross(axis_x), axis_z)
 
 
 func _on_choice(piece: String) -> void:
