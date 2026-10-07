@@ -229,7 +229,7 @@ func _tap_promotion(game: GameScreen, from_square: String, to_square: String) ->
 
 
 func _press_picker_option(picker: PromotionPicker, index: int) -> void:
-	var option := picker.get_node("Centre/Panel/Column/PromotionChoices/Options").get_child(index) as Button
+	var option := picker.get_node("Centre/Panel/Column/Options").get_child(index) as Button
 	option.pressed.emit()
 	await process_frame
 
