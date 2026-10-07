@@ -207,16 +207,35 @@ func _snapshot_piece(viewport: SubViewport, piece: String, side: String) -> Text
 	_aim_at(camera, Vector3(0.0, centre_y, 0.0))
 	viewport.add_child(camera)
 	camera.current = true
-	await get_tree().process_frame
-	await get_tree().process_frame
-	var image := viewport.get_texture().get_image()
+	# First render can lag frames behind on mobile (shader warmup), so wait
+	# for drawn pixels rather than a fixed frame count. A blank viewport
+	# reads back transparent everywhere; anything alpha means a piece.
+	var image: Image = null
+	for _attempt in range(60):
+		await get_tree().process_frame
+		await get_tree().process_frame
+		image = viewport.get_texture().get_image()
+		if _has_content(image):
+			break
 	viewport.remove_child(mesh)
 	viewport.remove_child(camera)
 	mesh.queue_free()
 	camera.queue_free()
-	if image == null or image.is_empty():
+	if not _has_content(image):
+		push_warning("Promotion preview captured blank: %s %s" % [side, piece])
 		return null
 	return ImageTexture.create_from_image(image)
+
+
+## Whether the capture holds drawn pixels (alpha anywhere above noise).
+static func _has_content(image: Image) -> bool:
+	if image == null or image.is_empty():
+		return false
+	for y in range(0, image.get_height(), 7):
+		for x in range(0, image.get_width(), 7):
+			if image.get_pixel(x, y).a > 0.05:
+				return true
+	return false
 
 
 func _find_mesh(node: Node) -> MeshInstance3D:
