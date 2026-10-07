@@ -127,6 +127,12 @@ fn rays_attack(
     })
 }
 
+/// King's square for `side`, if present.
+#[must_use]
+pub fn king_square(board: &Board, side: Color) -> Option<Square> {
+    find_king(board, side)
+}
+
 fn find_king(board: &Board, side: Color) -> Option<Square> {
     (0..64)
         .filter_map(|index| Square::try_new(index).ok())

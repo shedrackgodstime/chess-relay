@@ -29,6 +29,10 @@ signal game_started
 signal ready_changed(peer: String)
 ## Emitted when the session ended. `reason` is a human-readable string.
 signal game_ended(reason: String)
+## Emitted when a draw is offered. `seq` is the offer entry sequence.
+signal draw_offered(by: String, seq: int)
+## Emitted when the open offer is answered.
+signal draw_answered(by: String, accept: bool)
 ## Emitted for anything the core refused or could not do. Also the only way a
 ## screen learns the bridge failed to load at all.
 signal bridge_error(message: String)
@@ -55,6 +59,8 @@ func _ready() -> void:
 	_core.connect(&"game_started", func() -> void: game_started.emit())
 	_core.connect(&"ready_changed", func(peer: String) -> void: ready_changed.emit(peer))
 	_core.connect(&"game_ended", func(reason: String) -> void: game_ended.emit(reason))
+	_core.connect(&"draw_offered", func(by: String, seq: int) -> void: draw_offered.emit(by, seq))
+	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
 	_core.call(&"start")
 
@@ -93,6 +99,45 @@ func legal_moves_from(square: String) -> Array[String]:
 	for target: Variant in raw:
 		targets.append(str(target))
 	return targets
+
+
+## King square of the side to move while in check, else "".
+func check_square() -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"check_square"))
+
+
+## Fullmove number derived from the signed log, not a client counter.
+func move_number() -> int:
+	if _core == null:
+		return 1
+	var number: int = _core.call(&"move_number")
+	return number
+
+
+## Resigns the side to move. Returns false when refused.
+func resign() -> bool:
+	if _core == null:
+		return false
+	var accepted: bool = _core.call(&"resign")
+	return accepted
+
+
+## Offers a draw for the side to move. Returns false when refused.
+func offer_draw() -> bool:
+	if _core == null:
+		return false
+	var accepted: bool = _core.call(&"offer_draw")
+	return accepted
+
+
+## Answers the open offer as the other side. Returns false when refused.
+func answer_draw(accept: bool) -> bool:
+	if _core == null:
+		return false
+	var accepted: bool = _core.call(&"answer_draw", accept)
+	return accepted
 
 
 ## Plays `uci` for whichever side owns the turn.

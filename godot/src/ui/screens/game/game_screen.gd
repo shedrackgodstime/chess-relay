@@ -19,12 +19,15 @@ const FEN_PIECE_TYPES := {"p": "pawn", "n": "knight", "b": "bishop", "r": "rook"
 var _camera_scale := 1.0
 var _is_multiplayer := false
 var _active_clock_side := "white"
+# Out-of-scope furniture, not timekeeping: application_core.md puts the
+# clock out of v1 (the host would be timekeeper). This strip only shows
+# whose turn the core reports. Delete or replace when the clock lands.
 var _white_seconds := 600
 var _black_seconds := 598
 var _selected_piece_square := ""
 var _selected_piece_type := ""
 var _legal_targets: Array[String] = []
-var _move_number := 1
+var _finished := false
 var _bridge: ChessCoreBridge
 
 
@@ -96,6 +99,9 @@ func _start_bridge() -> void:
 	_bridge = ChessCoreBridge.new()
 	add_child(_bridge)
 	_bridge.move_applied.connect(_on_core_move_applied)
+	_bridge.game_ended.connect(_on_core_game_ended)
+	_bridge.draw_offered.connect(_on_core_draw_offered)
+	_bridge.draw_answered.connect(_on_core_draw_answered)
 	_bridge.bridge_error.connect(_on_bridge_error)
 
 
@@ -237,6 +243,8 @@ func _on_square_pressed(square: String) -> void:
 
 
 func _on_piece_pressed(piece: ChessPieceView) -> void:
+	if _finished:
+		return
 	_select_square(piece.square, piece.side, piece.piece_type)
 
 
@@ -262,17 +270,58 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 	var to_square := uci.substr(2, 2)
 	_rebuild_position()
 	_board.set_last_move(from_square, to_square)
+	_board.set_check_square(_bridge.check_square())
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_selected_piece_square = ""
 	_selected_piece_type = ""
 	_legal_targets.clear()
-	_move_number += 1
-	_move_number_label.text = "M%d" % _move_number
-	if _bridge != null:
-		_active_clock_side = _bridge.turn()
+	var move_number := _bridge.move_number()
+	_move_number_label.text = "M%d" % move_number
+	_active_clock_side = _bridge.turn()
 	_update_clock_strip()
-	_header.set_center_text("Move %d · %s to move" % [_move_number, _active_clock_side.capitalize()])
+	_header.set_center_text("Move %d · %s to move" % [move_number, _active_clock_side.capitalize()])
+
+
+func _on_core_game_ended(reason: String) -> void:
+	_finished = true
+	_board.set_highlight("")
+	_board.set_legal_moves([])
+	_selected_piece_square = ""
+	_legal_targets.clear()
+	_header.set_center_text(_end_text(reason))
+
+
+## Presentation wording for a finished session; the fact itself is Rust's.
+func _end_text(reason: String) -> String:
+	if "Checkmate" in reason:
+		if "White" in reason:
+			return "Checkmate · White wins"
+		return "Checkmate · Black wins"
+	if "Stalemate" in reason:
+		return "Draw · stalemate"
+	if "FiftyMove" in reason:
+		return "Draw · fifty moves"
+	if "Threefold" in reason:
+		return "Draw · threefold repetition"
+	if "InsufficientMaterial" in reason:
+		return "Draw · insufficient material"
+	if "AgreedDraw" in reason:
+		return "Draw agreed"
+	if "Resignation" in reason:
+		return "Resignation · game over"
+	if "Abort" in reason:
+		return "Game aborted"
+	return "Game over"
+
+
+func _on_core_draw_offered(by: String, seq: int) -> void:
+	_header.set_center_text("Draw offered · awaiting answer")
+
+
+func _on_core_draw_answered(by: String, accept: bool) -> void:
+	if not accept:
+		_header.set_center_text("Draw declined")
 
 
 func _on_bridge_error(message: String) -> void:
@@ -280,6 +329,58 @@ func _on_bridge_error(message: String) -> void:
 
 
 func _open_game_menu() -> void:
+	var menu := PanelContainer.new()
+	menu.name = "GameMenu"
+	menu.theme_type_variation = &"Card"
+	menu.custom_minimum_size = Vector2(220.0, 0.0)
+	var actions := VBoxContainer.new()
+	actions.add_theme_constant_override("separation", 6)
+	menu.add_child(actions)
+	var offer := Button.new()
+	offer.text = "Offer draw"
+	offer.custom_minimum_size.y = 42.0
+	offer.theme_type_variation = &"QuietButton"
+	offer.pressed.connect(func() -> void:
+		menu.queue_free()
+		_offer_draw()
+	)
+	actions.add_child(offer)
+	var leave := Button.new()
+	leave.text = "Leave game"
+	leave.custom_minimum_size.y = 42.0
+	leave.theme_type_variation = &"QuietButton"
+	leave.pressed.connect(func() -> void:
+		menu.queue_free()
+		_confirm_leave()
+	)
+	actions.add_child(leave)
+	add_child(menu)
+	menu.position = Vector2(maxf(size.x - 244.0, 16.0), 96.0)
+
+
+func _offer_draw() -> void:
+	if not _bridge.offer_draw():
+		return
+	var answer := ConfirmationDialog.new()
+	answer.theme_type_variation = &"ModalDialog"
+	answer.title = "Draw offered"
+	answer.dialog_text = "The side to move offers a draw. Accept?"
+	answer.dialog_autowrap = true
+	answer.ok_button_text = "Accept"
+	answer.cancel_button_text = "Decline"
+	answer.confirmed.connect(func() -> void:
+		_bridge.answer_draw(true)
+		answer.queue_free()
+	)
+	answer.canceled.connect(func() -> void:
+		_bridge.answer_draw(false)
+		answer.queue_free()
+	)
+	add_child(answer)
+	answer.popup_centered(Vector2i(460, 220))
+
+
+func _confirm_leave() -> void:
 	var confirmation := ConfirmationDialog.new()
 	confirmation.theme_type_variation = &"ModalDialog"
 	confirmation.title = "Leave game?"
@@ -292,6 +393,9 @@ func _open_game_menu() -> void:
 	confirmation.get_ok_button().theme_type_variation = &"ModalDangerButton"
 	confirmation.get_cancel_button().theme_type_variation = &"ModalSecondaryButton"
 	confirmation.confirmed.connect(func() -> void:
+		# Leaving mid-game resigns the side to move; the result is logged
+		# like any other session action.
+		_bridge.resign()
 		leave_requested.emit()
 		confirmation.queue_free()
 	)

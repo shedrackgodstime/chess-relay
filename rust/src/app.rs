@@ -146,6 +146,8 @@ pub struct GameStateView {
     pub side_to_move: Color,
     /// Rules outcome now.
     pub outcome: Outcome,
+    /// King square of the side to move while in check, else empty.
+    pub check: String,
 }
 
 /// Lifecycle snapshot.
@@ -542,10 +544,19 @@ impl App {
                 let game = session
                     .game()
                     .ok_or_else(|| AppError::bad_command("game not started".to_string()))?;
+                let board = game.board();
+                let side = board.side_to_move();
+                let check = if crate::chess_core::is_in_check(board, side) {
+                    crate::chess_core::king_square(board, side)
+                        .map_or_else(String::new, |sq| sq.to_string())
+                } else {
+                    String::new()
+                };
                 Ok(QueryResult::GameState(GameStateView {
-                    fen: game.board().to_fen(),
-                    side_to_move: game.board().side_to_move(),
+                    fen: board.to_fen(),
+                    side_to_move: side,
                     outcome: game.outcome(),
+                    check,
                 }))
             }
             Query::SessionState => {

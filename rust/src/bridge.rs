@@ -27,6 +27,7 @@ pub struct ChessRelayBridge {
     app: Option<App>,
     local: PeerId,
     peer: PeerId,
+    offer_by: Option<PeerId>,
 }
 
 #[godot_api]
@@ -41,6 +42,10 @@ impl ChessRelayBridge {
     fn move_applied(seq: i64, uci: GString, by: GString, agreed: bool);
     #[signal]
     fn move_agreed(seq: i64);
+    #[signal]
+    fn draw_offered(by: GString, seq: i64);
+    #[signal]
+    fn draw_answered(by: GString, accept: bool);
     #[signal]
     fn game_ended(reason: GString);
     #[signal]
@@ -173,6 +178,84 @@ impl ChessRelayBridge {
         }
     }
 
+    /// King square of the side to move while in check, else `""`.
+    #[func]
+    fn check_square(&self) -> GString {
+        match self
+            .app
+            .as_ref()
+            .and_then(|app| app.query(&Query::GameState).ok())
+        {
+            Some(QueryResult::GameState(view)) => GString::from(&view.check),
+            _ => GString::from(""),
+        }
+    }
+
+    /// Fullmove number derived from the signed log (not a client counter).
+    #[func]
+    fn move_number(&self) -> i64 {
+        match self
+            .app
+            .as_ref()
+            .and_then(|app| app.query(&Query::MoveLog).ok())
+        {
+            Some(QueryResult::MoveLog(entries)) => {
+                let moves = entries
+                    .iter()
+                    .filter(|entry| {
+                        matches!(entry.payload, crate::session::LogPayload::Move { .. })
+                    })
+                    .count();
+                (moves / 2 + 1) as i64
+            }
+            _ => 1,
+        }
+    }
+
+    /// Resigns the side to move (hotseat: the human giving up).
+    #[func]
+    fn resign(&mut self) -> bool {
+        let peer = match self.turn_peer() {
+            Some(peer) => peer,
+            None => return false,
+        };
+        self.run_command(Command::Resign { peer })
+    }
+
+    /// Offers a draw for the side to move; records the offerer.
+    #[func]
+    fn offer_draw(&mut self) -> bool {
+        let peer = match self.turn_peer() {
+            Some(peer) => peer,
+            None => return false,
+        };
+        if !self.run_command(Command::OfferDraw { peer }) {
+            return false;
+        }
+        self.offer_by = Some(peer);
+        true
+    }
+
+    /// Answers the open offer as the other side.
+    #[func]
+    fn answer_draw(&mut self, accept: bool) -> bool {
+        let peer = match self.offer_by {
+            Some(offerer) => {
+                let (white, black) = match self.sides() {
+                    Some(sides) => sides,
+                    None => return false,
+                };
+                if offerer == white { black } else { white }
+            }
+            None => return false,
+        };
+        if !self.run_command(Command::AnswerDraw { peer, accept }) {
+            return false;
+        }
+        self.offer_by = None;
+        true
+    }
+
     /// Target squares for legal moves departing `square` (e.g. `"e2"`).
     ///
     /// Empty when the square is unparseable, vacant, or the game has not
@@ -210,6 +293,41 @@ impl ChessRelayBridge {
     fn emit_all(&mut self, events: &[Event]) {
         for event in events {
             self.emit_one(event);
+        }
+    }
+
+    /// Runs a command, emitting its events; errors surface as `bridge_error`.
+    fn run_command(&mut self, command: Command) -> bool {
+        let events = match self.app.as_mut().map(|app| app.handle(&command)) {
+            Some(Ok(events)) => events,
+            Some(Err(err)) => {
+                self.emit_error(&err.to_string());
+                return false;
+            }
+            None => {
+                self.emit_error("bridge not started");
+                return false;
+            }
+        };
+        self.emit_all(&events);
+        true
+    }
+
+    /// Peer pair of the session, if any.
+    fn sides(&self) -> Option<(PeerId, PeerId)> {
+        match self.app.as_ref()?.query(&Query::SessionState).ok()? {
+            QueryResult::SessionState(view) => Some((view.white, view.black)),
+            _ => None,
+        }
+    }
+
+    /// Peer owning the side to move, if play started.
+    fn turn_peer(&self) -> Option<PeerId> {
+        let (white, black) = self.sides()?;
+        match game_side(self.app.as_ref()) {
+            Some(ChessColor::White) => Some(white),
+            Some(ChessColor::Black) => Some(black),
+            None => None,
         }
     }
 
@@ -251,7 +369,14 @@ impl ChessRelayBridge {
                 self.signals().move_agreed().emit(*seq as i64);
             }
             Event::MoveRejected { reason } => self.emit_error(reason),
-            Event::DrawOffered { .. } | Event::DrawAnswered { .. } => {}
+            Event::DrawOffered { by, seq } => {
+                let by = GString::from(&by.to_string());
+                self.signals().draw_offered().emit(&by, *seq as i64);
+            }
+            Event::DrawAnswered { by, accept } => {
+                let by = GString::from(&by.to_string());
+                self.signals().draw_answered().emit(&by, *accept);
+            }
             Event::GameEnded { reason } => {
                 let reason = GString::from(&format!("{reason:?}"));
                 self.signals().game_ended().emit(&reason);

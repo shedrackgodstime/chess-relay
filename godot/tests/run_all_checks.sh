@@ -72,6 +72,7 @@ checked=0
 while IFS= read -r file; do
   rel="${file#"$root"/}"
   checked=$((checked + 1))
+  printf '  [%d] %s\n' "$checked" "$rel"
   output="$("$GODOT_BIN" --headless --path "$root" --check-only --script "res://${rel#godot/}" 2>&1)"
   status=$?
   if [ "$status" -ne 0 ]; then
@@ -112,10 +113,18 @@ for suite in $(find "$root/tests" -maxdepth 1 -name '*_test.gd' -type f | sort);
   # Call sites only: the helper definition itself contains "_check(" and
   # must not be counted, or no suite can ever reach its expected number.
   expected="$(grep -cE '^\s*_check\(' "$suite" || true)"
-
-  output="$("$GODOT_BIN" --headless --path "$root" --script "$res" \
+  printf 'SUITE %s (expects %s checks)\n' "$rel" "$expected"
+  # A hung suite must fail loudly, not stall the run forever. 300s is
+  # generous: the slowest suite today finishes inside a minute.
+  output="$(timeout 300 "$GODOT_BIN" --headless --path "$root" --script "$res" \
     -- --expected-checks="$expected" 2>&1)"
   status=$?
+  if [ "$status" -eq 124 ]; then
+    printf '  FAIL %s timed out after 300s\n' "$rel"
+    printf 'FAIL: %s timed out after 300s\n' "$rel" >>"$findings" || true
+    failed=1
+    continue
+  fi
   printf '%s\n' "$output" | sed -n 's/^PASS: /  ok   /p'
   printf '%s\n' "$output" | sed -n 's/^FAIL: /  FAIL /p'
   printf '%s\n' "$output" | sed -n 's/^UI SMOKE: /  /p'

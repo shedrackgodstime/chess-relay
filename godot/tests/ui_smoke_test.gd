@@ -395,10 +395,18 @@ func _check_game_screen() -> void:
 	_check(_node3d(game, "World/Board/Pieces/White_Pawn_e4").position
 		== game._board.square_to_world("e4", 0.02),
 		"committing the demo move repositions the piece")
-	_check(_label(clock_strip, "Content/MoveNumber").text == "M2",
-		"committing the demo move advances the move number")
+	_check(_label(clock_strip, "Content/MoveNumber").text == "M1",
+		"the number stays on 1 inside white's first move")
 	_check(game._active_clock_side == "black",
 		"committing the demo move switches the active clock")
+	# Black replies through the same selection path; only then does the
+	# log-derived fullmove number advance. The old per-ply counter showed
+	# M2 here, which is chess-wrong.
+	var black_pawn := _node3d(game, "World/Board/Pieces/Black_Pawn_e7") as ChessPieceView
+	game._on_piece_pressed(black_pawn)
+	game._on_square_pressed("e5")
+	_check(_label(clock_strip, "Content/MoveNumber").text == "M2",
+		"the number advances on black's reply")
 	var touch := InputEventScreenTouch.new()
 	touch.pressed = true
 	touch.position = Vector2(420.0, 420.0)
