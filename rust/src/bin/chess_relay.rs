@@ -1,14 +1,13 @@
 //! Two-peer chess over Iroh: the transport slice proven end to end.
 //!
 //! Usage:
-//!   `chess_relay host` — prints `TICKET: ...`
-//!   `chess_relay join <ticket>`
+//!   chess_relay host [--code CODE]   # prints TICKET: ... (and CODE)
+//!   chess_relay join <ticket|code>
 //!
-//! Identity follows the arch doc: one fresh 32-byte seed per run builds
-//! both the Iroh endpoint key and the session signing key, and each side
-//! asserts the bytes match. The guest's identity is learned from the
-//! connection itself, so the host creates the session only after the
-//! guest arrives — no hardcoded keys anywhere.
+//! A ticket dials directly (cryptographic addressing). A short code
+//! resolves through pkarr rendezvous first. Identity follows the arch
+//! doc: one fresh 32-byte seed per run builds both the Iroh endpoint key
+//! and the session signing key, and each side asserts the bytes match.
 //!
 //! Everything here goes through the [`transport`](chess_relay_core::transport)
 //! traits plus [`App`](chess_relay_core::app); no Iroh or session types
@@ -51,18 +50,23 @@ async fn recv(connection: &mut IrohConnection, timeout: Duration) -> anyhow::Res
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    match std::env::args().nth(1).as_deref() {
+    let mut args = std::env::args().skip(1);
+    match args.next().as_deref() {
         Some("join") => {
-            let ticket = std::env::args()
-                .nth(2)
-                .ok_or_else(|| anyhow::anyhow!("usage: chess_relay join <ticket>"))?;
-            join(&ticket).await
+            let target = args
+                .next()
+                .ok_or_else(|| anyhow::anyhow!("usage: chess_relay join <ticket|code>"))?;
+            join(&target).await
         }
-        _ => host().await,
+        Some("host") => {
+            let code = args.next().filter(|flag| flag == "--code").and(args.next());
+            host(code).await
+        }
+        _ => host(None).await,
     }
 }
 
-async fn host() -> anyhow::Result<()> {
+async fn host(code: Option<String>) -> anyhow::Result<()> {
     let seed = fresh_seed();
     let mut endpoint = IrohEndpoint::bind_with_seed(seed).await?;
     let secret = SigningKey::from_bytes(&seed);
@@ -73,6 +77,18 @@ async fn host() -> anyhow::Result<()> {
     );
     let host_peer = PeerId::of(&secret);
     println!("TICKET: {}", endpoint.ticket());
+    let _publisher = match code.clone() {
+        Some(code) => {
+            println!("CODE: {code}");
+            let ticket: iroh_tickets::endpoint::EndpointTicket = endpoint.ticket().parse()?;
+            let code_clone = code.clone();
+            let ticket_clone = ticket;
+            Some(tokio::spawn(async move {
+                chess_relay_core::publish_loop(code_clone, ticket_clone).await;
+            }))
+        }
+        None => None,
+    };
 
     let mut app = App::with_local(secret);
     println!("waiting for guest (120s)...");
@@ -107,12 +123,15 @@ async fn host() -> anyhow::Result<()> {
     play_round(&mut app, &mut connection, host_peer, "e2e4").await?;
     receive_round(&mut app, &mut connection).await?;
     finish(&mut app, &mut connection, "host").await?;
+    if let Some(code) = code {
+        chess_relay_core::unpublish(&code).await;
+    }
     endpoint.close().await;
     println!("cli done");
     Ok(())
 }
 
-async fn join(ticket: &str) -> anyhow::Result<()> {
+async fn join(target: &str) -> anyhow::Result<()> {
     let seed = fresh_seed();
     let mut endpoint = IrohEndpoint::bind_with_seed(seed).await?;
     let secret = SigningKey::from_bytes(&seed);
@@ -122,7 +141,15 @@ async fn join(ticket: &str) -> anyhow::Result<()> {
         "endpoint identity must equal peer identity"
     );
     let guest_peer = PeerId::of(&secret);
-    let mut connection = endpoint.connect(ticket).await?;
+    // Tickets dial directly; short codes resolve through rendezvous first.
+    let ticket = match target.parse::<iroh_tickets::endpoint::EndpointTicket>() {
+        Ok(ticket) => ticket,
+        Err(_) => {
+            println!("resolving code {target}...");
+            chess_relay_core::resolve_ticket(target, Duration::from_secs(120)).await?
+        }
+    };
+    let mut connection = endpoint.connect(&ticket.to_string()).await?;
     println!("connected to host");
 
     let mut app = App::with_local(secret);
