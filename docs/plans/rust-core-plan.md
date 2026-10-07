@@ -12,7 +12,7 @@ Rename `rust` → `chess-relay-core`, `crate-type = ["cdylib", "rlib"]`,
 (`chess_core`, `session`, `app`, `protocol`).
 Verified: `fmt` + `clippy` clean, `cargo test` green (0 tests).
 
-## Phase 1 — Chess core (first real work)
+## Phase 1 — Chess core ✅ DONE (perft agrees with both oracles)
 
 Goal: deterministic pure-chess domain. No Godot, no Iroh, no AI.
 
@@ -34,7 +34,7 @@ Gates:
 - Fuzz spot-check: random plies never panic, always round-trip FEN.
 - Standards gate checklist green (docs, examples, error structs, no leaks).
 
-## Phase 2 — Session and move log
+## Phase 2 — Session and move log ✅ DONE
 
 Goal: `Created -> SettingUp -> Ready -> Playing -> Finished`,
 participants/roles/readiness, signed hash-linked log wired to chess core.
@@ -54,7 +54,7 @@ participants/roles/readiness, signed hash-linked log wired to chess core.
 Gates: scripted two-session divergence/convergence test (drop N moves,
 replay, identical logs); expired-key and tampered-entry tests rejected.
 
-## Phase 3 — Application contract
+## Phase 3 — Application contract ✅ DONE (names frozen; LegalMoves + check added in Phase 6)
 
 Goal: `handle(command) -> Result<Vec<Event>, Error>` over Phase 2.
 
@@ -92,14 +92,15 @@ Verdicts (arch doc step 4 demands):
 - Transport shape for Phase 7: one endpoint, game + voice ALPNs, one
   uni stream per message, tip-compare + replay-from-log resume.
 
-## Phase 5 — Mobile spike (in progress, gate below)
+## Phase 5 — Mobile spike ✅ DONE (gate passed on real hardware)
 
 Bridge (`rust/src/bridge.rs`, one `GodotClass` node, typed signals,
-outbox drained in `process()`) loads on desktop: headless
-`bridge_spike_test.gd` PASSes. Both Android ABIs cross-compile
+outbox drained in `process()`) loads on desktop and on-device: headless
+`bridge_spike_test.gd` PASSes, both Android ABIs cross-compile
 (`rust/build_android.sh`, NDK 27d, platform 24) and stage under
-`godot/android/libs/`. Phone gate runs `phone_spike.sh` (export +
-apksigner verify + install + logcat verdict) on attached hardware.
+`godot/android/libs/`, and the spike scene went green on a real phone
+(logcat verdict). `phone_spike.sh` now ships the real game (export +
+apksigner verify + force-stop + install + launch) instead.
 
 Goal: minimal `GodotClass` bridge on a **real Android device**:
 call into chess core, event back as signal; then one Iroh
@@ -114,7 +115,7 @@ phone↔desktop connection.
 Gate: pass on real hardware, or stop — core is client-agnostic, only
 the bridge/client changes. iOS result required before v1-done.
 
-## Phase 6 — Godot integration
+## Phase 6 — Godot integration ✅ DONE (local play complete)
 
 Goal: full bridge per arch doc §Godot integration.
 
@@ -127,6 +128,11 @@ Goal: full bridge per arch doc §Godot integration.
 
 Gates: existing `ui_smoke_test.gd` green against real core; square-press
 → `SubmitMove` → `MoveApplied` → render round-trip on desktop + Android.
+Done, plus: `Query::LegalMoves`, check square, log-derived move number,
+resign/offer/answer through the bridge; `game_scenarios_test.gd` proves
+captures, both castles, en passant, promotion (+picker), mate banner,
+draw and resign flows through the live screen; highlight vocabulary
+covers selection, quiet, capture rings, castle rings, last move, check.
 
 ## Phase 7 — Protocol and transport cleanup
 

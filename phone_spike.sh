@@ -1,9 +1,10 @@
 #!/usr/bin/env sh
-# One-shot Phase 5 phone gate: export the spike APK, install it on the
-# attached device, run the bridge scene, and verdict from logcat.
+# Ship the real game to the attached Android device: fresh release .so
+# for both ABIs, headless export, artifact verify, force-stop, install,
+# launch. The human verdict happens on glass; logcat follows for errors.
 # Usage: ./phone_spike.sh   (from the workspace root)
 # Requires: Godot 4.7.2, 4.7.2 export templates, debug keystore,
-#           one adb device, release or debug .so files staged already.
+#           one adb device.
 set -eu
 ROOT="$(dirname "$0")"
 GODOT="$ROOT/godot"
@@ -13,12 +14,6 @@ ADB=/opt/android-sdk/platform-tools/adb
 export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="${GODOT_ANDROID_KEYSTORE_DEBUG_PATH:-$HOME/.android/debug.keystore}"
 export GODOT_ANDROID_KEYSTORE_DEBUG_USER=androiddebugkey
 export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
-
-# 0. Spike scene must be the export target (reverted at the end).
-if ! grep -q 'bridge_spike_scene.tscn' "$GODOT/project.godot"; then
-  echo "SKIP: project.godot main scene is not the spike scene; refusing to export the real game."
-  exit 2
-fi
 
 # 1. Stage a fresh release .so for both ABIs.
 "$ROOT/rust/build_android.sh" release
@@ -38,14 +33,16 @@ APKSIGNER="$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)"
 echo "artifact verified"
 
 # 4. Install (force-stop first: Android keeps old code running in a
-# backgrounded process across reinstalls) and run.
+# backgrounded process across reinstalls) and launch.
 "$ADB" shell am force-stop "$PKG"
 "$ADB" install -r "$APK"
 "$ADB" logcat -c
 "$ADB" shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 > /dev/null
-sleep 15
-LOGCAT="$("$ADB" logcat -d | grep -E 'BRIDGE-SPIKE|godot-rust' || true)"
-echo "$LOGCAT"
-echo "$LOGCAT" | grep -q "BRIDGE-SPIKE RESULT: PASS" \
-  && echo "PHONE GATE: PASS" \
-  || { echo "PHONE GATE: FAIL"; exit 1; }
+sleep 12
+ERRORS="$("$ADB" logcat -d 2>/dev/null | grep -a 'godot   :' | grep -av 'godotengine.editor' | grep -aiE 'error|fatal|script error' | head -10 || true)"
+if [ -n "$ERRORS" ]; then
+  echo "$ERRORS"
+  echo "PHONE LAUNCH: errors on boot"
+  exit 1
+fi
+echo "PHONE LAUNCH: clean boot, on glass now"
