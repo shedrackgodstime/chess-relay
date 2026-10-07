@@ -129,7 +129,17 @@ func _scenario_captures() -> void:
 	var victim := _piece_at(game, "d5")
 	_check(attacker != null and victim != null, "both pieces stand for the capture")
 	game._on_piece_pressed(attacker)
-	game._on_piece_pressed(victim)
+	# Through the victim's surface, not the screen handler: live taps emit
+	# here, and the rebuild runs mid-emission with the emitter inside it.
+	# Freeing during emission used to abort the rebuild and empty the board.
+	var capture := InputEventMouseButton.new()
+	capture.button_index = MOUSE_BUTTON_LEFT
+	capture.pressed = true
+	var surface := victim.get_node("PieceInputSurface") as Area3D
+	surface.input_event.emit(
+		game._camera, capture, Vector3.ZERO, Vector3.UP, 0)
+	_check(_side_at(game, "d5") == "white",
+		"capture lands the white pawn on d5")
 	_check(_side_at(game, "d5") == "white",
 		"capture lands the white pawn on d5")
 	_check(_piece_at(game, "e4") == null,

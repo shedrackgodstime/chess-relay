@@ -85,7 +85,10 @@ func _on_piece_input(_camera: Node, event: InputEvent, _position: Vector3, _norm
 		_shape_idx: int) -> void:
 	if ChessBoardView.is_selecting_press(event):
 		piece_pressed.emit(self)
-		get_viewport().set_input_as_handled()
+		# The tap can rebuild the board synchronously, detaching this node
+		# mid-emission; only mark handled while still inside the tree.
+		if is_inside_tree():
+			get_viewport().set_input_as_handled()
 
 func _find_mesh(node: Node) -> MeshInstance3D:
 	if node is MeshInstance3D:

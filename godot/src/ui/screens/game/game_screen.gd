@@ -118,12 +118,14 @@ func _rebuild_position() -> void:
 		_board.add_child(pieces_root)
 	else:
 		pieces_root = existing as Node3D
-	# Removed and freed in one step. Removing after queue_free leaves both sets
-	# parented for a frame, which the foundation audit found had already been
-	# fixed in the UI flow card and reintroduced here.
+	# Removed synchronously, freed deferred: the rebuild runs inside the
+	# tapped surface's own signal emission, and freeing an object while it
+	# is emitting is illegal ("Object is locked"). queue_free() runs at
+	# idle, outside any emission. The immediate remove is what keeps stale
+	# names out of lookups, not the free.
 	for child in pieces_root.get_children():
 		pieces_root.remove_child(child)
-		child.free()
+		child.queue_free()
 	if not _bridge.is_available():
 		return
 	_build_position_from_fen(pieces_root, _bridge.fen())
@@ -244,6 +246,11 @@ func _on_square_pressed(square: String) -> void:
 
 func _on_piece_pressed(piece: ChessPieceView) -> void:
 	if _finished:
+		return
+	# Live taps fire both the piece and the board surface for one tap. The
+	# first handler can rebuild the position, freeing this node before the
+	# second handler runs; calling into a freed node aborts the handler.
+	if not is_instance_valid(piece):
 		return
 	var square: String = piece.square
 	# A tap on an occupied target square is a capture, not a new selection:
