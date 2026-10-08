@@ -191,8 +191,23 @@ failure is rendered, so retry cannot inherit the failed runtime.
           |
           +--> driver exits, transient disconnect signal only
 
-The missing durable transition is the right-hand branch: the connection is no
-longer usable, but NetState and the session remain available to local calls.
+The reconnect supervisor now owns that transition: the connection is no longer
+usable, but `NetState`, the endpoint identity, and the signed session remain
+available to local calls while the transport retries. `DEGRADED` is transient;
+`LOST` is reserved for retry exhaustion, protocol/log rejection, or explicit
+leave.
+
+### C-SOT-09 — Reconnect state and resume authority
+
+**Status:** implemented; automated Rust coverage passes; real device loss and
+recovery still require hardware verification.
+
+The Rust bridge is the single source of truth for reconnect state. It retains
+the endpoint/session, retries using the same identity, and reconciles through
+the signed log. Godot consumes only typed `network_reconnecting`,
+`peer_connected`, `peer_disconnected`, and `network_error` signals. The header
+maps those facts to `DEGRADED`, `GOOD`, and `LOST`; it does not run a second
+retry timer or infer recovery from screen timing.
 
 ### C-SOT-07 — Setup choices were local-only
 

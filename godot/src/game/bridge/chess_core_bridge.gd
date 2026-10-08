@@ -42,6 +42,8 @@ signal draw_answered(by: String, accept: bool)
 signal bridge_error(message: String)
 ## Emitted when the session driver links a peer. `peer` is its identity.
 signal peer_connected(peer: String)
+## Emitted after a live link drops while the Rust session remains resumable.
+signal network_reconnecting
 ## Emitted when the peer link drops.
 signal peer_disconnected
 ## Emitted when the remote game screen has loaded and is ready for the board.
@@ -81,6 +83,7 @@ func _ready() -> void:
 	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
 	_core.connect(&"peer_connected", func(peer: String) -> void: peer_connected.emit(peer))
+	_core.connect(&"network_reconnecting", func() -> void: network_reconnecting.emit())
 	_core.connect(&"peer_disconnected", func() -> void: peer_disconnected.emit())
 	_core.connect(&"peer_loaded", func() -> void: peer_loaded.emit())
 	_core.connect(&"network_error", func(message: String) -> void: network_error.emit(message))

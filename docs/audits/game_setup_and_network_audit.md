@@ -29,7 +29,7 @@ A quick-and-dirty CLI integration test script from Phase 4 was copied wholesale 
 | **F-04** | [Self-Answering Draw Offers in Game Screen UI](#f-04-self-answering-draw-offers-in-game-screen-ui) | **High** | Godot UI |
 | **F-05** | [Monolithic Bridge Violates Dependency Isolation](#f-05-monolithic-bridge-violates-dependency-isolation) | **High** | Bridge Architecture |
 | **F-06** | [Network Session Leak When Leaving Game Setup](#f-06-network-session-leak-when-leaving-game-setup) | **Medium-High** | Godot App Root |
-| **F-07** | [Broken Reconnect and Resume Path in Bridge](#f-07-broken-reconnect-and-resume-path-in-bridge) | **Medium-High** | Bridge / Transport |
+| **F-07** | [Reconnect and Resume Path in Bridge](#f-07-reconnect-and-resume-path-in-bridge) | **Implemented; hardware verification pending** | Bridge / Transport |
 | **F-08** | [One Unidirectional QUIC Stream per Message Hazard](#f-08-one-unidirectional-quic-stream-per-message-hazard) | **Medium** | Iroh Transport |
 | **F-09** | [Phantom Features and Disconnected Controls](#f-09-phantom-features-and-disconnected-controls) | **Medium** | Godot UI / Core |
 | **F-10** | [Inefficient Scene Teardown and GDScript FEN Parsing](#f-10-inefficient-scene-teardown-and-gdscript-fen-parsing) | **Low-Medium** | Game Screen |
@@ -252,8 +252,8 @@ If a player opens the "Leave game" dialog in `GameSetupScreen` and confirms, the
 
 ---
 
-### F-07: Broken Reconnect and Resume Path in Bridge
-**Severity: Medium-High**  
+### F-07: Reconnect and Resume Path in Bridge
+**Status: fixed in the current implementation; device verification remains required**
 **Locations:**
 - [`rust/src/bridge.rs#L1639`](../../rust/src/bridge.rs#L1639)
 - [`rust/src/bridge.rs#L1491-L1522`](../../rust/src/bridge.rs#L1491-L1522)
@@ -262,22 +262,23 @@ If a player opens the "Leave game" dialog in `GameSetupScreen` and confirms, the
 [`application_core.md`](../architecture/application_core.md#L141-L148):
 > *"With no clock, a disconnect just pauses the game. On reconnect, peers compare logs, replay any moves the other side is missing, and continue. If either side's log fails validation, the game stops with an error."*
 
-#### Evidence
-1. In `bridge.rs`, the message dispatcher explicitly discards resume messages:
-   ```rust
-   Msg::Hello { .. } | Msg::Tip { .. } | Msg::Fen { .. } => Ok(()),
-   ```
-2. When a connection drops or encounters EOF, `drive_session` simply terminates:
-   ```rust
-   Err(_) => {
-       note(&core, generation, NetNote::Disconnected);
-       return;
-   }
-   ```
-3. There is no reconnection state machine, no re-accept loop, no re-dial loop, and no tip comparison implementation.
+#### Evidence and current contract
+The network driver now keeps the Rust session and endpoint alive after a
+transport loss. Hosts re-enter accept, guests redial the same persistent
+endpoint ticket for a bounded retry window, and the bridge emits
+`network_reconnecting` while the header is `DEGRADED`.
+
+After a new link is established, both sides exchange `Msg::Resume` containing
+the signed log. Existing entries must have the same hash; only a contiguous
+suffix may be ingested and replayed. Invalid hashes or gaps terminate the
+attempt with a visible network error. The local session remains authoritative;
+the UI never invents a replacement position.
 
 #### Impact
-Any momentary packet drop or Wi-Fi glitch immediately and permanently terminates the game with no ability to recover or resume.
+Transient packet loss no longer immediately terminates the game. Recovery is
+silent at the session layer and visible only through the header's degraded and
+recovered states. A peer that does not return before the retry bound, or whose
+signed log fails validation, remains a terminal disconnect for v1.
 
 ---
 

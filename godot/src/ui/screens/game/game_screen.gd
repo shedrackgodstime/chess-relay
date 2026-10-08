@@ -186,6 +186,8 @@ func _connect_bridge_signals() -> void:
 	_bridge.draw_answered.connect(_on_core_draw_answered)
 	_bridge.bridge_error.connect(_on_bridge_error)
 	_bridge.network_error.connect(_on_net_error)
+	_bridge.network_reconnecting.connect(_on_net_reconnecting)
+	_bridge.peer_connected.connect(_on_net_reconnected)
 	_bridge.peer_disconnected.connect(_on_peer_disconnected)
 	_bridge.peer_loaded.connect(_on_peer_loaded)
 
@@ -216,6 +218,15 @@ func _sync_board_perspective() -> void:
 func _on_peer_disconnected() -> void:
 	_header.set_network_state(GameHeader.NetworkState.LOST)
 	_header.set_center_text("Opponent disconnected")
+
+
+func _on_net_reconnecting() -> void:
+	_header.set_network_state(GameHeader.NetworkState.DEGRADED)
+	_header.set_center_text("Reconnecting…")
+
+
+func _on_net_reconnected(_peer: String) -> void:
+	_header.set_network_state(GameHeader.NetworkState.GOOD)
 
 
 func _on_net_error(message: String) -> void:

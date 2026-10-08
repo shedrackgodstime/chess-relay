@@ -81,6 +81,8 @@ pub enum Msg {
     Started,
     /// The local game screen is loaded and ready to reveal the board.
     Loaded,
+    /// Signed session log snapshot used when a transport is re-established.
+    Resume { entries: Vec<LogEntry> },
     /// A signed log entry of any kind: moves today, and offers, answers,
     /// resignations and aborts as sessions use them. The payload already
     /// distinguishes kinds; the protocol never interprets them, it only
@@ -260,6 +262,9 @@ mod tests {
             Msg::Ready { peer },
             Msg::Started,
             Msg::Loaded,
+            Msg::Resume {
+                entries: vec![genesis],
+            },
             Msg::Entry(genesis),
             Msg::Agreed {
                 seq: 3,
