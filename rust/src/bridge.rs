@@ -644,6 +644,15 @@ impl ChessRelayBridge {
     /// Plays `uci` for whoever owns the turn; emits `move_applied`.
     #[func]
     fn submit_move(&mut self, uci: GString) -> bool {
+        if self
+            .lock()
+            .net
+            .as_ref()
+            .is_some_and(|net| net.cmd_tx.is_closed())
+        {
+            self.emit_error("network connection closed");
+            return false;
+        }
         let mv: Move = match uci.to_string().parse() {
             Ok(mv) => mv,
             Err(err) => {
@@ -947,6 +956,11 @@ impl ChessRelayBridge {
     fn run_command(&mut self, command: Command) -> bool {
         let events = {
             let mut core = self.lock();
+            if core.net.as_ref().is_some_and(|net| net.cmd_tx.is_closed()) {
+                drop(core);
+                self.emit_error("network connection closed");
+                return false;
+            }
             match core.app.as_mut().map(|app| app.handle(&command)) {
                 Some(Ok(events)) => events,
                 Some(Err(err)) => {
