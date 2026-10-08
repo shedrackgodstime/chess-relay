@@ -106,14 +106,14 @@ func _on_hub_back_requested() -> void:
 
 func _on_invite_created() -> void:
 	invite_created.emit("")
-	var ticket := _net().host_game(_identity_path())
-	if ticket.is_empty():
+	var code := _net().host_game(_identity_path())
+	if code.is_empty():
 		_leave_network()
 		if _current_screen is MultiplayerHubScreen:
 			(_current_screen as MultiplayerHubScreen).host_failed()
 		return
 	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).show_host_ticket(ticket)
+		(_current_screen as MultiplayerHubScreen).show_host_code(code)
 
 
 func _on_invite_cancelled() -> void:
@@ -121,17 +121,17 @@ func _on_invite_cancelled() -> void:
 	invite_cancelled.emit()
 
 
-func _on_join_requested(ticket: String) -> void:
-	join_requested.emit(ticket)
-	if not _net().join_game(ticket, _identity_path()):
+func _on_join_requested(code: String) -> void:
+	join_requested.emit(code)
+	if not _net().join_game(code, _identity_path()):
 		_leave_network()
 		if _current_screen is MultiplayerHubScreen:
 			(_current_screen as MultiplayerHubScreen).join_failed()
 
 
-func _on_join_cancelled(ticket: String) -> void:
+func _on_join_cancelled(code: String) -> void:
 	_leave_network()
-	join_cancelled.emit(ticket)
+	join_cancelled.emit(code)
 
 
 func _on_player_invite_requested(player_name: String) -> void:

@@ -81,6 +81,8 @@ struct NetState {
     endpoint: crate::IrohEndpoint,
     /// Driver inbox: local progress notifications for the session task.
     cmd_tx: tokio::sync::mpsc::UnboundedSender<NetCmd>,
+    /// Published host invitation, if this network owns one.
+    invite_code: Option<String>,
 }
 
 /// Driver input: local progress or lifecycle events worth sending to the peer.
@@ -311,7 +313,8 @@ impl ChessRelayBridge {
     }
 
     /// Hosts a networked game: loads the installation identity, binds one
-    /// endpoint from it, and returns its ticket for the guest. Accept runs in the
+    /// endpoint from it, publishes a short invitation code, and returns that
+    /// code. Accept runs in the
     /// background; the guest's arrival surfaces as `peer_connected`.
     /// The handshake that starts play on the wire is slice C.
     #[func]
@@ -340,6 +343,46 @@ impl ChessRelayBridge {
             }
         };
         let ticket = launch.endpoint.ticket();
+        let ticket = match iroh_tickets::endpoint::EndpointTicket::from_str(&ticket) {
+            Ok(ticket) => ticket,
+            Err(_) => {
+                self.leave_network();
+                self.emit_error("host ticket could not be encoded");
+                return GString::new();
+            }
+        };
+        let code = match generate_invite_code() {
+            Ok(code) => code,
+            Err(message) => {
+                self.leave_network();
+                self.emit_error(&message);
+                return GString::new();
+            }
+        };
+        let publisher = {
+            let core = self.lock();
+            core.net.as_ref().map(|net| net.runtime.handle().clone())
+        };
+        let Some(publisher) = publisher else {
+            self.leave_network();
+            self.emit_error("host network disappeared");
+            return GString::new();
+        };
+        if publisher
+            .block_on(crate::publish_once(&code, &ticket))
+            .is_err()
+        {
+            self.leave_network();
+            self.emit_error("invite code could not be published");
+            return GString::new();
+        }
+        publisher.spawn(crate::publish_loop(code.clone(), ticket));
+        {
+            let mut core = self.lock();
+            if let Some(net) = core.net.as_mut() {
+                net.invite_code = Some(code.clone());
+            }
+        }
         {
             let core = self.lock();
             if let Some(net) = core.net.as_ref() {
@@ -351,18 +394,18 @@ impl ChessRelayBridge {
                 ));
             }
         }
-        GString::from(&ticket)
+        GString::from(&code)
     }
 
-    /// Joins a networked game: dials `ticket` (or a short rendezvous
-    /// code) in the background. Returns false only when setup fails
+    /// Joins a networked game by resolving its short rendezvous code in the
+    /// background. Returns false only when setup fails
     /// outright; dial success or failure surfaces as `peer_connected`
     /// or `network_error`.
     #[func]
     fn join_game(&mut self, ticket: GString, identity_path: String) -> bool {
         let ticket = ticket.to_string();
         if ticket.is_empty() {
-            self.emit_error("empty ticket");
+            self.emit_error("empty invite code");
             return false;
         }
         let seed = match load_or_create_seed(&identity_path) {
@@ -1191,6 +1234,7 @@ fn start_network(core: &mut CoreState, seed: [u8; 32]) -> Result<NetLaunch, Stri
         runtime,
         endpoint: endpoint.clone(),
         cmd_tx,
+        invite_code: None,
     });
     Ok(NetLaunch {
         endpoint,
@@ -1217,6 +1261,9 @@ fn begin_retire(core: &mut CoreState) -> Option<NetState> {
 fn finish_retire(net: Option<NetState>) {
     if let Some(net) = net {
         net.runtime.block_on(async {
+            if let Some(code) = net.invite_code.as_deref() {
+                crate::unpublish(code).await;
+            }
             net.endpoint.close().await;
             tokio::task::yield_now().await;
         });
@@ -1664,6 +1711,20 @@ fn load_or_create_seed(path: &str) -> Result<[u8; 32], crate::session::StoreErro
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&bytes);
     Ok(seed)
+}
+
+const INVITE_CODE_ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+const INVITE_CODE_LENGTH: usize = 6;
+
+/// Generates the user-facing invitation code for a hosted game.
+fn generate_invite_code() -> Result<String, String> {
+    let mut bytes = [0u8; INVITE_CODE_LENGTH];
+    getrandom::getrandom(&mut bytes).map_err(|_| "no randomness available".to_string())?;
+    let code = bytes
+        .into_iter()
+        .map(|byte| INVITE_CODE_ALPHABET[usize::from(byte) % INVITE_CODE_ALPHABET.len()] as char)
+        .collect();
+    Ok(code)
 }
 
 struct ChessRelayExtension;
@@ -2148,6 +2209,7 @@ mod tests {
                 runtime,
                 endpoint: endpoint.clone(),
                 cmd_tx,
+                invite_code: None,
             });
         }
         spawner.spawn(accept_task(core.clone(), endpoint, 1, cmd_rx));
@@ -2182,5 +2244,15 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(std::fs::metadata(&path).expect("identity exists").len(), 32);
         std::fs::remove_file(path).expect("test identity is removed");
+    }
+
+    #[test]
+    fn generated_invite_code_has_the_public_shape() {
+        let code = generate_invite_code().expect("randomness is available");
+        assert_eq!(code.len(), INVITE_CODE_LENGTH);
+        assert!(
+            code.bytes()
+                .all(|byte| INVITE_CODE_ALPHABET.contains(&byte))
+        );
     }
 }

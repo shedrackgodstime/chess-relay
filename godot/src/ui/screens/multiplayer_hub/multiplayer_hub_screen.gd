@@ -6,8 +6,8 @@ const FLOW_ACTION_SIZE := Vector2(144.0, 48.0)
 signal back_requested
 signal create_requested
 signal create_cancelled
-signal join_requested(ticket: String)
-signal join_cancelled(ticket: String)
+signal join_requested(code: String)
+signal join_cancelled(code: String)
 signal player_invite_requested(player_name: String)
 signal player_invite_cancelled
 signal incoming_invite_responded(player_name: String, accepted: bool)
@@ -25,9 +25,6 @@ const PLAYER_ROW_SCENE: PackedScene = preload(
 
 const CODE_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 6
-## Short codes stay exactly six characters; anything this long is a
-## pasted ticket and skips code normalization and validation.
-const TICKET_MIN_LENGTH := 20
 
 @onready var _invite_grid: GridContainer = %InviteGrid
 ## The card the running flow fills. A component rather than a panel built here,
@@ -216,16 +213,14 @@ func _on_create_invite() -> void:
 	create_requested.emit()
 
 
-## Backend calls this with the ticket once hosting is up. The guest
-## dials it; until short-code publishing lands this string is the
-## whole invitation, copied to the clipboard like a code.
-func show_host_ticket(ticket: String) -> void:
+## Backend calls this with the generated short code once hosting is up.
+func show_host_code(code: String) -> void:
 	if not _create_waiting or _active_invite_flow != "create":
 		return
 	_flow.show_flow("", "")
-	_flow.add_status("YOUR GAME TICKET", &"Caption")
-	_create_code_label = _flow.add_code(ticket)
-	_copy_button = _flow.add_action("Copy ticket")
+	_flow.add_status("YOUR GAME CODE", &"Caption")
+	_create_code_label = _flow.add_code(_format_invite_code(code))
+	_copy_button = _flow.add_action("Copy code")
 	_copy_button.pressed.connect(_on_copy_code)
 	_create_status = _flow.add_status("Waiting for opponent...")
 	_flow_cancel_button(_cancel_create_wait)
@@ -303,7 +298,7 @@ func _on_copy_code() -> void:
 	_create_status.text = "Waiting for opponent..."
 	get_tree().create_timer(1.6).timeout.connect(func() -> void:
 		if is_instance_valid(_copy_button):
-			_copy_button.text = "Copy ticket"
+			_copy_button.text = "Copy code"
 	)
 
 
@@ -319,7 +314,7 @@ func _begin_join_flow() -> void:
 	_invite_grid.hide()
 	_flow.show()
 	_set_player_invites_enabled(false)
-	_flow.show_flow("Join a game", "Enter the ticket someone shared with you.")
+	_flow.show_flow("Join a game", "Enter the six-character code someone shared with you.")
 	_join_field = _flow.add_content(_code_field()) as LineEdit
 	_join_field.text_changed.connect(_on_join_code_changed)
 	_join_echo = _flow.add_status("", &"Caption")
@@ -365,7 +360,7 @@ func _on_join_pressed() -> void:
 	join_requested.emit(_current_join_code)
 
 
-## Backend calls this when the entered ticket cannot be reached.
+## Backend calls this when the entered code cannot be resolved or reached.
 ## `reason` carries the core's words; without it every failure reads
 ## the same and the real cause (bad ticket, lost code, dead relay) is
 ## undebuggable on device.
@@ -375,7 +370,7 @@ func join_failed(reason: String = "") -> void:
 	_join_is_connecting = false
 	_active_invite_flow = "join-failed"
 	if reason.is_empty():
-		reason = "Check the game ticket and try again."
+		reason = "Check the game code and try again."
 	_join_status.text = reason
 	_join_echo.text = "Couldn't connect."
 	_join_retry_button.show()
@@ -443,12 +438,8 @@ func _flow_cancel_button(action: Callable) -> Button:
 ## appears it should become a scene of its own, like PlayerRow did.
 
 
-## What the guest typed: a short code (uppercased, separators dropped)
-## or a pasted ticket (kept whole; tickets carry their own alphabet).
+## What the guest typed: a short code (uppercased, separators dropped).
 func _normalize_join_target(value: String) -> String:
-	var trimmed := value.strip_edges()
-	if trimmed.length() >= TICKET_MIN_LENGTH:
-		return trimmed
 	var result := ""
 	for index in value.length():
 		var character := value[index]
@@ -459,16 +450,12 @@ func _normalize_join_target(value: String) -> String:
 
 
 func _format_invite_code(value: String) -> String:
-	if value.length() >= TICKET_MIN_LENGTH:
-		return "%s...%s" % [value.substr(0, 12), value.right(6)]
 	if value.length() <= 3:
 		return value
 	return "%s-%s" % [value.substr(0, 3), value.substr(3)]
 
 
 func _is_valid_join_target(value: String) -> bool:
-	if value.length() >= TICKET_MIN_LENGTH:
-		return true
 	return _is_valid_invite_code(value)
 
 
@@ -489,7 +476,7 @@ func _update_responsive_layout(width: float = -1.0) -> void:
 
 func _code_field() -> LineEdit:
 	var field := LineEdit.new()
-	field.placeholder_text = "ABC-123 or pasted ticket"
-	field.max_length = 512
+	field.placeholder_text = "ABC-123"
+	field.max_length = CODE_LENGTH + 1
 	field.custom_minimum_size.y = 48
 	return field

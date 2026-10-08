@@ -237,13 +237,13 @@ func host_game(identity_path: String) -> String:
 	return str(_core.call(&"host_game", identity_path))
 
 
-## Joins a networked game over `ticket` (or a rendezvous code).
+## Joins a networked game over a generated rendezvous code.
 ## Returns false only when setup failed outright; dial success or
 ## failure reports through `peer_connected` / `network_error`.
-func join_game(ticket: String, identity_path: String) -> bool:
+func join_game(code: String, identity_path: String) -> bool:
 	if _core == null:
 		return false
-	var accepted: bool = _core.call(&"join_game", ticket, identity_path)
+	var accepted: bool = _core.call(&"join_game", code, identity_path)
 	return accepted
 
 
