@@ -21,6 +21,7 @@ const GAME_SETUP_SCREEN: PackedScene = preload(
 const MULTIPLAYER_HUB_SCREEN: PackedScene = preload(
 	"res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.tscn")
 const GAME_SCREEN: PackedScene = preload("res://src/ui/screens/game/game_screen.tscn")
+const IDENTITY_FILE := "user://chess_relay_identity.key"
 const MockMultiplayerServiceScript := preload(
 	"res://src/ui/multiplayer/mock_multiplayer_service.gd")
 
@@ -105,7 +106,7 @@ func _on_hub_back_requested() -> void:
 
 func _on_invite_created() -> void:
 	invite_created.emit("")
-	var ticket := _net().host_game()
+	var ticket := _net().host_game(_identity_path())
 	if ticket.is_empty():
 		_leave_network()
 		if _current_screen is MultiplayerHubScreen:
@@ -122,7 +123,7 @@ func _on_invite_cancelled() -> void:
 
 func _on_join_requested(ticket: String) -> void:
 	join_requested.emit(ticket)
-	if not _net().join_game(ticket):
+	if not _net().join_game(ticket, _identity_path()):
 		_leave_network()
 		if _current_screen is MultiplayerHubScreen:
 			(_current_screen as MultiplayerHubScreen).join_failed()
@@ -241,6 +242,10 @@ func _on_net_peer_disconnected() -> void:
 ## binding a real endpoint for nothing.
 func _net_if_live() -> ChessCoreBridge:
 	return _net_bridge
+
+
+func _identity_path() -> String:
+	return ProjectSettings.globalize_path(IDENTITY_FILE)
 
 
 ## Retires the networked session, if any, and drops its bridge so a

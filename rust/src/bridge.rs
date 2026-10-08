@@ -310,12 +310,19 @@ impl ChessRelayBridge {
         finish_ai_retire(old_ai);
     }
 
-    /// Hosts a networked game: binds an endpoint on a fresh identity
-    /// and returns its ticket for the guest. Accept runs in the
+    /// Hosts a networked game: loads the installation identity, binds one
+    /// endpoint from it, and returns its ticket for the guest. Accept runs in the
     /// background; the guest's arrival surfaces as `peer_connected`.
     /// The handshake that starts play on the wire is slice C.
     #[func]
-    fn host_game(&mut self) -> GString {
+    fn host_game(&mut self, identity_path: String) -> GString {
+        let seed = match load_or_create_seed(&identity_path) {
+            Ok(seed) => seed,
+            Err(err) => {
+                self.emit_error(&err.to_string());
+                return GString::new();
+            }
+        };
         let old = {
             let mut core = self.lock();
             begin_retire(&mut core)
@@ -323,7 +330,7 @@ impl ChessRelayBridge {
         finish_retire(old);
         let launch = {
             let mut core = self.lock();
-            match start_network(&mut core) {
+            match start_network(&mut core, seed) {
                 Ok(launch) => launch,
                 Err(message) => {
                     drop(core);
@@ -352,12 +359,19 @@ impl ChessRelayBridge {
     /// outright; dial success or failure surfaces as `peer_connected`
     /// or `network_error`.
     #[func]
-    fn join_game(&mut self, ticket: GString) -> bool {
+    fn join_game(&mut self, ticket: GString, identity_path: String) -> bool {
         let ticket = ticket.to_string();
         if ticket.is_empty() {
             self.emit_error("empty ticket");
             return false;
         }
+        let seed = match load_or_create_seed(&identity_path) {
+            Ok(seed) => seed,
+            Err(err) => {
+                self.emit_error(&err.to_string());
+                return false;
+            }
+        };
         let old = {
             let mut core = self.lock();
             begin_retire(&mut core)
@@ -365,7 +379,7 @@ impl ChessRelayBridge {
         finish_retire(old);
         let launch = {
             let mut core = self.lock();
-            match start_network(&mut core) {
+            match start_network(&mut core, seed) {
                 Ok(launch) => launch,
                 Err(message) => {
                     drop(core);
@@ -1149,12 +1163,10 @@ fn turn_peer(core: &CoreState) -> Option<PeerId> {
     }
 }
 
-/// Builds a runtime, binds an endpoint on a fresh seed, records `me`,
+/// Builds a runtime, binds an endpoint on the persisted installation seed, records `me`,
 /// clears any previous session, and retires any previous network.
 /// Returns the handoff a link task needs after setup.
-fn start_network(core: &mut CoreState) -> Result<NetLaunch, String> {
-    let mut seed = [0u8; 32];
-    getrandom::getrandom(&mut seed).map_err(|_| "no randomness available".to_string())?;
+fn start_network(core: &mut CoreState, seed: [u8; 32]) -> Result<NetLaunch, String> {
     let secret = SigningKey::from_bytes(&seed);
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -1414,7 +1426,11 @@ async fn on_msg<C: Connection>(
     match msg {
         Msg::Hello { version, genesis } => {
             if version != PROTOCOL_VERSION {
-                note(core, generation, NetNote::Error("version mismatch".to_string()));
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("version mismatch".to_string()),
+                );
                 return Err(());
             }
             if !is_current(core, generation) {
@@ -1433,21 +1449,40 @@ async fn on_msg<C: Connection>(
             )
             .is_err()
             {
-                note(core, generation, NetNote::Error("join rejected".to_string()));
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("join rejected".to_string()),
+                );
                 return Err(());
             }
             let co_sig = {
                 let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                match guard.app.as_ref().and_then(|app| app.query(&Query::MoveLog).ok()) {
+                match guard
+                    .app
+                    .as_ref()
+                    .and_then(|app| app.query(&Query::MoveLog).ok())
+                {
                     Some(QueryResult::MoveLog(entries)) => entries.first().and_then(|e| e.co_sig),
                     _ => None,
                 }
             };
             let Some(co_sig) = co_sig else {
-                note(core, generation, NetNote::Error("genesis agreement missing".to_string()));
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("genesis agreement missing".to_string()),
+                );
                 return Err(());
             };
-            if conn.send(&Msg::Agreed { seq: 0, sig: co_sig }).await.is_err() {
+            if conn
+                .send(&Msg::Agreed {
+                    seq: 0,
+                    sig: co_sig,
+                })
+                .await
+                .is_err()
+            {
                 note(core, generation, NetNote::Disconnected);
                 return Err(());
             }
@@ -1463,11 +1498,27 @@ async fn on_msg<C: Connection>(
                     guard.remote_peer
                 };
                 let Some(guest) = guest else {
-                    note(core, generation, NetNote::Error("no remote peer".to_string()));
+                    note(
+                        core,
+                        generation,
+                        NetNote::Error("no remote peer".to_string()),
+                    );
                     return Err(());
                 };
-                if apply(core, Command::NotePeerJoined { peer: guest, co_sig: sig }).is_err() {
-                    note(core, generation, NetNote::Error("genesis agreement rejected".to_string()));
+                if apply(
+                    core,
+                    Command::NotePeerJoined {
+                        peer: guest,
+                        co_sig: sig,
+                    },
+                )
+                .is_err()
+                {
+                    note(
+                        core,
+                        generation,
+                        NetNote::Error("genesis agreement rejected".to_string()),
+                    );
                     return Err(());
                 }
                 let me = {
@@ -1475,7 +1526,11 @@ async fn on_msg<C: Connection>(
                     guard.me
                 };
                 if apply(core, Command::SetReady { peer: me }).is_err() {
-                    note(core, generation, NetNote::Error("host readiness rejected".to_string()));
+                    note(
+                        core,
+                        generation,
+                        NetNote::Error("host readiness rejected".to_string()),
+                    );
                     return Err(());
                 }
                 if conn.send(&Msg::Ready { peer: me }).await.is_err() {
@@ -2109,5 +2164,23 @@ mod tests {
         done_rx
             .recv_timeout(Duration::from_secs(15))
             .expect("retire returns with a pending accept");
+    }
+
+    #[test]
+    fn installation_identity_is_created_once_and_reused() {
+        let path = std::env::temp_dir().join(format!(
+            "chess-relay-identity-{}-{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let path = path.to_string_lossy().into_owned();
+        let _ = std::fs::remove_file(&path);
+
+        let first = load_or_create_seed(&path).expect("identity is created");
+        let second = load_or_create_seed(&path).expect("identity is loaded");
+
+        assert_eq!(first, second);
+        assert_eq!(std::fs::metadata(&path).expect("identity exists").len(), 32);
+        std::fs::remove_file(path).expect("test identity is removed");
     }
 }

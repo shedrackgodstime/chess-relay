@@ -227,22 +227,23 @@ func side_of_peer(peer: String) -> String:
 	return str(_core.call(&"side_of_peer", peer))
 
 
-## Hosts a networked game. Returns the ticket the guest dials, or ""
+## Hosts a networked game using the persistent installation identity. Returns
+## the ticket the guest dials, or ""
 ## when hosting failed (see `bridge_error`). Linking runs in the
 ## background; `peer_connected` reports the guest.
-func host_game() -> String:
+func host_game(identity_path: String) -> String:
 	if _core == null:
 		return ""
-	return str(_core.call(&"host_game"))
+	return str(_core.call(&"host_game", identity_path))
 
 
 ## Joins a networked game over `ticket` (or a rendezvous code).
 ## Returns false only when setup failed outright; dial success or
 ## failure reports through `peer_connected` / `network_error`.
-func join_game(ticket: String) -> bool:
+func join_game(ticket: String, identity_path: String) -> bool:
 	if _core == null:
 		return false
-	var accepted: bool = _core.call(&"join_game", ticket)
+	var accepted: bool = _core.call(&"join_game", ticket, identity_path)
 	return accepted
 
 

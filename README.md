@@ -54,6 +54,7 @@ cannot execute build scripts and `cargo build` fails with
 | [rust standards](docs/standards/rust-standards.md) | Binding standard for all Rust work |
 | [cross-layer correctness](docs/standards/cross-layer-correctness.md) | Binding rules for Rust, Godot, and the bridge |
 | [definition of done](docs/standards/definition-of-done.md) | Required implementation, verification, and closure states |
+| [implementation and closure plan](docs/plans/implementation-closure-plan.md) | Active execution order and finding ledger |
 | [rust core plan](docs/plans/rust-core-plan.md) | Phased build plan with gates |
 | [foundation audit](docs/audits/foundation_audit.md) | Measured state of the code as of 2026-10-07 |
 | [handover](godot/docs/HANDOVER.md) | Lessons paid for; read before the architecture docs |
