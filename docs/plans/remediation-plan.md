@@ -187,3 +187,336 @@ Every phase must pass:
 3. `cargo test --manifest-path rust/Cargo.toml`
 4. `RUSTDOCFLAGS="-D warnings" cargo doc --manifest-path rust/Cargo.toml --no-deps`
 5. `GODOT_BIN=godot bash godot/tests/run_all_checks.sh`
+
+### 4a. Gate corrections, 2026-10-08
+
+Two fixes to this list, both found by checking the commands against the code
+rather than assuming they cover it.
+
+**`cargo fmt` flag is wrong above.** `cargo fmt -- --check` passes `--check` to
+rustfmt, but the canonical form is `cargo fmt --check` (rustfmt takes the flag
+directly through cargo). Both happen to work; keep the plain one so it matches
+CI, which runs `cargo fmt --check`.
+
+**Add `--locked` to test, clippy, and doc.** Without it, CI silently accepts a
+`Cargo.lock` update, which is how a breaking dependency arrives in a commit that
+looks small. `Cargo.lock` has already grown by 274 lines in this period.
+
+### 4b. The Godot gate cannot run on a device without the import step
+
+**This is the one that matters, and it is a defect in the gate rather than in
+the code.** `godot/tests/run_all_checks.sh` parses every `.gd` individually, and
+`promotion_picker.gd` does:
+
+```gdscript
+const PREVIEW_QUEEN_WHITE: Texture2D = preload("res://assets/chess/pieces/preview_queen_white.png")
+```
+
+That preload resolves through `.godot/imported/*.ctex`, and `.godot/` is
+git-ignored. On a clone where the import has not run, all eight previews fail to
+load and the file fails to parse:
+
+```
+SCRIPT ERROR: Parse Error: Could not preload resource file
+              "res://assets/chess/pieces/preview_queen_white.png".
+```
+
+Confirmed by extracting `HEAD` into a clean directory: the PNG sources are
+committed (8 of them, with `.import` sidecars), no `.ctex` exists, and
+`--check-only` fails.
+
+**Two consequences, and only the first is obvious:**
+
+1. **On this device, `--import` aborts** with `free(): invalid size` — the known
+   binary fault in `HANDOVER.md` §4. So the import can never be made to run here
+   and the promotion picker can never parse here. That is environmental.
+2. **CI does not run `--import` either.** `.github/workflows/gates.yml` only
+   *restores* a cache of `godot/.godot/imported`. On a cache hit the `.ctex`
+   files are there; on a cold cache they are not, and the parse gate fails for a
+   reason that has nothing to do with the code under review.
+
+**Fix, before Phase 1:** add an import step to the `godot-checks` job, before the
+gates run, and make it authoritative rather than allowed to fail:
+
+```yaml
+- name: Import project assets
+  run: |
+    godot --headless --path godot --import || true
+    test -f godot/.godot/imported/preview_queen_white.png-*.ctex
+```
+
+The `|| true` is because `--import` exits noisily even on success on some
+builds. The `test -f` after it is what makes the step real: it fails when the
+import did not happen, which is exactly the case a cache miss produces.
+
+**A gate that only passes when a cache is warm is a gate that will fail for
+someone on their first push and read as their mistake.** Same family as the
+"expected versus executed check" problem, and worth the same suspicion.
+
+### 4c. Verification commands this environment cannot run
+
+`cargo test` on Android shared storage is a 40-minute build that cannot be run
+interactively. The Rust gates above are therefore verified by CI only, and any
+claim about them should say so. The Godot gates run in seconds and are verified
+directly.
+
+---
+
+## 5. Review of the remediation plan itself
+
+Independent check of the plan and of
+[`game_setup_and_network_audit.md`](../audits/game_setup_and_network_audit.md)
+against the code as of `0a4218b`. The audit is accurate and unusually specific;
+these are confirmations, corrections, and additions.
+
+### 5a. Every finding verified still present
+
+Checked against the tree, not the audit's line numbers:
+
+| ID | Still present? | Where |
+| --- | --- | --- |
+| F-01 lifecycle inversion | **Yes** | `bridge.rs:1263` still `StartGame { white: me, black: guest }` inside the link task; `game_setup_screen.gd:113` still `_apply_net_lobby()` with `_play_button.text = "Enter game"` |
+| F-02 remote lifecycle | **Yes** | `app.rs:619` still `let LogPayload::Move { mv } = entry.payload else { ... }` |
+| F-03 turn-bound resign | **Yes** | `bridge.rs:578` and `:591` both still `turn_peer(&core)` |
+| F-04 self-answering draw | **Yes** | `game_screen.gd:546` still opens the dialog on the offerer's own screen; `:488` still only sets a header string |
+| F-05 monolithic bridge | **Yes, worse** | 1,885 lines, and now also owns local AI, pkarr, and file storage |
+| F-06 setup leak | **Yes** | `app_root.gd:258-262` unchanged; no `_leave_network()` |
+| F-07 no resume | **Yes** | `bridge.rs:1639` still discards `Msg::Hello` / `Tip` / `Fen` |
+| F-08 uni stream per msg | **Yes** | `transport_iroh.rs:135-147` unchanged |
+| F-09 phantom features | **Yes, extended** | see 5c |
+
+### 5b. F-08 is confirmed by the RFC — cite it
+
+The audit asserts an ordering hazard without authority. RFC 9000 §2 says it
+directly:
+
+> QUIC does not provide any means of ensuring ordering between bytes on different
+> streams.
+
+and §4 (stream priority) notes QUIC "relies on receiving priority information
+from the application" to decide delivery order between streams.
+
+So the hazard is not a suspicion, it is the specification's stated behaviour.
+The relevant consequence for this project is sharper than the audit puts it: log
+entries carry sequence numbers and are hash-linked, so an out-of-order entry
+fails validation and **stops the game** (`application_core.md` §Disconnects).
+One uni-stream-per-message is therefore not merely wasteful overhead — under
+loss it can end a match. The plan puts this in Phase 1 as "persistent framing";
+it deserves to be *first* in Phase 1, ahead of the resign/draw work, because it is
+the only finding here that can end a live game by accident rather than by player
+action.
+
+Counter-consideration worth stating: QUIC's own stream-reordering behavior is
+invisible if the receiver never reorders. The receiving side should therefore
+buffer and sort by `seq` regardless of what the transport does, rather than
+trusting arrival order. That is defence in depth, and it also makes the F-07
+resume path easier to build later.
+
+### 5c. F-09 has grown since the audit was written
+
+The audit lists five phantom features. Since then:
+
+- **Chess960** remains in the setup UI with 0% core support. Still true.
+- **Time controls** remain and are still discarded. Still true.
+- **Fabricated clock** still present in `game_screen.gd`.
+- **Discovery toggles** still write a local label only.
+- **Short invite codes** — the audit says `host_game()` returns raw tickets.
+  **This is now partly fixed.** `transport_rendezvous.rs` exists (217 lines) and
+  `bridge.rs` exposes a short-code path; commit `8a25602` is titled "Short-code
+  rendezvous via pkarr wormhole pattern". Needs a read to confirm how much of
+  F-09's fifth item is closed.
+
+Four of the five remain a control that is visible, interactive, and discarded.
+None of them crash. They are the exact shape the handover's fourth law warns
+about — a `PLAY` button with nothing connected to it — repeated four times on one
+screen.
+
+Worth a gate. The cheapest version: a test that asserts every `ChoiceGroup`
+option and every toggle on `game_setup_screen.tscn` is read by something. That is
+checkable headless and would have caught four of the five.
+
+### 5d. The committed seeds are now worse, not better
+
+`bridge.rs:31-32` still holds `LOCAL_SEED = [1u8; 32]` and
+`SPIKE_PEER_SEED = [2u8; 32]`. The handover names this as "the worst thing still
+in the repository".
+
+Since the audit, `SPIKE_PEER_SEED` acquired a **third** use at `bridge.rs:263`,
+where it signs the AI's moves:
+
+```rust
+let ai_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
+```
+
+So one hardcoded secret now stands in for the local player, the remote player,
+*and* the computer opponent. The security argument is unchanged and still
+weak-for-a-spike, but the blast radius grew: a game against the AI is signed by a
+key that is in the git history, and a key used for two different roles should
+not be used for a third. **Give the AI its own seed, or better, a real per-install
+identity.** This belongs in Phase 1 and is smaller than anything else in it.
+
+### 5e. 20 temporary diagnostic prints are committed
+
+`grep -rn TEMP-DIAG rust/src godot/src` returns 20 lines: `NET-TRACE` prints in
+`bridge.rs` (14) and `app_root.gd` (6), including a `_trace_screen()` helper
+added purely for them.
+
+Two problems. First, they are `eprintln!`/`print` on the render thread, so they
+run in the shipped build. Second, **no gate catches them**, which is the part
+that repeats the pattern: the HANDOVER's fifth law is about debug scaffolding
+outliving the session, and nothing enforces it.
+
+Cheapest gate that works: `grep -rE 'TEMP-DIAG|NET-TRACE|DBG ' godot/src rust/src`
+must return nothing, in `run_all_checks.sh` and in CI. A debug print with no gate
+is a print that stays.
+
+### 5f. Phase ordering — one correction
+
+The plan's Phase 1 is resign/draw/abort (application-level), and transport
+framing is Phase 3. **Move framing to the front of Phase 1**, per 5b: it is the
+one defect here that can destroy a live game by accident rather than by player
+action, and it is cheap.
+
+The plan's own ordering is otherwise sound — unblocking remote lifecycle before
+rearchitecting the handshake is right, because Phases 1 and 2 are independent and
+Phase 2's e2e test will exercise Phase 1 anyway.
+
+### 5g. Two things the plan does not mention
+
+**The `--expected-checks` count is now correct, and that fix has a consequence
+worth recording.** `run_all_checks.sh` changed from `grep -c '_check('` to
+`grep -cE '^\s*_check\('` because the helper definition itself contains `_check(`.
+Measured deltas: `ai_bridge_test.gd` 7→6, `bridge_spike_test.gd` 14→13,
+`game_scenarios_test.gd` 43→42, `ui_smoke_test.gd` 149→147. That is a genuine
+correction of an over-count, and it is the kind of fix that quietly makes a
+gate weaker if done carelessly — here it is right, and the old count would have
+been unachievable by any suite. Worth a note so nobody "fixes" it back.
+
+Also added: a 300s `timeout` per suite, and exit code 124 handled. Good — a
+hung suite now fails loudly instead of stalling CI.
+
+**`make check` exists and Guardrail 3 is correct.** There is a `Makefile` at the
+repository root (added with `51b00d9`), and its `check` target runs the five
+commands above. Two things in it are still worth fixing, and they are the same
+two from §4a: `cargo fmt -- --check` should be `cargo fmt --check`, and none of
+the cargo invocations pass `--locked`.
+
+Its `run` target also encodes something useful that the gates do not:
+`godot/bin/libchess_relay_core.so` is a real file target depending on the Rust
+sources, so a stale `.so` cannot be exported to a device. The header comment
+says exactly why — *"a stale .so can never reach the device again"* — which is a
+good instinct that the Godot gate does not share. Worth extending: the Godot
+suite currently loads whatever `.so` is present and does not check whether it
+matches the sources.
+
+---
+
+## 6. Two more audits, reviewed
+
+### 6a. `chess-differential.md` is strong; its one known divergence is a rules bug
+
+The differential run against shakmaty is the most valuable verification in the
+project's history: 1500 games, 507,485 plies, zero mismatches, comparing FEN,
+full legal move sets, check flag, mate/stalemate, insufficient material,
+halfmove clock, and threefold timing after *every ply*. Fifty thousand more
+agreements than anything else here. The three self-authored test vectors that
+turned out to be illegal positions, where the engines were right and the vectors
+were wrong, is exactly the kind of thing that makes the result trustworthy.
+
+**But the one documented divergence is not a simplification. It is a FIDE error,
+and calling it casual understates it.**
+
+`game.rs` declares two knights versus a bare king a draw. The audit's own words
+are accurate — *"a helpmate exists"* — and that is precisely the FIDE test.
+Article 5.2(b) / 9.6 draw a position when neither player can checkmate *"by any
+series of legal moves"*, not by any forced line. A position where mate is
+**possible** is not dead.
+
+Every source agrees, and they agree for the same reason:
+
+> Two knights against a bare king cannot force mate. Everybody knows that...
+> **But watch what happens if the defender helps.** [...] Because that mate
+> exists, two knights are not insufficient material. The rules ask whether a mate
+> is possible by any series of legal moves, not whether you can force one against
+> a defender who is trying.
+
+The consequence is concrete. FIDE 6.9: run out of time and you **lose**,
+unless the opponent cannot mate you by any possible sequence. With two knights,
+mate is possible, so a flag fall in that ending is a loss. Our engine returns
+`Draw`. A player who reaches KNNK with the opponent on the clock wins on time
+under FIDE and is handed a draw by our engine.
+
+**This is out of scope for this remediation plan** — it is a chess-core rules
+change, not a lifecycle or network fix, and it needs its own red test and its own
+perft-adjacent vector. It belongs in `rust-core-plan.md` as a Phase 1 amendment.
+
+The comment in `game.rs:10` says the simplification *"matches the GDScript
+prototype"*. That is the wrong reason to keep a rules bug. `rust-standards.md`
+says the prototype and shakmaty are **oracles to agree with**, and here they
+disagree with each other, so agreement is not available as a justification.
+shakmaty plays on; shakmaty is the independent one.
+
+Suggested, so it is a decision rather than a shrug: remove the two-knight rule,
+and record in `chess-differential.md` that the divergence closed with shakmaty.
+The rule is `game.rs:223-227` (a `matches!` on exactly two knights against an
+empty side) and the test that pins it is `game.rs:309`. Both would go.
+
+**One caveat before anyone does it.** Insufficient material is also used for
+flag-fall adjudication in most engines, and this codebase has no clock, so the
+6.9 case does not arise yet. Which means fixing this changes nothing a player can
+observe *today*, and it would be easy to defer indefinitely on that basis. It
+should be fixed anyway, before a clock lands and inherits the bug: a time control
+added on top of this would award draws where FIDE says wins.
+
+### 6b. `ai-integration-divergence.md` is right, and its guardrail is missing
+
+That audit found the AI losing a legal capture because a tap on the destination
+piece hit the piece surface before the board surface, and the multiplayer
+ownership guard returned "Waiting for opponent" before routing to
+`SubmitMove`. The diagnosis is correct: each layer is individually right and the
+gesture is still discarded between rendering and command submission.
+
+It lists seven risks. One of them is now worth turning into a gate, and the audit
+itself names the missing evidence: *"bridge integration can appear healthy while
+the real `GameScreen` event path is not exercised."*
+
+**That is still true.** `game_scenarios_test.gd` (43 checks) is new and substantial,
+but the AI capture regression was found and fixed *by hand*, and the class of bug
+is "the surface that answers the tap is not the surface you expected." No gate
+asserts event ordering between the piece surface and the board surface.
+
+Cheap gate: one scenario where the capture destination is **occupied**, tapping
+that piece routes to `SubmitMove` in AI mode, and the same gesture in multiplayer
+mode is refused. Both halves, because the bug only appears when the two modes
+diverge — which is why the fix could pass locally and fail for the AI.
+
+---
+
+## 7. What to do first, concretely
+
+Not the plan's order. The plan's order is right for the architectural work; this
+is the order that keeps the gates honest while that happens.
+
+1. **Add the `--import` step to CI** (§4b). Without it the Godot gate fails on a
+   cold cache for a reason unrelated to the change, which teaches people to
+   ignore the gate.
+2. **Give the AI its own signing key** (§5d). Smallest real defect in the repo.
+3. **Add the no-debug-prints gate** (§5e). Twenty lines of script, removes twenty
+   lines of committed noise, and stops it recurring.
+4. **Move transport framing to the front of Phase 1** (§5b, §5f).
+5. **Commit `.godot/extension_list.cfg` or document the step** — it is required,
+   git-ignored, and its absence is indistinguishable from a missing library
+   entry. Already documented in `HANDOVER.md` §4; make CI do it automatically,
+   which it does.
+6. **Then Phase 1 proper**: remote lifecycle ingest, turn-bound resign/draw.
+7. **Add the phantom-control gate** (§5c) before Phase 2, so the setup screen
+   cannot grow a fifth one while it is being rebuilt.
+
+Steps 1-3 are an afternoon, none of them touch architecture, and all three make
+the remaining work verifiable. Steps 4-7 are the plan.
+
+One thing deliberately left out of this list: the two-knights draw (§6a). It is a
+real rules bug and it should be fixed, but it is chess-core work, it needs its own
+red test, and mixing it into a lifecycle-and-network remediation would be the
+"monolithic refactor across Godot and Rust simultaneously" Guardrail 3 forbids.
+Amend `rust-core-plan.md` and do it as its own change.
