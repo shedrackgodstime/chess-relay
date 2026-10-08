@@ -60,6 +60,13 @@ pub enum Msg {
         /// Ready peer.
         peer: PeerId,
     },
+    /// Host's pre-session side assignment, shown by the guest before start.
+    Setup {
+        /// Side assigned to White.
+        white: PeerId,
+        /// Side assigned to Black.
+        black: PeerId,
+    },
     /// A signed log entry of any kind: moves today, and offers, answers,
     /// resignations and aborts as sessions use them. The payload already
     /// distinguishes kinds; the protocol never interprets them, it only
@@ -227,6 +234,10 @@ mod tests {
         let peer = PeerId::of(&guest_secret());
         let messages = [
             Msg::Ready { peer },
+            Msg::Setup {
+                white: PeerId::of(&host_secret()),
+                black: peer,
+            },
             Msg::Entry(genesis),
             Msg::Agreed {
                 seq: 3,

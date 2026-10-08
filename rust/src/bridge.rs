@@ -91,6 +91,7 @@ struct NetState {
 #[derive(Debug)]
 enum NetCmd {
     HostStarted { genesis: Box<LogEntry> },
+    Setup { white: PeerId, black: PeerId },
     SendReady,
     Flush,
 }
@@ -106,6 +107,10 @@ struct NetLaunch {
 #[derive(Debug)]
 enum NetNote {
     Connected(PeerId),
+    Setup {
+        white: PeerId,
+        black: PeerId,
+    },
     /// Slice C pushes this when its driver sees the peer go away.
     #[allow(dead_code)]
     Disconnected,
@@ -152,6 +157,8 @@ impl ChessRelayBridge {
     fn bridge_error(message: GString);
     #[signal]
     fn peer_connected(peer: GString);
+    #[signal]
+    fn setup_changed(mine: GString, opponent: GString);
     #[signal]
     fn peer_disconnected();
     #[signal]
@@ -547,6 +554,31 @@ impl ChessRelayBridge {
         true
     }
 
+    /// Publishes the host's selected side before the session is created.
+    #[func]
+    fn set_network_side(&mut self, side: GString) -> bool {
+        let side = side.to_string().to_lowercase();
+        let (me, guest) = {
+            let core = self.lock();
+            let Some(guest) = core.remote_peer else {
+                drop(core);
+                self.emit_error("no guest connected");
+                return false;
+            };
+            (core.me, guest)
+        };
+        let (white, black) = if side == "black" {
+            (guest, me)
+        } else {
+            (me, guest)
+        };
+        let Some(tx) = self.lock().net.as_ref().map(|net| net.cmd_tx.clone()) else {
+            self.emit_error("no network active");
+            return false;
+        };
+        tx.send(NetCmd::Setup { white, black }).is_ok()
+    }
+
     /// Persists the current move log to the configured save path.
     ///
     /// No-op (false) without a path or session; the screen calls this
@@ -923,6 +955,19 @@ impl INode for ChessRelayBridge {
                     }
                     let peer = GString::from(&peer.to_string());
                     self.signals().peer_connected().emit(&peer);
+                }
+                NetNote::Setup { white, black } => {
+                    let mine = self.lock().me;
+                    let (mine, opponent) = if mine == *white {
+                        ("white", "black")
+                    } else if mine == *black {
+                        ("black", "white")
+                    } else {
+                        ("", "")
+                    };
+                    let mine = GString::from(mine);
+                    let opponent = GString::from(opponent);
+                    self.signals().setup_changed().emit(&mine, &opponent);
                 }
                 NetNote::Disconnected => {
                     self.signals().peer_disconnected().emit();
@@ -1483,6 +1528,12 @@ async fn drive_session<C: Connection>(
                             return;
                         }
                     }
+                    Some(NetCmd::Setup { white, black }) => {
+                        if conn.send(&Msg::Setup { white, black }).await.is_err() {
+                            note(&core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
                     Some(NetCmd::SendReady) => {
                         let me = {
                             let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -1560,6 +1611,13 @@ async fn on_msg<C: Connection>(
     generation: u64,
 ) -> Result<(), ()> {
     match msg {
+        Msg::Setup { white, black } => {
+            if !is_current(core, generation) {
+                return Err(());
+            }
+            note(core, generation, NetNote::Setup { white, black });
+            Ok(())
+        }
         Msg::Hello { version, genesis } => {
             if version != PROTOCOL_VERSION {
                 note(

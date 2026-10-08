@@ -87,6 +87,8 @@ func configure_net_bridge(bridge: ChessCoreBridge) -> void:
 	_net_bridge = bridge
 	if not _net_bridge.session_created.is_connected(_on_net_session_created):
 		_net_bridge.session_created.connect(_on_net_session_created)
+	if not _net_bridge.setup_changed.is_connected(_on_net_setup_changed):
+		_net_bridge.setup_changed.connect(_on_net_setup_changed)
 	if is_node_ready() and _peer_setup:
 		_apply_peer_setup()
 
@@ -151,6 +153,16 @@ func _on_net_session_created(_white: String, _black: String, _host: String) -> v
 		_play_button.disabled = false
 
 
+func _on_net_setup_changed(mine: String, opponent: String) -> void:
+	if _net_bridge == null or mine.is_empty():
+		return
+	_player_card.set_side(mine.capitalize())
+	_opponent_card.set_side(opponent.capitalize())
+	_side_choice.set_selection(0 if mine == "white" else 1)
+	_ready_label.text = "Host selected sides · waiting for the session" \
+		if _peer_kind == "join" else _ready_label.text
+
+
 func _update_header_visibility() -> void:
 	_header.set_visibility(_peer_setup, _peer_setup, true, true)
 
@@ -173,6 +185,8 @@ func _update_screen_columns(width: float = -1.0) -> void:
 
 func _on_side_changed(_choice: String, _index: int) -> void:
 	_update_side_cards()
+	if _net_bridge != null and _peer_kind == "create":
+		_net_bridge.set_network_side(_side_choice.get_selected_choice())
 	_update_summary()
 
 
