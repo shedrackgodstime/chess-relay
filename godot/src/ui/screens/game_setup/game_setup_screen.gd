@@ -112,7 +112,7 @@ func _apply_peer_setup() -> void:
 
 
 ## Network setup owns the user-visible transition into the session. The host
-## chooses a side and starts; the guest waits for the host and then marks ready.
+## chooses a side and starts; the guest observes and waits for that one action.
 func _apply_net_setup() -> void:
 	_custom_time_controls.hide()
 	_difficulty_choice.hide()
@@ -132,21 +132,23 @@ func _apply_net_setup() -> void:
 		_play_button.tooltip_text = "Choose your side and start the session"
 		_ready_label.text = "Choose your side, then start the game"
 		_play_button.disabled = false
+		_publish_net_setup()
 	else:
 		_side_choice.set_enabled(false)
 		_time_choice.set_enabled(false)
 		_variant_choice.set_enabled(false)
-		_play_button.text = "Ready"
-		_play_button.tooltip_text = "Tell the host you are ready"
-		_ready_label.text = "Waiting for the host to create the session"
-		_settings_summary.text = _format_time_summary() + "  ·  " + _variant_choice.get_selected_choice()
-		_play_button.disabled = not _remote_setup_received
+		_play_button.text = "Waiting for host"
+		_play_button.tooltip_text = "The host controls the lobby"
+		_ready_label.text = "Waiting for the host to choose settings"
+		_play_button.disabled = true
+		_apply_saved_net_setup()
 
 
-func _on_net_setup_changed(_side: String, time: String, variant: String) -> void:
+func _on_net_setup_changed(side: String, time: String, variant: String) -> void:
 	if _net_bridge == null or _peer_kind != "join":
 		return
 	_remote_setup_received = true
+	_apply_remote_side(side)
 	for index in range(_time_choice.choices.size()):
 		if _time_choice.choices[index] == time:
 			_time_choice.set_selection(index)
@@ -157,8 +159,44 @@ func _on_net_setup_changed(_side: String, time: String, variant: String) -> void
 			break
 	_update_custom_time_visibility()
 	_update_summary()
-	_ready_label.text = "Host settings received · mark yourself ready"
-	_play_button.disabled = false
+	_ready_label.text = "Host is readying the match · waiting to start"
+	_play_button.disabled = true
+
+
+func _apply_remote_side(side: String) -> void:
+	for index in range(_side_choice.choices.size()):
+		if _side_choice.choices[index] == side:
+			_side_choice.set_selection(index)
+			break
+	match side:
+		"Black":
+			_player_card.set_side("White")
+			_opponent_card.set_side("Black")
+		"Random":
+			_player_card.set_side("Auto assigned")
+			_opponent_card.set_side("Auto assigned")
+		_:
+			_player_card.set_side("Black")
+			_opponent_card.set_side("White")
+
+
+func _apply_saved_net_setup() -> void:
+	if _net_bridge == null or _peer_kind != "join":
+		return
+	var snapshot := _net_bridge.network_setup()
+	if snapshot.size() != 3:
+		return
+	_on_net_setup_changed(snapshot[0], snapshot[1], snapshot[2])
+
+
+func _publish_net_setup() -> void:
+	if _net_bridge == null or _peer_kind != "create":
+		return
+	_net_bridge.update_network_setup(
+		_side_choice.get_selected_choice(),
+		_time_choice.get_selected_choice(),
+		_variant_choice.get_selected_choice(),
+	)
 
 
 func _on_net_session_created(_white: String, _black: String, _host: String) -> void:
@@ -171,8 +209,9 @@ func _on_net_session_created(_white: String, _black: String, _host: String) -> v
 	if _peer_kind == "create":
 		_ready_label.text = "Game created · waiting for opponent to be ready"
 	else:
-		_ready_label.text = "Game created · mark yourself ready"
-		_play_button.disabled = false
+		_ready_label.text = "Game created · waiting for host to start"
+		_play_button.text = "Waiting for host"
+		_play_button.disabled = true
 
 
 func _update_header_visibility() -> void:
@@ -198,15 +237,18 @@ func _update_screen_columns(width: float = -1.0) -> void:
 func _on_side_changed(_choice: String, _index: int) -> void:
 	_update_side_cards()
 	_update_summary()
+	_publish_net_setup()
 
 
 func _on_time_changed(_choice: String, _index: int) -> void:
 	_update_custom_time_visibility()
 	_update_summary()
+	_publish_net_setup()
 
 
 func _on_settings_changed(_choice: String, _index: int) -> void:
 	_update_summary()
+	_publish_net_setup()
 
 
 func _on_custom_time_changed(_value: float) -> void:
@@ -222,11 +264,9 @@ func _on_play_pressed() -> void:
 				_variant_choice.get_selected_choice(),
 			):
 				_play_button.disabled = true
-				_ready_label.text = "Game started · waiting for opponent to be ready"
+				_ready_label.text = "Starting game · waiting for opponent"
 		else:
-			_net_bridge.set_ready(_net_bridge.my_side())
-			_play_button.disabled = true
-			_ready_label.text = "Ready · waiting for the host"
+			return
 		return
 	if _peer_setup:
 		_local_ready = true

@@ -8,9 +8,10 @@
 //! prefixes on streams) belongs to transport; this layer owns message
 //! meaning, the version gate, and malformed-input rejection.
 //!
-//! Versioning: the first message of every connection is a [`Msg::Hello`]
-//! carrying [`PROTOCOL_VERSION`]. Anything else first, or a version mismatch, is
-//! [`ProtocolError`], never a panic.
+//! Versioning: the first message of every connection is a [`Msg::LobbyHello`]
+//! carrying [`PROTOCOL_VERSION`]. The host sends [`Msg::Hello`] only after the
+//! lobby setup is committed and a session genesis exists. Anything else first,
+//! or a version mismatch, is [`ProtocolError`], never a panic.
 //!
 //! # Examples
 //!
@@ -48,15 +49,22 @@ pub const PROTOCOL_VERSION: u16 = crate::session::PROTOCOL_VERSION;
 /// One framed message on the game ALPN.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Msg {
-    /// First message every connection: version gate plus genesis.
+    /// First message every connection: establishes the protocol before a
+    /// session exists. This allows the host-owned lobby to exchange setup
+    /// previews without inventing a fake game genesis.
+    LobbyHello {
+        /// Must equal [`PROTOCOL_VERSION`].
+        version: u16,
+    },
+    /// Session-start message: version gate plus genesis after the lobby.
     Hello {
         /// Must equal [`PROTOCOL_VERSION`].
         version: u16,
         /// Session-fixing entry, co-signed later like any genesis.
         genesis: LogEntry,
     },
-    /// Host-owned setup snapshot. Sent only after `Hello` so the first
-    /// message ordering contract remains intact.
+    /// Host-owned setup snapshot. Sent after [`Msg::LobbyHello`] and may be
+    /// repeated while the host changes the lobby selections.
     Setup {
         side: String,
         time: String,
@@ -104,7 +112,7 @@ impl Msg {
         postcard::to_stdvec(self).expect("protocol messages are encodable")
     }
 
-    /// Decodes and version-gates: a [`Msg::Hello`] with the wrong version
+    /// Decodes and version-gates: a versioned greeting with the wrong version
     /// fails, so mismatched peers stop at the handshake.
     ///
     /// # Errors
@@ -112,10 +120,12 @@ impl Msg {
     /// Returns [`ProtocolError`] on malformed bytes or version mismatch.
     pub fn decode(bytes: &[u8]) -> Result<Self, ProtocolError> {
         let msg: Self = postcard::from_bytes(bytes).map_err(|_| ProtocolError::decode())?;
-        if let Self::Hello { version, .. } = &msg
-            && *version != PROTOCOL_VERSION
-        {
-            return Err(ProtocolError::bad_version(*version));
+        let version = match &msg {
+            Self::LobbyHello { version } | Self::Hello { version, .. } => Some(*version),
+            _ => None,
+        };
+        if version.is_some_and(|version| version != PROTOCOL_VERSION) {
+            return Err(ProtocolError::bad_version(version.unwrap_or_default()));
         }
         Ok(msg)
     }
@@ -233,6 +243,9 @@ mod tests {
         let genesis = genesis_entry();
         let peer = PeerId::of(&guest_secret());
         let messages = [
+            Msg::LobbyHello {
+                version: PROTOCOL_VERSION,
+            },
             Msg::Setup {
                 side: "White".to_string(),
                 time: "5 | 3".to_string(),

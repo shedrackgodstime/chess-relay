@@ -48,10 +48,18 @@ struct CoreState {
     outbox: VecDeque<Event>,
     net: Option<NetState>,
     net_notes: VecDeque<NetNote>,
+    network_setup: Option<NetworkSetup>,
     ai: Option<AiState>,
     /// Bumped on every host/join/leave so late tasks from a retired
     /// network go silent instead of emitting stale signals.
     net_generation: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct NetworkSetup {
+    side: String,
+    time: String,
+    variant: String,
 }
 
 struct AiRequest {
@@ -90,6 +98,11 @@ struct NetState {
 /// Driver input: local progress or lifecycle events worth sending to the peer.
 #[derive(Debug)]
 enum NetCmd {
+    UpdateSetup {
+        side: String,
+        time: String,
+        variant: String,
+    },
     HostStarted {
         genesis: Box<LogEntry>,
         side: String,
@@ -560,6 +573,59 @@ impl ChessRelayBridge {
             });
         }
         true
+    }
+
+    /// Publishes the host's current lobby choices. This is metadata only:
+    /// the core still starts standard chess without an authoritative clock.
+    #[func]
+    fn update_network_setup(&mut self, side: GString, time: GString, variant: GString) -> bool {
+        if variant != "Standard" {
+            self.emit_error("unsupported network variant");
+            return false;
+        }
+        let setup = NetworkSetup {
+            side: side.to_string(),
+            time: time.to_string(),
+            variant: variant.to_string(),
+        };
+        let tx = {
+            let mut core = self.lock();
+            if core.net.is_none() {
+                drop(core);
+                self.emit_error("no network active");
+                return false;
+            }
+            core.network_setup = Some(setup.clone());
+            core.net.as_ref().map(|net| net.cmd_tx.clone())
+        };
+        if let Some(tx) = tx {
+            if tx
+                .send(NetCmd::UpdateSetup {
+                    side: setup.side,
+                    time: setup.time,
+                    variant: setup.variant,
+                })
+                .is_err()
+            {
+                self.emit_error("network connection closed");
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Returns the last host-owned lobby snapshot, or an empty array before
+    /// the host has published one.
+    #[func]
+    fn network_setup(&self) -> PackedStringArray {
+        let core = self.lock();
+        let mut values = PackedStringArray::new();
+        if let Some(setup) = core.network_setup.as_ref() {
+            values.push(&GString::from(setup.side.as_str()));
+            values.push(&GString::from(setup.time.as_str()));
+            values.push(&GString::from(setup.variant.as_str()));
+        }
+        values
     }
 
     /// Persists the current move log to the configured save path.
@@ -1353,6 +1419,7 @@ fn start_network(
     let generation = core.net_generation;
     core.me = me;
     core.remote_peer = None;
+    core.network_setup = None;
     core.recent_peers_path = Some(recent_path);
     core.app = Some(App::with_local(secret));
     core.outbox.clear();
@@ -1422,7 +1489,7 @@ async fn accept_task(
         guard.remote_peer = Some(guest);
     }
     note(&core, generation, NetNote::Connected(guest));
-    drive_session(core, conn, cmd_rx, generation).await;
+    drive_session(core, conn, cmd_rx, generation, true).await;
 }
 
 /// Background dial for the guest: resolves short codes through
@@ -1470,7 +1537,7 @@ async fn join_task(
         guard.remote_peer = Some(host);
     }
     note(&core, generation, NetNote::Connected(host));
-    drive_session(core, conn, cmd_rx, generation).await;
+    drive_session(core, conn, cmd_rx, generation, false).await;
 }
 
 /// True while `generation` is still the live network.
@@ -1511,12 +1578,29 @@ async fn drive_session<C: Connection>(
     mut conn: C,
     mut cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
     generation: u64,
+    host_role: bool,
 ) {
     let mut sent_seq = 1u64;
+    if conn
+        .send(&Msg::LobbyHello {
+            version: PROTOCOL_VERSION,
+        })
+        .await
+        .is_err()
+    {
+        note(&core, generation, NetNote::Disconnected);
+        return;
+    }
     loop {
         tokio::select! {
             cmd = cmd_rx.recv() => {
                 match cmd {
+                    Some(NetCmd::UpdateSetup { side, time, variant }) => {
+                        if !host_role || conn.send(&Msg::Setup { side, time, variant }).await.is_err() {
+                            note(&core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
                     Some(NetCmd::HostStarted {
                         genesis,
                         side,
@@ -1568,7 +1652,7 @@ async fn drive_session<C: Connection>(
             msg = conn.recv() => {
                 match msg {
                     Ok(msg) => {
-                        if on_msg(&core, &mut conn, msg, generation).await.is_err() {
+                        if on_msg(&core, &mut conn, msg, generation, host_role).await.is_err() {
                             return;
                         }
                     }
@@ -1618,8 +1702,20 @@ async fn on_msg<C: Connection>(
     conn: &mut C,
     msg: Msg,
     generation: u64,
+    host_role: bool,
 ) -> Result<(), ()> {
     match msg {
+        Msg::LobbyHello { version } => {
+            if version != PROTOCOL_VERSION {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("version mismatch".to_string()),
+                );
+                return Err(());
+            }
+            Ok(())
+        }
         Msg::Hello { version, genesis } => {
             if version != PROTOCOL_VERSION {
                 note(
@@ -1749,6 +1845,24 @@ async fn on_msg<C: Connection>(
                 return Err(());
             }
             let _ = apply(core, Command::NotePeerReady { peer });
+            if !host_role {
+                let me = {
+                    let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    guard.me
+                };
+                if apply(core, Command::SetReady { peer: me }).is_err() {
+                    note(
+                        core,
+                        generation,
+                        NetNote::Error("guest readiness rejected".to_string()),
+                    );
+                    return Err(());
+                }
+                if conn.send(&Msg::Ready { peer: me }).await.is_err() {
+                    note(core, generation, NetNote::Disconnected);
+                    return Err(());
+                }
+            }
             Ok(())
         }
         Msg::Setup {
@@ -1766,6 +1880,14 @@ async fn on_msg<C: Connection>(
                     NetNote::Error(format!("unsupported network variant: {variant}")),
                 );
                 return Err(());
+            }
+            {
+                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.network_setup = Some(NetworkSetup {
+                    side: side.clone(),
+                    time: time.clone(),
+                    variant: variant.clone(),
+                });
             }
             note(
                 core,
@@ -2006,10 +2128,9 @@ mod tests {
         }
     }
 
-    /// Handshake plus one move across memory links: both sides start
-    /// play, the host's pawn push reaches the guest, and the guest's
-    /// Decoupled setup plus one move across memory links: host starts
-    /// match as White, guest receives genesis and marks ready, both start,
+    /// Handshake plus one move across memory links: the host starts the
+    /// match as White, the guest receives genesis and auto-acknowledges
+    /// readiness, both start, and the host's pawn push reaches the guest.
     /// and host's pawn push reaches guest and is agreed with identical positions.
     #[tokio::test]
     async fn session_drives_handshake_and_move_over_memory() {
@@ -2050,13 +2171,13 @@ mod tests {
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                drive_session(core, host_conn, host_rx, 1).await;
+                drive_session(core, host_conn, host_rx, 1, true).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                drive_session(core, guest_conn, guest_rx, 1).await;
+                drive_session(core, guest_conn, guest_rx, 1, false).await;
             }
         });
 
@@ -2097,15 +2218,7 @@ mod tests {
         })
         .await;
 
-        // Guest marks ready
-        {
-            let mut guard = guest_core.lock().unwrap();
-            let app = guard.app.as_mut().unwrap();
-            let events = app.handle(&Command::SetReady { peer: guest_peer }).unwrap();
-            guard.outbox.extend(events);
-        }
-        guest_tx.send(NetCmd::SendReady).unwrap();
-
+        // The guest auto-acknowledges the host's readiness.
         poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
         assert!(!fen_of(&host_core).is_empty());
@@ -2184,13 +2297,13 @@ mod tests {
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                drive_session(core, host_conn, host_rx, 1).await;
+                drive_session(core, host_conn, host_rx, 1, true).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                drive_session(core, guest_conn, guest_rx, 1).await;
+                drive_session(core, guest_conn, guest_rx, 1, false).await;
             }
         });
 
@@ -2230,15 +2343,7 @@ mod tests {
         })
         .await;
 
-        // Guest marks ready
-        {
-            let mut guard = guest_core.lock().unwrap();
-            let app = guard.app.as_mut().unwrap();
-            let events = app.handle(&Command::SetReady { peer: guest_peer }).unwrap();
-            guard.outbox.extend(events);
-        }
-        guest_tx.send(NetCmd::SendReady).unwrap();
-
+        // The guest auto-acknowledges the host's readiness.
         poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
 
         // Guest is White: plays e2e4
@@ -2316,13 +2421,13 @@ mod tests {
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                drive_session(core, host_conn, host_rx, 1).await;
+                drive_session(core, host_conn, host_rx, 1, true).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                drive_session(core, guest_conn, guest_rx, 1).await;
+                drive_session(core, guest_conn, guest_rx, 1, false).await;
             }
         });
 
@@ -2362,15 +2467,7 @@ mod tests {
         })
         .await;
 
-        // Guest marks ready
-        {
-            let mut guard = guest_core.lock().unwrap();
-            let app = guard.app.as_mut().unwrap();
-            let events = app.handle(&Command::SetReady { peer: guest_peer }).unwrap();
-            guard.outbox.extend(events);
-        }
-        guest_tx.send(NetCmd::SendReady).unwrap();
-
+        // The guest auto-acknowledges the host's readiness.
         poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
 
         {

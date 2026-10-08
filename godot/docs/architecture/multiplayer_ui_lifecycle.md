@@ -15,13 +15,14 @@ controls or require the hub to know how a connection is established.
 ```text
 Multiplayer hub
 ├── Create invite -> show code and wait -> transport connected -> Game Setup
-│   └── host starts -> session created -> guest ready -> game started -> board
+│   └── host live setup -> host starts -> guest auto-acknowledges -> game -> board
 ├── Join by code -> resolving/connecting -> failed/retry or connected -> Setup
-│   └── session created -> guest ready -> game started -> board
+│   └── host setup snapshot -> wait for host start -> game -> board
 ├── Invite listed player -> wait -> declined/retry or accepted -> Game Setup
 └── Receive invite -> accept -> Game Setup or decline -> return to hub
 
-Peer Game Setup -> local Ready -> wait for peer Ready -> both ready
+Peer Game Setup -> host owns setup and Start; guest observes -> both enter only
+after the host commit and the automatic readiness exchange
 ```
 
 Create and join use the live bridge; direct player invitations and incoming
@@ -51,7 +52,7 @@ The app routes results back to the hub through the live bridge for transport
 and session events, and through `receive_incoming_invite`,
 `player_invite_accepted`, and `player_invite_declined` for preview flows. Game
 Setup exposes `configure_peer` and the live bridge setup contract for
-peer-specific presentation and readiness updates. Preserve these screen-facing
+peer-specific presentation and host-owned setup snapshots. Preserve these screen-facing
 responsibilities when replacing the remaining mock event source.
 
 ## Mock scenarios
@@ -66,8 +67,8 @@ and local to UI development:
   KnightOwl and RookRunner, so both outcomes can be reviewed.
 - A mock incoming invite arrives five seconds after entering the hub. It can
   be accepted or declined; a declined invitation stays visible until Done.
-- A peer setup receives the opponent's Ready response after the local player
-  marks Ready.
+- A peer setup renders the host's live setup snapshot; the guest has no Ready
+  action and waits for the host to start.
 
 These are test fixtures for presentation, not product rules. Replace their
 outcomes with app-layer events; keep the screen states and user-intent boundary

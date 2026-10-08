@@ -96,6 +96,16 @@ async fn host(code: Option<String>) -> anyhow::Result<()> {
     let guest_peer = PeerId::from_bytes(connection.peer_id_bytes());
     println!("guest arrived: {guest_peer}");
 
+    connection
+        .send(&Msg::LobbyHello {
+            version: PROTOCOL_VERSION,
+        })
+        .await?;
+    let Msg::LobbyHello { version } = recv(&mut connection, Duration::from_secs(60)).await? else {
+        anyhow::bail!("expected lobby greeting from guest");
+    };
+    assert_eq!(version, PROTOCOL_VERSION, "version gate");
+
     app.handle(&Command::StartGame {
         white: host_peer,
         black: guest_peer,
@@ -151,6 +161,16 @@ async fn join(target: &str) -> anyhow::Result<()> {
     };
     let mut connection = endpoint.connect(&ticket.to_string()).await?;
     println!("connected to host");
+
+    connection
+        .send(&Msg::LobbyHello {
+            version: PROTOCOL_VERSION,
+        })
+        .await?;
+    let Msg::LobbyHello { version } = recv(&mut connection, Duration::from_secs(60)).await? else {
+        anyhow::bail!("expected lobby greeting from host");
+    };
+    assert_eq!(version, PROTOCOL_VERSION, "version gate");
 
     let mut app = App::with_local(secret);
     let Msg::Hello { version, genesis } = recv(&mut connection, Duration::from_secs(60)).await?

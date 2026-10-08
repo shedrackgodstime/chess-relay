@@ -25,7 +25,7 @@ extends Node
 signal move_applied(sequence: int, uci: String, by: String, agreed: bool)
 ## Emitted when the core has assigned both sides for a session.
 signal session_created(white: String, black: String, host: String)
-## Emitted when the host's setup snapshot arrives after the Hello handshake.
+## Emitted when a host setup snapshot arrives during the lobby.
 signal setup_changed(side: String, time: String, variant: String)
 ## Emitted when play begins.
 signal game_started
@@ -251,6 +251,21 @@ func start_network_game(side: String, time: String, variant: String) -> bool:
 		return false
 	var accepted: bool = _core.call(&"start_network_game", side, time, variant)
 	return accepted
+
+
+## Publishes the host-owned setup preview to the connected guest.
+## Time remains display metadata until authoritative clocks are implemented.
+func update_network_setup(side: String, time: String, variant: String) -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"update_network_setup", side, time, variant)
+
+
+## Returns the last Rust-owned network setup snapshot as [side, time, variant].
+func network_setup() -> PackedStringArray:
+	if _core == null:
+		return PackedStringArray()
+	return _core.call(&"network_setup")
 
 
 ## This device's side ("white"/"black"), or "" before the session has sides.

@@ -196,18 +196,30 @@ longer usable, but NetState and the session remain available to local calls.
 
 ### C-SOT-07 — Setup choices were local-only
 
-**Status:** transport snapshot added; game-rule enforcement remains a separate
-follow-up because the current session core still starts standard chess only.
+**Status:** fixed for v1 lobby behavior; game-rule enforcement remains a
+separate follow-up because the current session core still starts standard chess
+only.
 
 The setup screen previously let each peer render its own time and variant
 selection. Those values never crossed the wire, while side assignment lived in
-the Rust genesis. The host now sends a `Setup` snapshot immediately after the
-required `Hello` message. The guest applies the snapshot before enabling
-`Ready`, so the visible setup is deterministic and cannot be confirmed before
-the host's choices arrive. Unsupported variants are rejected at the wire
-boundary; the UI exposes only the core-supported Standard variant. Time-control
-choices are synchronized as preview metadata because the clock is explicitly
-out of v1 and has no Rust authority yet.
+the Rust genesis. The connection now begins with `LobbyHello`; the host may
+send repeated `Setup` snapshots while changing the lobby. The snapshot is also
+stored in the Rust bridge so a screen created after the signal still reads the
+same state. The guest is a read-only observer: it has no Ready action and
+automatically acknowledges the host's single start action. Both peers enter the
+session only after that host commit and the normal genesis/readiness exchange.
+Unsupported variants are rejected at the wire boundary; the UI exposes only
+the core-supported Standard variant. Time-control choices are synchronized as
+preview metadata because the clock is explicitly out of v1 and has no Rust
+authority yet.
+
+This is the v1 multiplayer contract:
+
+    LobbyHello -> live host Setup snapshots -> host Start
+        -> Hello(genesis) -> automatic guest acknowledgement -> GameStarted
+
+No client may invent a setup value, declare itself ready independently, or
+advance to the game screen from transport connection alone.
 
 ## What is already documented elsewhere
 

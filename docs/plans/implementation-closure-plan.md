@@ -176,8 +176,8 @@ remains open — `LIFECYCLE-001`.
   stale for resume-for-play and is purged before the replacement session.
 - Keep the transport-connected, session-created, ready, and game-started
   transitions distinct in the Godot screen flow; transport connection opens
-  setup, host starts the session, guest marks its assigned side ready, and only
-  `game_started` opens the board.
+  setup, the host owns live setup and the single Start action, the guest
+  observes and auto-acknowledges, and only `game_started` opens the board.
 
 Exit condition: event order, revision, generation, and terminal-state behavior
 are covered by integration tests rather than inferred from timing.
@@ -220,7 +220,7 @@ report distinguishes verified behavior from unavailable evidence.
 | `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; production no longer instantiates the mock service |
 | `DISCOVERY-001` | Discovery controls claim backend state while only changing a local label | Verified | Discovery dialog removed from production; hub explicitly displays unavailable and directs users to invite codes |
 | `LABEL-001` | Game screen hardcodes an opponent name instead of observing the peer identity | Verified | Networked GameScreen receives the bridge-owned peer label; neutral fallback is used when no label exists |
-| `SETUP-001` | Network setup hides shared controls and allows host board entry before guest readiness | Confirmed | `GameSetupScreen._apply_net_setup()` hides time/variant controls; `start_network_game()` emits local `GameStarted` before the guest-ready transition; no shared setup-selection contract exists yet |
+| `SETUP-001` | Network setup hides shared controls and allows host board entry before guest readiness | Implemented | `LobbyHello` plus durable host `Setup` snapshots; guest is observer-only and auto-acknowledges the host start; both sides advance only through the shared readiness/game-start path |
 | `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring, startup-order protection, snapshot synchronization, and stale-generation tests; two-process UI integration still open |
 | `SAVE-001` | New games can be hijacked by persisted or finished sessions | Verified | Explicit fresh-start contract, finished-save rejection/purge in both resume paths, and Godot AI regression; user-facing Resume action remains a separate product surface |
 | `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |
