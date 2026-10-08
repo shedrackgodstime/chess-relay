@@ -233,6 +233,11 @@ mod tests {
         let genesis = genesis_entry();
         let peer = PeerId::of(&guest_secret());
         let messages = [
+            Msg::Setup {
+                side: "White".to_string(),
+                time: "5 | 3".to_string(),
+                variant: "Standard".to_string(),
+            },
             Msg::Ready { peer },
             Msg::Entry(genesis),
             Msg::Agreed {
