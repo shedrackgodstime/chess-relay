@@ -75,6 +75,10 @@ pub enum Msg {
         /// Ready peer.
         peer: PeerId,
     },
+    /// Host confirmation that the authoritative session has started. The
+    /// guest waits for this before applying its own readiness locally, so
+    /// both screens enter play from the same host commit.
+    Started,
     /// A signed log entry of any kind: moves today, and offers, answers,
     /// resignations and aborts as sessions use them. The payload already
     /// distinguishes kinds; the protocol never interprets them, it only
@@ -252,6 +256,7 @@ mod tests {
                 variant: "Standard".to_string(),
             },
             Msg::Ready { peer },
+            Msg::Started,
             Msg::Entry(genesis),
             Msg::Agreed {
                 seq: 3,

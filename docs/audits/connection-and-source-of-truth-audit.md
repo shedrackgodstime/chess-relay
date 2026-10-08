@@ -216,7 +216,7 @@ authority yet.
 This is the v1 multiplayer contract:
 
     LobbyHello -> live host Setup snapshots -> host Start
-        -> Hello(genesis) -> automatic guest acknowledgement -> GameStarted
+        -> Hello(genesis) -> Ready exchange -> host Started -> GameStarted
 
 No client may invent a setup value, declare itself ready independently, or
 advance to the game screen from transport connection alone.

@@ -128,7 +128,7 @@ async fn host(code: Option<String>) -> anyhow::Result<()> {
     app.handle(&Command::NotePeerJoined { peer, co_sig: sig })?;
     app.handle(&Command::NotePeerReady { peer })?;
     app.handle(&Command::SetReady { peer: host_peer })?;
-    connection.send(&Msg::Ready { peer: host_peer }).await?;
+    connection.send(&Msg::Started).await?;
 
     play_round(&mut app, &mut connection, host_peer, "e2e4").await?;
     receive_round(&mut app, &mut connection).await?;
@@ -161,6 +161,7 @@ async fn join(target: &str) -> anyhow::Result<()> {
     };
     let mut connection = endpoint.connect(&ticket.to_string()).await?;
     println!("connected to host");
+    let host_peer = PeerId::from_bytes(connection.peer_id_bytes());
 
     connection
         .send(&Msg::LobbyHello {
@@ -182,7 +183,6 @@ async fn join(target: &str) -> anyhow::Result<()> {
         peer: guest_peer,
         genesis: Box::new(genesis),
     })?;
-    app.handle(&Command::SetReady { peer: guest_peer })?;
     connection.send(&Msg::Ready { peer: guest_peer }).await?;
     let co_sig = move_log(&app)[0].co_sig.unwrap();
     connection
@@ -192,10 +192,11 @@ async fn join(target: &str) -> anyhow::Result<()> {
         })
         .await?;
 
-    let Msg::Ready { peer } = recv(&mut connection, Duration::from_secs(60)).await? else {
-        anyhow::bail!("expected Ready from host");
+    let Msg::Started = recv(&mut connection, Duration::from_secs(60)).await? else {
+        anyhow::bail!("expected Started from host");
     };
-    app.handle(&Command::NotePeerReady { peer })?;
+    app.handle(&Command::NotePeerReady { peer: host_peer })?;
+    app.handle(&Command::SetReady { peer: guest_peer })?;
     receive_round(&mut app, &mut connection).await?;
     play_round(&mut app, &mut connection, guest_peer, "e7e5").await?;
     finish(&mut app, &mut connection, "guest").await?;

@@ -1844,24 +1844,66 @@ async fn on_msg<C: Connection>(
             if !is_current(core, generation) {
                 return Err(());
             }
-            let _ = apply(core, Command::NotePeerReady { peer });
-            if !host_role {
+            if apply(core, Command::NotePeerReady { peer }).is_err() {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("readiness rejected".to_string()),
+                );
+                return Err(());
+            }
+            if host_role {
+                if conn.send(&Msg::Started).await.is_err() {
+                    note(core, generation, NetNote::Disconnected);
+                    return Err(());
+                }
+            } else {
                 let me = {
                     let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
                     guard.me
                 };
-                if apply(core, Command::SetReady { peer: me }).is_err() {
-                    note(
-                        core,
-                        generation,
-                        NetNote::Error("guest readiness rejected".to_string()),
-                    );
-                    return Err(());
-                }
                 if conn.send(&Msg::Ready { peer: me }).await.is_err() {
                     note(core, generation, NetNote::Disconnected);
                     return Err(());
                 }
+            }
+            Ok(())
+        }
+        Msg::Started => {
+            if host_role || !is_current(core, generation) {
+                return Err(());
+            }
+            let me = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.me
+            };
+            let host = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.remote_peer
+            };
+            let Some(host) = host else {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("host identity missing".to_string()),
+                );
+                return Err(());
+            };
+            if apply(core, Command::NotePeerReady { peer: host }).is_err() {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("host readiness rejected".to_string()),
+                );
+                return Err(());
+            }
+            if apply(core, Command::SetReady { peer: me }).is_err() {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("host start rejected".to_string()),
+                );
+                return Err(());
             }
             Ok(())
         }

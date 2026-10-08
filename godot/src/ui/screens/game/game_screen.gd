@@ -99,15 +99,20 @@ func _on_clock_tick() -> void:
 
 
 func _update_clock_strip() -> void:
-	_opponent_clock.text = "%s  %s" % [_opponent_name.to_upper(), _format_clock(_black_seconds)]
-	_player_clock.text = "%s  YOU" % _format_clock(_white_seconds)
+	var local_side := _bridge.my_side() if _bridge != null else _ai_side.to_lower()
+	var local_is_black := local_side == "black"
+	var player_seconds := _black_seconds if local_is_black else _white_seconds
+	var opponent_seconds := _white_seconds if local_is_black else _black_seconds
+	var local_active := "black" if local_is_black else "white"
+	_opponent_clock.text = "%s  %s" % [_opponent_name.to_upper(), _format_clock(opponent_seconds)]
+	_player_clock.text = "%s  YOU" % _format_clock(player_seconds)
 	var active_color := Color(1.0, 0.94, 0.82, 1.0)
 	var idle_color := Color(0.72, 0.66, 0.58, 1.0)
 	var warning_color := Color(1.0, 0.45, 0.28, 1.0)
-	var opponent_color := warning_color if _black_seconds <= 60 \
-		else active_color if _active_clock_side == "black" else idle_color
-	var player_color := warning_color if _white_seconds <= 60 \
-		else active_color if _active_clock_side == "white" else idle_color
+	var opponent_color := warning_color if opponent_seconds <= 60 \
+		else active_color if _active_clock_side != local_active else idle_color
+	var player_color := warning_color if player_seconds <= 60 \
+		else active_color if _active_clock_side == local_active else idle_color
 	_opponent_clock.add_theme_color_override(
 		"font_color", opponent_color)
 	_player_clock.add_theme_color_override(
@@ -151,6 +156,7 @@ func _start_bridge() -> void:
 func _sync_bridge_snapshot() -> void:
 	if not _bridge.is_available() or _bridge.fen().is_empty():
 		return
+	_sync_board_perspective()
 	_rebuild_position()
 	_active_clock_side = _bridge.turn()
 	_move_number_label.text = "M%d" % _bridge.move_number()
@@ -174,8 +180,16 @@ func _connect_bridge_signals() -> void:
 
 
 func _on_core_game_started() -> void:
+	_sync_board_perspective()
 	_rebuild_position()
 	_header.set_center_text("Game started · %s to move" % _bridge.turn().capitalize())
+
+
+func _sync_board_perspective() -> void:
+	var side := _bridge.my_side()
+	if side.is_empty():
+		side = _ai_side.to_lower()
+	_board.set_player_side(side)
 
 
 func _on_peer_disconnected() -> void:

@@ -45,6 +45,12 @@ func _ready() -> void:
 	_build_input_surface()
 
 
+## The local player is always at the bottom. The Rust side assignment is the
+## authority; this only rotates the presentation and input coordinate frame.
+func set_player_side(side: String) -> void:
+	rotation_degrees.y = 180.0 if side.to_lower() == "black" else 0.0
+
+
 func square_to_world(square: String, height := 0.2) -> Vector3:
 	if square.length() != 2:
 		return Vector3.ZERO
