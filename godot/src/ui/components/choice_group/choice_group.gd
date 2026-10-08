@@ -13,12 +13,10 @@ signal selection_changed(choice: String, index: int)
 
 var _button_group := ButtonGroup.new()
 var _buttons: Array[Button] = []
-var _observer_label := ""
 
 
 func _ready() -> void:
 	_title_label.text = title
-	_observer_label = ""
 	_options_grid.columns = columns
 	_build_options()
 
@@ -45,7 +43,6 @@ func set_selection(index: int) -> void:
 		return
 	selected_index = index
 	_buttons[index].button_pressed = true
-	_refresh_button_labels()
 
 
 func get_selected_choice() -> String:
@@ -59,20 +56,14 @@ func set_enabled(enabled: bool) -> void:
 		button.disabled = not enabled
 
 
-## Makes a disabled network choice explicit instead of making it look broken.
-## The selected value remains the normal choice; the check prefix is only
-## presentation for the guest's host-owned snapshot.
-func set_observer_label(label: String) -> void:
-	_observer_label = label
-	_title_label.text = title if label.is_empty() else "%s · %s" % [title, label]
-	_refresh_button_labels()
-
-
-func _refresh_button_labels() -> void:
-	for index in range(_buttons.size()):
-		_buttons[index].text = choices[index]
-	if selected_index >= 0 and selected_index < _buttons.size() and not _observer_label.is_empty():
-		_buttons[selected_index].text = "✓ %s" % choices[selected_index]
+## Keeps the native pressed-state styling while preventing the guest from
+## changing the host-owned selection. Disabled buttons hide that styling in
+## the theme, so read-only uses input filtering instead of disabled visuals.
+func set_read_only(read_only: bool) -> void:
+	for button in _buttons:
+		button.disabled = false
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE if read_only else Control.MOUSE_FILTER_STOP
+		button.focus_mode = Control.FOCUS_NONE if read_only else Control.FOCUS_ALL
 
 
 func _build_options() -> void:

@@ -125,9 +125,9 @@ func _apply_net_setup() -> void:
 	_player_card.set_side(mine_shown)
 	_opponent_card.set_side(theirs)
 	if _peer_kind == "create":
-		_side_choice.set_observer_label("")
-		_time_choice.set_observer_label("")
-		_variant_choice.set_observer_label("")
+		_side_choice.set_read_only(false)
+		_time_choice.set_read_only(false)
+		_variant_choice.set_read_only(false)
 		_side_choice.set_enabled(true)
 		_time_choice.set_enabled(true)
 		_variant_choice.set_enabled(true)
@@ -137,12 +137,9 @@ func _apply_net_setup() -> void:
 		_play_button.disabled = false
 		_publish_net_setup()
 	else:
-		_side_choice.set_observer_label("Host selected")
-		_time_choice.set_observer_label("Host selected")
-		_variant_choice.set_observer_label("Host selected")
-		_side_choice.set_enabled(false)
-		_time_choice.set_enabled(false)
-		_variant_choice.set_enabled(false)
+		_side_choice.set_read_only(true)
+		_time_choice.set_read_only(true)
+		_variant_choice.set_read_only(true)
 		_play_button.text = "Waiting for host"
 		_play_button.tooltip_text = "The host controls the lobby"
 		_ready_label.text = "Waiting for the host to choose settings"
@@ -163,9 +160,6 @@ func _on_net_setup_changed(side: String, time: String, variant: String) -> void:
 		if _variant_choice.choices[index] == variant:
 			_variant_choice.set_selection(index)
 			break
-	_side_choice.set_observer_label("Host selected")
-	_time_choice.set_observer_label("Host selected")
-	_variant_choice.set_observer_label("Host selected")
 	_update_custom_time_visibility()
 	_update_summary()
 	_ready_label.text = "Host is readying the match · waiting to start"
