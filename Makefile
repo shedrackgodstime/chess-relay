@@ -103,8 +103,13 @@ _launch:
 	"$$APKSIGNER" verify "$(APK)" || { echo "EXPORT FAIL: signature invalid"; exit 1; }
 	"$(ADB)" shell am force-stop "$(PKG)"
 	@if [ "$(RESET)" = "1" ]; then \
-		"$(ADB)" shell pm clear "$(PKG)" >/dev/null || { echo "ANDROID RESET FAIL: could not clear $(PKG)"; exit 1; }; \
-		echo "CLEARED: Android app data for $(PKG)"; \
+		if "$(ADB)" shell pm clear "$(PKG)" >/dev/null 2>&1; then \
+			echo "CLEARED: Android app data for $(PKG)"; \
+		else \
+			echo "pm clear unavailable; uninstalling $(PKG) to clear app data"; \
+			"$(ADB)" uninstall "$(PKG)" >/dev/null || { echo "ANDROID RESET FAIL: could not clear $(PKG)"; exit 1; }; \
+			echo "CLEARED: Android app data for $(PKG) via uninstall"; \
+		fi; \
 	fi
 	"$(ADB)" install -r "$(APK)"
 	"$(ADB)" logcat -c
