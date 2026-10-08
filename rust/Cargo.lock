@@ -314,10 +314,13 @@ dependencies = [
  "iroh-tickets",
  "pkarr",
  "postcard",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_bytes",
  "sha2 0.10.9",
  "tokio",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -979,6 +982,22 @@ name = "gdextension-api"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3489a9e7463353467db3cfe3eb12de31c9b6200e4f928bde4959bf5db5b31d2f"
+
+[[package]]
+name = "genawaiter"
+version = "0.99.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c86bd0361bcbde39b13475e6e36cb24c329964aa2611be285289d1e4b751c1a0"
+dependencies = [
+ "futures-core",
+ "genawaiter-macro",
+]
+
+[[package]]
+name = "genawaiter-macro"
+version = "0.99.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b32dfe1fdfc0bbde1f22a5da25355514b5e450c33a6af6770884c8750aedfbc"
 
 [[package]]
 name = "generator"
@@ -2483,12 +2502,15 @@ dependencies = [
  "ed25519-dalek 3.0.0",
  "futures-buffered",
  "futures-lite",
+ "genawaiter",
  "getrandom 0.4.3",
  "log",
  "lru",
  "mainline",
  "ntimestamp",
  "reqwest",
+ "rustls",
+ "rustls-webpki",
  "self_cell",
  "serde",
  "sha1_smol",

@@ -42,6 +42,32 @@ const REPUBLISH_INTERVAL: Duration = Duration::from_secs(60);
 /// Resolve poll interval for guests.
 const RESOLVE_INTERVAL: Duration = Duration::from_secs(5);
 
+/// Builds the relay client without reqwest's Android platform verifier.
+///
+/// The bridge is a Godot GDExtension, not an Android Activity. Consequently
+/// no Android `Context` is available for rustls-platform-verifier's JNI
+/// initialization. An explicit Mozilla root set keeps normal certificate
+/// validation while remaining usable from the native extension boundary.
+fn client() -> Result<Client, TransportError> {
+    // Multiple dependencies use rustls with provider selection disabled. Set
+    // the one provider this application builds before any TLS config exists.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+    let mut roots = rustls::RootCertStore::empty();
+    roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
+    let tls = rustls::ClientConfig::builder()
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    let http = reqwest::Client::builder()
+        .use_preconfigured_tls(tls)
+        .build()
+        .map_err(|err| TransportError::unavailable_with_detail(err.to_string()))?;
+    let mut builder = Client::builder();
+    builder.reqwest_client(http);
+    builder
+        .build()
+        .map_err(|err| TransportError::unavailable_with_detail(err.to_string()))
+}
+
 /// Derives the rendezvous keypair from a human invite code.
 ///
 /// Deterministic: both sides derive identical keys from the code alone,
@@ -93,9 +119,7 @@ fn ticket_from_packet(packet: &SignedPacket) -> Option<EndpointTicket> {
 ///
 /// Returns [`TransportError`] when the pkarr client or packet fails.
 pub async fn publish_once(code: &str, ticket: &EndpointTicket) -> Result<(), TransportError> {
-    let client = Client::builder()
-        .build()
-        .map_err(|_| TransportError::unavailable())?;
+    let client = client()?;
     let packet = ticket_packet(code, ticket)?;
     client
         .publish(&packet)
@@ -130,9 +154,7 @@ pub async fn resolve_ticket(
 ) -> Result<EndpointTicket, TransportError> {
     let keypair = derive_keypair(code);
     let public_key = keypair.public_key();
-    let client = Client::builder()
-        .build()
-        .map_err(|_| TransportError::unavailable())?;
+    let client = client()?;
     let deadline = tokio::time::Instant::now() + timeout;
     while tokio::time::Instant::now() < deadline {
         match client.resolve(&public_key, ResolvePolicy::CacheFirst).await {
@@ -163,7 +185,7 @@ pub async fn resolve_ticket(
 /// instead of at TTL expiry. Best effort by design.
 pub async fn unpublish(code: &str) {
     let keypair = derive_keypair(code);
-    let Ok(client) = Client::builder().build() else {
+    let Ok(client) = client() else {
         return;
     };
     let Ok(tombstone) = SignedPacket::builder().sign(&keypair) else {
