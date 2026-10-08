@@ -332,6 +332,9 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 func _on_square_pressed(square: String) -> void:
 	if not _bridge.is_available():
 		return
+	if (_is_multiplayer or _is_ai) and _bridge.turn() != _bridge.my_side():
+		_header.set_center_text("Waiting for opponent")
+		return
 	if not _selected_piece_square.is_empty() and square in _legal_targets:
 		# A pawn reaching the last rank cannot move as two squares: the
 		# promotion piece is the player's call, so ask instead of assuming.
@@ -342,6 +345,11 @@ func _on_square_pressed(square: String) -> void:
 		if _bridge.submit_move(_selected_piece_square + square):
 			return
 		_header.set_center_text("Illegal move")
+		return
+	var occupied_side := str(_position_sides(_bridge.fen().split(" ")[0]).get(square, ""))
+	var local_side := _bridge.my_side().to_lower()
+	if (_is_multiplayer or _is_ai) and not occupied_side.is_empty() and occupied_side != local_side:
+		_header.set_center_text("Waiting for opponent")
 		return
 	_select_square(square, "", "")
 
@@ -362,7 +370,10 @@ func _on_piece_pressed(piece: ChessPieceView) -> void:
 		return
 	# Ownership applies when selecting a source piece. It must not block an
 	# opponent piece that is the destination of an already-selected capture.
-	if (_is_multiplayer or _is_ai) and piece.side != _bridge.my_side():
+	var local_side := _bridge.my_side().to_lower()
+	if (_is_multiplayer or _is_ai) and (
+		piece.side.to_lower() != local_side or _bridge.turn() != local_side
+	):
 		_header.set_center_text("Waiting for opponent")
 		return
 	_select_square(square, piece.side, piece.piece_type)

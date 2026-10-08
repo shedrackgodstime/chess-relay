@@ -743,7 +743,19 @@ impl ChessRelayBridge {
         };
         let outcome: Result<Vec<Event>, String> = {
             let mut core = self.lock();
-            match turn_peer(&core) {
+            let peer = if core.net.is_some() || core.ai.is_some() {
+                if turn_peer(&core) != Some(core.me) {
+                    return {
+                        drop(core);
+                        self.emit_error("waiting for opponent");
+                        false
+                    };
+                }
+                Some(core.me)
+            } else {
+                turn_peer(&core)
+            };
+            match peer {
                 None => Err("game not started".to_string()),
                 Some(peer) => match core.app.as_mut() {
                     Some(app) => app
