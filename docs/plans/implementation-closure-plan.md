@@ -58,13 +58,14 @@ source path and a stated owner.
 
 Baseline evidence from 2026-10-08:
 
-- Rust: 81 passed, 1 failed, 2 ignored. The failing test is
-  `bridge::tests::retire_completes_with_pending_accept`; its Iroh bind is
-  unavailable in this environment.
-- Godot: parsing and warning drift pass, but the full run is not clean: resume
-  persistence has four failures and the runner reports `156 of 147 checks ran`.
-- Godot verification is available through `/home/kristency/.local/bin/godot`,
-  but its log directory reports a separate `user://logs` write failure.
+- Rust: complete suite passed outside the restricted socket sandbox: 83 unit
+  tests, 23 integration tests, 21 doctests; 2 intentionally ignored tests.
+- Godot: complete suite passed with a writable `user://`: 26 scripts parsed,
+  warning drift passed, resume persistence passed, and the UI suite reported
+  exactly `156 of 156` checks.
+- The earlier Rust and Godot failures were environment-specific: the sandbox
+  blocked Iroh UDP binding and Godot user-data writes. They are retained in the
+  session record as evidence, not as code findings.
 
 ### Phase 1 — Contract reset and bridge disentangling
 

@@ -39,32 +39,33 @@ func _phase_done() -> void:
 	_phase_reached_end = true
 
 
-func _require_phase_completed(name: String) -> void:
-	_check(_phase_reached_end,
-		"phase %s ran to completion (a GDScript error skips the rest of a phase silently)" % name)
-
-
 func _run() -> void:
 	await process_frame
-	await _phase_run(_check_scene_contracts, "scene_contracts")
-	await _phase_run(_check_reusable_components, "reusable_components")
-	await _phase_run(_check_participant_and_setup_states, "participant_and_setup_states")
-	await _phase_run(_check_hub_interactions, "hub_interactions")
-	await _phase_run(_check_responsive_layouts, "responsive_layouts")
-	await _phase_run(_check_game_screen, "game_screen")
-	await _phase_run(_check_theme_contracts, "theme_contracts")
-	await _phase_run(_check_app_lifecycle, "app_lifecycle")
+	_phase("scene_contracts")
+	await _check_scene_contracts()
+	_check(_phase_reached_end, "phase scene_contracts ran to completion")
+	_phase("reusable_components")
+	await _check_reusable_components()
+	_check(_phase_reached_end, "phase reusable_components ran to completion")
+	_phase("participant_and_setup_states")
+	await _check_participant_and_setup_states()
+	_check(_phase_reached_end, "phase participant_and_setup_states ran to completion")
+	_phase("hub_interactions")
+	await _check_hub_interactions()
+	_check(_phase_reached_end, "phase hub_interactions ran to completion")
+	_phase("responsive_layouts")
+	await _check_responsive_layouts()
+	_check(_phase_reached_end, "phase responsive_layouts ran to completion")
+	_phase("game_screen")
+	await _check_game_screen()
+	_check(_phase_reached_end, "phase game_screen ran to completion")
+	_phase("theme_contracts")
+	_check_theme_contracts()
+	_check(_phase_reached_end, "phase theme_contracts ran to completion")
+	_phase("app_lifecycle")
+	await _check_app_lifecycle()
+	_check(_phase_reached_end, "phase app_lifecycle ran to completion")
 	_report()
-
-
-## Runs one phase and then proves it finished.
-##
-## `Callable` rather than a bare `await phase()` because the completion check has
-## to happen after the await, and that is only observable here.
-func _phase_run(phase: Callable, name: String) -> void:
-	_phase(name)
-	await phase.call()
-	_require_phase_completed(name)
 
 
 ## Prints the summary and the one number that catches a truncated run.
@@ -606,9 +607,12 @@ func _check_game_screen() -> void:
 	game._on_board_view_overlay_input(outside_click, _control(game, "HUD/BoardViewOverlay"))
 	_check(_control(game, "HUD/BoardViewOverlay").is_queued_for_deletion(),
 		"board view closes from an outside click")
-	for square: String in ["a1", "e4", "h8"]:
-		_check(game._board.world_to_square(game._board.square_to_world(square)) == square,
-			"board coordinate round trip works for %s" % square)
+	_check(game._board.world_to_square(game._board.square_to_world("a1")) == "a1",
+		"board coordinate round trip works for a1")
+	_check(game._board.world_to_square(game._board.square_to_world("e4")) == "e4",
+		"board coordinate round trip works for e4")
+	_check(game._board.world_to_square(game._board.square_to_world("h8")) == "h8",
+		"board coordinate round trip works for h8")
 	game._board.set_highlight("e4")
 	_check(game._board.get_highlighted_square() == "e4",
 		"board exposes selected square state")
