@@ -22,13 +22,9 @@ const MULTIPLAYER_HUB_SCREEN: PackedScene = preload(
 	"res://src/ui/screens/multiplayer_hub/multiplayer_hub_screen.tscn")
 const GAME_SCREEN: PackedScene = preload("res://src/ui/screens/game/game_screen.tscn")
 const IDENTITY_FILE := "user://chess_relay_identity.key"
-const MockMultiplayerServiceScript := preload(
-	"res://src/ui/multiplayer/mock_multiplayer_service.gd")
-
 @onready var _screen_host: Control = %ScreenHost
 
 var _current_screen: Control
-var _mock_multiplayer: MockMultiplayerService
 ## The networked session owner. Created on demand for the multiplayer
 ## flow and handed to the game screen, so host/join outlive the hub and
 ## the setup screen. Null until first use and after a full leave.
@@ -42,12 +38,6 @@ var _net_peer := ""
 
 func _ready() -> void:
 	get_window().min_size = MIN_WINDOW_SIZE
-	_mock_multiplayer = MockMultiplayerServiceScript.new()
-	add_child(_mock_multiplayer)
-	_mock_multiplayer.player_invite_accepted.connect(_on_player_invite_accepted)
-	_mock_multiplayer.player_invite_declined.connect(_on_player_invite_declined)
-	_mock_multiplayer.incoming_invite_received.connect(_on_incoming_invite_received)
-	_mock_multiplayer.opponent_ready.connect(_on_opponent_ready)
 	_show_home_screen()
 
 
@@ -78,13 +68,9 @@ func _on_p2p_requested() -> void:
 	hub.create_cancelled.connect(_on_invite_cancelled)
 	hub.join_requested.connect(_on_join_requested)
 	hub.join_cancelled.connect(_on_join_cancelled)
-	hub.player_invite_requested.connect(_on_player_invite_requested)
-	hub.player_invite_cancelled.connect(_on_player_invite_cancelled)
-	hub.incoming_invite_responded.connect(_on_incoming_invite_responded)
 	hub.game_setup_requested.connect(_on_peer_setup_requested)
 	_show_screen(hub)
 	hub.configure_recent_players(_net(), _identity_path())
-	_mock_multiplayer.start_hub_session()
 
 
 ## Hands the live network bridge to whoever needs it, wiring its
@@ -133,23 +119,6 @@ func _on_join_requested(code: String) -> void:
 func _on_join_cancelled(code: String) -> void:
 	_leave_network()
 	join_cancelled.emit(code)
-
-
-func _on_player_invite_requested(player_name: String) -> void:
-	_mock_multiplayer.invite_player(player_name)
-
-
-func _on_player_invite_cancelled() -> void:
-	_mock_multiplayer.cancel_player_invite()
-
-
-func _on_incoming_invite_received(player_name: String) -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).receive_incoming_invite(player_name)
-
-
-func _on_incoming_invite_responded(player_name: String, accepted: bool) -> void:
-	_mock_multiplayer.answer_incoming_invite(player_name, accepted)
 
 
 func _on_peer_setup_requested(opponent_name: String, setup_kind: String) -> void:
@@ -225,9 +194,8 @@ func _on_net_peer_disconnected() -> void:
 		(_current_screen as GameSetupScreen).notify_net_issue("Opponent disconnected.")
 
 
-## The live bridge, if any. Null when no networked session exists, so
-## mock flows (player invites) fall back to local boards instead of
-## binding a real endpoint for nothing.
+## The live bridge, if any. Null when no networked session exists; setup is
+## allowed to bind it only for a real host/join flow.
 func _net_if_live() -> ChessCoreBridge:
 	return _net_bridge
 
@@ -259,24 +227,8 @@ func _on_settings_requested() -> void:
 	settings_requested.emit()
 
 
-func _on_player_invite_accepted(player_name: String) -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).player_invite_accepted(player_name)
-
-
-func _on_player_invite_declined(player_name: String) -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).player_invite_declined(player_name)
-
-
-func _on_opponent_ready() -> void:
-	if _current_screen is GameSetupScreen:
-		(_current_screen as GameSetupScreen).opponent_ready()
-
-
 func _show_screen(screen: Control) -> void:
 	if _current_screen != null:
-		_mock_multiplayer.cancel_pending_requests()
 		_screen_host.remove_child(_current_screen)
 		_current_screen.queue_free()
 

@@ -138,8 +138,9 @@ Status: `Verified`; final protection is the store/bridge/UI regression gate —
 Current evidence: Rust now owns a bounded, persisted recent-peer index written
 only after successful network connection and exposed through the typed bridge.
 Godot renders those peer IDs newest-first and distinguishes empty from
-unavailable. The separate `MockMultiplayerService` still fabricates invite,
-incoming-player, and readiness preview flows.
+unavailable. The former `MockMultiplayerService` has been removed from the
+production tree; local setup-preview behavior is exercised directly by tests
+and is not wired into `AppRoot`.
 
 Verification evidence: `RecentPeerStore` persistence/deduplication tests pass;
 the rebuilt GDExtension exposes the query/status methods; and the full Godot
@@ -149,8 +150,8 @@ gate passes with the hub loading its empty recent-peer state through the bridge.
   it is not a current-presence or discovery claim.
 - Put the chosen data behind a Rust-owned query/persistence contract.
 - Render an honest loading, empty, unavailable, or populated state.
-- Remove hardcoded recent/player names from production flow. The separate mock
-  invite/readiness flows remain explicitly open until their backend contract is
+- Remove hardcoded recent/player names from production flow. Invite and
+  incoming-player controls remain unavailable until their backend contract is
   implemented; they must not be presented as real network state.
 - Refresh the index after the bridge reports a successful peer connection.
 - Add persistence and empty/error/reload tests.
@@ -216,7 +217,7 @@ report distinguishes verified behavior from unavailable evidence.
 | --- | --- | --- | --- |
 | `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality; app restart still open |
 | `JOIN-001` | Short-code implementation is not the displayed/used host contract | Implemented | Host-code → resolver contract and UI wiring; live rendezvous still open |
-| `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; full gate passes |
+| `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; production no longer instantiates the mock service |
 | `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring, startup-order protection, snapshot synchronization, and stale-generation tests; two-process UI integration still open |
 | `SAVE-001` | New games can be hijacked by persisted or finished sessions | Verified | Explicit fresh-start contract, finished-save rejection/purge in both resume paths, and Godot AI regression; user-facing Resume action remains a separate product surface |
 | `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |

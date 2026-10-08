@@ -8,9 +8,6 @@ signal create_requested
 signal create_cancelled
 signal join_requested(code: String)
 signal join_cancelled(code: String)
-signal player_invite_requested(player_name: String)
-signal player_invite_cancelled
-signal incoming_invite_responded(player_name: String, accepted: bool)
 signal game_setup_requested(opponent_name: String, setup_kind: String)
 
 ## The list row, loaded here rather than referred to by path at runtime so that a
@@ -54,8 +51,6 @@ var _join_is_connecting := false
 ## asks each row to do it and the row stays the thing that knows how.
 var _player_rows_added: Array[PlayerRow] = []
 var _active_invite_flow := ""
-var _current_player_invite := ""
-var _queued_incoming_invite := ""
 var _discoverable_nearby := true
 var _discoverable_online := false
 var _discovery_dialog: DiscoverySettingsDialog = null
@@ -119,81 +114,6 @@ func _clear_player_rows() -> void:
 		if is_instance_valid(row):
 			row.queue_free()
 	_player_rows_added.clear()
-
-
-func _show_mock_invite(player_name: String) -> void:
-	_active_invite_flow = "player-invite"
-	_current_player_invite = player_name
-	_invite_grid.hide()
-	_flow.show()
-	_set_player_invites_enabled(false)
-	_flow.show_flow("Invite %s" % player_name, "")
-	_flow.add_status("Invitation sent · waiting for response...")
-	_flow_cancel_button(_cancel_player_invite)
-	player_invite_requested.emit(player_name)
-
-
-## Mock or backend response: the invited player accepted.
-func player_invite_accepted(player_name: String) -> void:
-	if _active_invite_flow != "player-invite":
-		return
-	game_setup_requested.emit(player_name, "player")
-
-
-## Mock or backend response: keep the flow inline and let the user retry or leave.
-func player_invite_declined(player_name: String) -> void:
-	if _active_invite_flow != "player-invite":
-		return
-	_flow.show_flow("Invite %s" % player_name, "")
-	_flow.add_status("Invitation declined.")
-	_flow.add_action("Invite again").pressed.connect(_retry_player_invite)
-	_flow.add_action("Done", &"QuietButton").pressed.connect(_cancel_player_invite)
-
-
-func _retry_player_invite() -> void:
-	_show_mock_invite(_current_player_invite)
-
-
-func _cancel_player_invite() -> void:
-	_reset_invite_flow()
-	player_invite_cancelled.emit()
-
-
-## An incoming request uses the same inline card. Queue it if another flow is active.
-func receive_incoming_invite(player_name: String) -> void:
-	if not _active_invite_flow.is_empty():
-		_queued_incoming_invite = player_name
-		return
-	_show_incoming_invite(player_name)
-
-
-func _show_incoming_invite(player_name: String) -> void:
-	_active_invite_flow = "incoming-invite"
-	_current_player_invite = player_name
-	_invite_grid.hide()
-	_flow.show()
-	_set_player_invites_enabled(false)
-	_flow.show_flow("Game invitation", "%s invited you to play." % player_name)
-	_flow.add_action("Accept").pressed.connect(_accept_incoming_invite)
-	_flow.add_action("Decline", &"QuietButton").pressed.connect(_decline_incoming_invite)
-
-
-func _accept_incoming_invite() -> void:
-	if _active_invite_flow != "incoming-invite":
-		return
-	var player_name := _current_player_invite
-	incoming_invite_responded.emit(player_name, true)
-	game_setup_requested.emit(player_name, "incoming")
-
-
-func _decline_incoming_invite() -> void:
-	if _active_invite_flow != "incoming-invite":
-		return
-	var player_name := _current_player_invite
-	incoming_invite_responded.emit(player_name, false)
-	_flow.show_flow("", "")
-	_flow.add_status("Invitation declined.")
-	_flow_cancel_button(_reset_invite_flow)
 
 
 ## Opens the dialog, with the answers that are currently in force.
@@ -431,15 +351,10 @@ func _reset_invite_flow() -> void:
 	_active_invite_flow = ""
 	_create_waiting = false
 	_join_is_connecting = false
-	_current_player_invite = ""
 	_flow.hide()
 	_invite_grid.show()
 	_clear_invite_flow()
 	_set_player_invites_enabled(true)
-	if not _queued_incoming_invite.is_empty():
-		var queued_player := _queued_incoming_invite
-		_queued_incoming_invite = ""
-		_show_incoming_invite(queued_player)
 
 
 ## The card, emptied, without changing which flow is active.

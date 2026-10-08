@@ -159,3 +159,60 @@ Residual product decision: a dedicated user-facing “Resume Game” action is n
 yet implemented. Resume remains an explicit bridge API for in-progress saves;
 finished saves are never resumed as playable sessions, and newly configured
 games cannot silently adopt the old save.
+
+---
+
+## 7. UX Specification: Post-Game Modal & Winner Affirmation
+
+### 1. The UX Problem in Current `GameScreen`
+When a game reaches a terminal state (`game_ended` signal):
+1. **Quiet, Missable Announcement:** The only UI change is `_header.set_center_text(_end_text(reason))`. This is a small, quiet 14px label at the very top of the window, easily overlooked on desktop and mobile screens.
+2. **Dead-End Experience (No Call to Action):** The board simply stops accepting input (`_finished = true`), with no modal, no banner, and no primary action buttons appearing. The player is left staring at a frozen board without an intuitive next step.
+3. **Friction to Replay:** To play another game or return to the main menu, the player must:
+   - Tap a small 42px burger button in the top-right corner.
+   - Click "Leave game".
+   - Confirm a "Leave game?" modal dialog.
+   - Navigate back through Home $\to$ Game Setup $\to$ Play.
+4. **Stale Menu Actions:** Even after a game is over, opening the hamburger menu still displays "Offer draw" alongside "Leave game".
+
+### 2. Comparison with `ref/chess-relay`
+In [`ref/chess-relay`](file:///home/kristency/Projects/chess-relay/ref/chess-relay):
+- **Prominent Banner ([`tools/build_main_scene.gd:266`](file:///home/kristency/Projects/chess-relay/ref/chess-relay/tools/build_main_scene.gd#L266)):**
+  `GameOverLabel` was a large, high-contrast 34pt font banner centered over the board:
+  - Position: `Vector2(-190.0, 168.0)`, size `Vector2(380.0, 56.0)`.
+  - Color: Warm Gold `Color(1.0, 0.90, 0.72)` with an 8px dark outline.
+  - Explicit outcomes: `"CHECKMATE · White wins"`, `"STALEMATE · draw"`, `"DRAW · threefold repetition"`, etc.
+- **Immediate Replay Affordance ([`ui/hud.gd:192`](file:///home/kristency/Projects/chess-relay/ref/chess-relay/ui/hud.gd#L192), [`main.gd:144`](file:///home/kristency/Projects/chess-relay/ref/chess-relay/main.gd#L144)):**
+  - HUD emitted `new_game_requested` which called `start_new_game()` directly, resetting the board and starting play immediately without navigating through menus.
+  - HUD emitted `quit_requested` which smoothly returned to the lobby.
+
+### 3. UX Design Requirements for Production Game-Over Flow
+
+To provide a polished, clear chess experience, `GameScreen` requires a dedicated **Post-Game Modal / Card**:
+
+#### A. Visual Presentation (Post-Game Card)
+Upon receiving `game_ended`:
+- Display a modal card (styled with the theme's `Card` variation and `ModalBackdrop` wash) centered over the screen.
+- **Header:**
+  - In single-player/AI: `"Victory!"` (if player won), `"Defeat"` (if player lost), or `"Draw"`.
+  - In multiplayer/local: `"White Wins"`, `"Black Wins"`, or `"Game Drawn"`.
+- **Reason Subtitle:**
+  - `"by Checkmate"`, `"by Resignation"`, `"by Stalemate"`, `"by Agreement"`, `"by Fifty-Move Rule"`, etc.
+- **Action Buttons (3-tier hierarchy):**
+  1. **Primary Button ("Play Again" / "Rematch"):**
+     - Single-player AI: Immediately starts a fresh game with the same AI difficulty and chosen side (or auto-flipped side if desired).
+     - Networked peer: Sends a rematch offer or returns to setup ready state.
+  2. **Secondary Button ("Return to Home" / "Leave"):**
+     - Cleanly retires the session, cleans up the temporary save, and transitions back to `HomeScreen` (or `MultiplayerHubScreen`).
+  3. **Tertiary Button / Backdrop Tap ("Review Board"):**
+     - Dismisses or minimizes the modal card so the player can analyze the final board state and move history.
+     - When minimized, a persistent pill/button bar remains visible on the HUD: `[ Play Again ]  [ Leave ]`.
+
+#### B. Dynamic Hamburger Menu Cleanup
+When `_finished == true`:
+- Remove `"Offer draw"` from the game menu (an offer is illegal after terminal state).
+- Display `"Play again"` and `"Return to Home"` directly inside the menu.
+
+#### C. Board Presentation on Game Over
+- Highlight the checkmated King's square in red/danger tone (`Theme` warning color) if the game ended in checkmate.
+- Clear any lingering selection or legal move markers.
