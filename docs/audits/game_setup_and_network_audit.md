@@ -369,3 +369,23 @@ Phase 3: UI Correction & Polish
 ├── Either hide or implement real time controls / remove fabricated clocks
 └── Decompose `bridge.rs` into modular network, AI, and storage services
 ```
+
+---
+
+## Follow-up from player reports
+
+A player-visible audit was produced from device reports on 2026-10-08:
+[`player_visible_defects.md`](player_visible_defects.md). It confirms every
+finding above as still present, and adds detail or new findings:
+
+- **F-01** confirmed as the cause of "setup cards show titles only" — with an
+  additional layout defect this document does not cover (fixed
+  `custom_minimum_size` leaves empty cards once the contents are hidden).
+- **F-03** extended beyond the bridge: the same turn-ownership assumption is
+  load-bearing in `game_screen.gd` in two places, so it affects captures and
+  draw offers, not just the two `#[func]`s named above.
+- **F-06** extended to the in-game leave path, which produces no
+  opponent-visible event.
+- Four findings not in this document: a string-typed `setup_kind` compared in two
+  files, a guard flag that cannot fail, and two proposed gates whose absence is
+  the root cause of this class of defect shipping.

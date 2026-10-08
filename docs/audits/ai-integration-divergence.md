@@ -106,6 +106,29 @@ The AI column must not become a second chess implementation. Its only special
 behavior is choosing a move for its side and submitting it through the same
 contract.
 
+### A second cause of the same symptom, three layers down
+
+The row *"Tap legal opponent destination → Submit capture"* is the one that
+failed. A player reported on 2026-10-08 that capturing AI pieces still does not
+work, so the fix above may not be the whole story.
+
+`chess_core::game::legal_moves()` generates for **the side to move**, not for the
+piece occupying a square, and `Query::LegalMoves { from }` only filters that list
+by origin. So `_select_square` populates `_legal_targets` from
+`legal_moves_from(square)` regardless of who owns that square. Tapping an
+opponent piece while it is *not* that piece's turn yields an empty
+`_legal_targets`, the capture shortcut never fires, and the ownership guard
+returns "Waiting for opponent" instead.
+
+In local/hotseat the guard does not run, so the identical gesture succeeds —
+which is why the divergence reads as an AI problem when it is an input-path
+problem.
+
+See [`player_visible_defects.md`](player_visible_defects.md) §1 for the trace,
+the two candidate causes, and the gate that would tell them apart. Note that
+this gate cannot run on a device that cannot load the GDExtension library, which
+is the condition the original divergence was found under.
+
 ## Failure modes found or exposed
 
 ### 1. Capture surface precedence

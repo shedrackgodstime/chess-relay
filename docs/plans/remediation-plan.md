@@ -497,6 +497,14 @@ diverge — which is why the fix could pass locally and fail for the AI.
 Not the plan's order. The plan's order is right for the architectural work; this
 is the order that keeps the gates honest while that happens.
 
+**Read first:** [`player_visible_defects.md`](../audits/player_visible_defects.md),
+written the same day from player reports on real hardware. It confirms all nine
+findings above as still present, extends F-03 into the client, extends F-06 to
+the in-game leave path, and names four things this plan does not cover — a
+string-typed `setup_kind` compared in two files, a guard flag that cannot fail, a
+fixed `custom_minimum_size` that leaves empty cards once the lifecycle inversion
+hides their contents, and the gates whose absence let all of it ship.
+
 1. **Add the `--import` step to CI** (§4b). Without it the Godot gate fails on a
    cold cache for a reason unrelated to the change, which teaches people to
    ignore the gate.
