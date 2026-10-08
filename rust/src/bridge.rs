@@ -17,7 +17,7 @@ use crate::ai::{Adaptation, Difficulty, LocalAiEngine, Personality, SearchContro
 use crate::app::{App, Command, Event, Query, QueryResult};
 use crate::chess_core::{Board, Color as ChessColor, Move, Square};
 use crate::protocol::{Msg, PROTOCOL_VERSION};
-use crate::session::{LogEntry, LogStore, PeerId};
+use crate::session::{LogEntry, LogStore, PeerId, RecentPeerStore};
 use crate::transport::{Connection, Endpoint as _, TransportError};
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
@@ -44,6 +44,7 @@ struct CoreState {
     remote_peer: Option<PeerId>,
     offer_by: Option<PeerId>,
     save_path: Option<String>,
+    recent_peers_path: Option<std::path::PathBuf>,
     outbox: VecDeque<Event>,
     net: Option<NetState>,
     net_notes: VecDeque<NetNote>,
@@ -104,7 +105,7 @@ struct NetLaunch {
 /// Facts from network tasks for the scene thread to announce.
 #[derive(Debug)]
 enum NetNote {
-    Connected(String),
+    Connected(PeerId),
     /// Slice C pushes this when its driver sees the peer go away.
     #[allow(dead_code)]
     Disconnected,
@@ -334,7 +335,7 @@ impl ChessRelayBridge {
         finish_retire(old);
         let launch = {
             let mut core = self.lock();
-            match start_network(&mut core, seed) {
+            match start_network(&mut core, seed, recent_peers_path(&identity_path)) {
                 Ok(launch) => launch,
                 Err(message) => {
                     drop(core);
@@ -417,7 +418,7 @@ impl ChessRelayBridge {
         finish_retire(old);
         let launch = {
             let mut core = self.lock();
-            match start_network(&mut core, seed) {
+            match start_network(&mut core, seed, recent_peers_path(&identity_path)) {
                 Ok(launch) => launch,
                 Err(message) => {
                     drop(core);
@@ -541,6 +542,36 @@ impl ChessRelayBridge {
                 false
             }
         }
+    }
+
+    /// Returns the ordered local index of peers seen through successful
+    /// network connections. The index is observation data, not session truth.
+    #[func]
+    fn recent_players(&mut self, identity_path: String) -> PackedStringArray {
+        let mut players = PackedStringArray::new();
+        match RecentPeerStore::new(&recent_peers_path(&identity_path)).load() {
+            Ok(peers) => {
+                for peer in peers {
+                    let display = peer.to_string();
+                    let display = GString::from(display.as_str());
+                    players.push(&display);
+                }
+            }
+            Err(err) => {
+                self.emit_error(&format!("recent peer history unavailable: {err}"));
+            }
+        }
+        players
+    }
+
+    /// Reports whether the local recent-peer index can be read.
+    #[func]
+    fn recent_players_status(&self, identity_path: String) -> GString {
+        let status = match RecentPeerStore::new(&recent_peers_path(&identity_path)).load() {
+            Ok(_) => "ready",
+            Err(_) => "unavailable",
+        };
+        GString::from(status)
     }
 
     /// Marks a side ready (`"white"` or `"black"`); second starts play.
@@ -833,7 +864,19 @@ impl INode for ChessRelayBridge {
         for note in &notes {
             match note {
                 NetNote::Connected(peer) => {
-                    let peer = GString::from(peer);
+                    let record_error = {
+                        let core = self.lock();
+                        core.recent_peers_path.as_ref().and_then(|path| {
+                            RecentPeerStore::new(path)
+                                .record(*peer)
+                                .err()
+                                .map(|err| err.to_string())
+                        })
+                    };
+                    if let Some(message) = record_error {
+                        self.emit_error(&format!("recent peer history unavailable: {message}"));
+                    }
+                    let peer = GString::from(&peer.to_string());
                     self.signals().peer_connected().emit(&peer);
                 }
                 NetNote::Disconnected => {
@@ -1205,7 +1248,11 @@ fn turn_peer(core: &CoreState) -> Option<PeerId> {
 /// Builds a runtime, binds an endpoint on the persisted installation seed, records `me`,
 /// clears any previous session, and retires any previous network.
 /// Returns the handoff a link task needs after setup.
-fn start_network(core: &mut CoreState, seed: [u8; 32]) -> Result<NetLaunch, String> {
+fn start_network(
+    core: &mut CoreState,
+    seed: [u8; 32],
+    recent_path: std::path::PathBuf,
+) -> Result<NetLaunch, String> {
     let secret = SigningKey::from_bytes(&seed);
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -1222,6 +1269,7 @@ fn start_network(core: &mut CoreState, seed: [u8; 32]) -> Result<NetLaunch, Stri
     let generation = core.net_generation;
     core.me = me;
     core.remote_peer = None;
+    core.recent_peers_path = Some(recent_path);
     core.app = Some(App::with_local(secret));
     core.outbox.clear();
     core.offer_by = None;
@@ -1289,7 +1337,7 @@ async fn accept_task(
         }
         guard.remote_peer = Some(guest);
     }
-    note(&core, generation, NetNote::Connected(guest.to_string()));
+    note(&core, generation, NetNote::Connected(guest));
     drive_session(core, conn, cmd_rx, generation).await;
 }
 
@@ -1333,7 +1381,7 @@ async fn join_task(
         }
         guard.remote_peer = Some(host);
     }
-    note(&core, generation, NetNote::Connected(host.to_string()));
+    note(&core, generation, NetNote::Connected(host));
     drive_session(core, conn, cmd_rx, generation).await;
 }
 
@@ -1707,6 +1755,12 @@ fn load_or_create_seed(path: &str) -> Result<[u8; 32], crate::session::StoreErro
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&bytes);
     Ok(seed)
+}
+
+/// Keeps identity material and the peer index in the same installation-owned
+/// directory without making the index part of the identity file itself.
+fn recent_peers_path(identity_path: &str) -> std::path::PathBuf {
+    std::path::Path::new(identity_path).with_file_name("chess_relay_recent_peers.bin")
 }
 
 const INVITE_CODE_ALPHABET: &[u8] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";

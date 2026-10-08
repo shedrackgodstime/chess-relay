@@ -77,7 +77,48 @@ func _ready() -> void:
 ## worse than an explicit empty state because they imply real availability.
 func _show_empty_players() -> void:
 	_player_rows.show()
+	_empty_players_label.text = "No recent players yet."
 	_empty_players_label.show()
+
+
+## Loads only Rust-owned observations. A peer row is not an online presence
+## claim; it means this installation previously connected to that peer.
+func configure_recent_players(bridge: ChessCoreBridge, identity_path: String) -> void:
+	if bridge.recent_players_status(identity_path) != "ready":
+		_show_recent_players_unavailable()
+		return
+	var peers := bridge.recent_players(identity_path)
+	_clear_player_rows()
+	if peers.is_empty():
+		_show_empty_players()
+		return
+	_empty_players_label.hide()
+	_player_rows.show()
+	for peer in peers:
+		var row := PLAYER_ROW_SCENE.instantiate() as PlayerRow
+		_player_rows.add_child(row)
+		row.configure("Peer %s" % str(peer), "Seen recently", true)
+		row.set_invite_enabled(false)
+		_player_rows_added.append(row)
+
+
+## Re-reads the same Rust-owned index after a successful connection fact.
+func refresh_recent_players(bridge: ChessCoreBridge, identity_path: String) -> void:
+	configure_recent_players(bridge, identity_path)
+
+
+func _show_recent_players_unavailable() -> void:
+	_clear_player_rows()
+	_player_rows.show()
+	_empty_players_label.text = "Recent players unavailable."
+	_empty_players_label.show()
+
+
+func _clear_player_rows() -> void:
+	for row in _player_rows_added:
+		if is_instance_valid(row):
+			row.queue_free()
+	_player_rows_added.clear()
 
 
 func _show_mock_invite(player_name: String) -> void:

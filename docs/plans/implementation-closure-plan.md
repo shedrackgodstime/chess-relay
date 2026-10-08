@@ -59,7 +59,7 @@ source path and a stated owner.
 
 Baseline evidence from 2026-10-08:
 
-- Rust: complete suite passed outside the restricted socket sandbox: 83 unit
+- Rust: complete suite passed outside the restricted socket sandbox: 84 unit
   tests, 26 integration tests, 21 doctests; 2 intentionally ignored tests.
 - Godot: complete suite passed with a writable `user://`: 26 scripts parsed,
   warning drift passed, resume persistence passed, and the UI suite reported
@@ -132,22 +132,27 @@ handshake, and session outcomes.
 
 ### Phase 4 — Remove invented recent/discovery state
 
-Status: `Implemented` for removing fabricated rows; authoritative data source
-remains open — `RECENT-001`.
+Status: `Verified`; final protection is the store/bridge/UI regression gate —
+`RECENT-001`.
 
-Current evidence: `MultiplayerHubScreen._populate_mock_players()` inserts four
-hardcoded rows; `MockMultiplayerService` fabricates invites, incoming players,
-and readiness.
+Current evidence: Rust now owns a bounded, persisted recent-peer index written
+only after successful network connection and exposed through the typed bridge.
+Godot renders those peer IDs newest-first and distinguishes empty from
+unavailable. The separate `MockMultiplayerService` still fabricates invite,
+incoming-player, and readiness preview flows.
 
-- Decide and document the real meaning of “recent”: local completed/joined
-  sessions, discovered peers, or both. They are different data sets.
+Verification evidence: `RecentPeerStore` persistence/deduplication tests pass;
+the rebuilt GDExtension exposes the query/status methods; and the full Godot
+gate passes with the hub loading its empty recent-peer state through the bridge.
+
+- “Recent” means local peers observed through successful network connections;
+  it is not a current-presence or discovery claim.
 - Put the chosen data behind a Rust-owned query/persistence contract.
 - Render an honest loading, empty, unavailable, or populated state.
 - Remove hardcoded recent/player names from production flow. The separate mock
   invite/readiness flows remain explicitly open until their backend contract is
   implemented; they must not be presented as real network state.
-- Until the source exists, render an explicit empty state instead of pretending
-  that the feature is populated.
+- Refresh the index after the bridge reports a successful peer connection.
 - Add persistence and empty/error/reload tests.
 
 Exit condition: every displayed row has a real source, stable identity, defined
@@ -207,7 +212,7 @@ report distinguishes verified behavior from unavailable evidence.
 | --- | --- | --- | --- |
 | `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality; app restart still open |
 | `JOIN-001` | Short-code implementation is not the displayed/used host contract | Implemented | Host-code → resolver contract and UI wiring; live rendezvous still open |
-| `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Confirmed | Real query/persistence source + empty/error tests |
+| `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; full gate passes |
 | `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring + stale-generation tests; two-process UI integration still open |
 | `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |
 

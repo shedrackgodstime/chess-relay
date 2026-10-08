@@ -117,6 +117,20 @@ func save_game() -> bool:
 	return saved
 
 
+## Returns the Rust-owned recent network-peer index, newest first.
+func recent_players(identity_path: String) -> PackedStringArray:
+	if _core == null:
+		return PackedStringArray()
+	return _core.call(&"recent_players", identity_path)
+
+
+## Returns "ready" or "unavailable" for the recent-peer index.
+func recent_players_status(identity_path: String) -> String:
+	if _core == null:
+		return "unavailable"
+	return str(_core.call(&"recent_players_status", identity_path))
+
+
 ## Whether the Rust core is loaded and holding a session.
 func is_available() -> bool:
 	return _core != null

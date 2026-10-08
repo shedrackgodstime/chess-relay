@@ -198,12 +198,12 @@ size_flags_horizontal = 3
 [node name="PresenceLegend" type="Label" parent="Workspace/Margins/Content/PlayersSection/PlayersHeading"]
 layout_mode = 2
 theme_type_variation = &"QuietLabel"
-text = "Nearby  ·  Online"
+text = "Recent connections"
 
 [node name="PlayersDescription" type="Label" parent="Workspace/Margins/Content/PlayersSection"]
 layout_mode = 2
 theme_type_variation = &"QuietLabel"
-text = "Nearby and online players appear here automatically. Recent players appear in this list when they’re online."
+text = "Peers you have connected to recently appear here."
 autowrap_mode = 2
 
 [node name="PlayerList" type="ScrollContainer" parent="Workspace/Margins/Content/PlayersSection"]

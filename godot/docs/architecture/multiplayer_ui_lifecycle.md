@@ -1,10 +1,10 @@
 # Multiplayer UI lifecycle
 
-The multiplayer hub is a UI-only flow. `MultiplayerHubScreen` owns the
-presentation of invite choices, code entry, player rows, and incoming or
-outgoing invite status. `app_root.gd` owns screen changes. The current
-`MockMultiplayerService` supplies delayed outcomes so these states can be
-reviewed without a connection implementation.
+The multiplayer hub owns presentation and user intent for invite choices, code
+entry, player rows, and incoming or outgoing invite status. `app_root.gd` owns
+screen changes and the typed bridge. Rust owns the recent-peer index and live
+network outcomes. The `MockMultiplayerService` supplies only the explicitly
+labelled preview invite flows that do not yet have a backend contract.
 
 Keep this separation when backend work begins: the backend should report
 events and receive user intent through the app layer. It should not own screen
@@ -14,20 +14,23 @@ controls or require the hub to know how a connection is established.
 
 ```text
 Multiplayer hub
-├── Create invite -> show code and wait -> peer connected -> Game Setup
-├── Join by code -> connecting -> failed/retry or connected -> Game Setup
+├── Create invite -> show code and wait -> transport connected -> Game Setup
+│   └── host starts -> session created -> guest ready -> game started -> board
+├── Join by code -> resolving/connecting -> failed/retry or connected -> Setup
+│   └── session created -> guest ready -> game started -> board
 ├── Invite listed player -> wait -> declined/retry or accepted -> Game Setup
 └── Receive invite -> accept -> Game Setup or decline -> return to hub
 
 Peer Game Setup -> local Ready -> wait for peer Ready -> both ready
 ```
 
-Create, join, direct player invitations, and incoming invitations all use the
-hub's shared full-width invite card. The small Create and Join cards are hidden
+Create and join use the live bridge; direct player invitations and incoming
+invitations remain preview flows. All use the hub's shared full-width invite
+card. The small Create and Join cards are hidden
 while a flow is active, as are the player-list Invite buttons. An incoming
 invitation received during another flow is queued and shown when that flow
-ends. Accepting any peer invitation reuses `GameSetupScreen`; reaching the
-ready state is the end of this UI preview and does not start a chess game.
+ends. Accepting a preview peer invitation reuses `GameSetupScreen`; reaching
+the ready state is the end of that UI preview and does not start a chess game.
 
 ## Screen and app event boundary
 
@@ -44,12 +47,12 @@ ready state is the end of this UI preview and does not start a chess game.
 | `incoming_invite_responded(player_name, accepted)` | Send the user's accept or decline response. |
 | `game_setup_requested(opponent_name, setup_kind)` | Open shared peer Game Setup after acceptance/connection. |
 
-The app routes results back to the hub through `opponent_connected`,
-`opponent_left`, `join_connected`, `join_failed`, `receive_incoming_invite`,
-`player_invite_accepted`, and `player_invite_declined`. Game Setup exposes
-`configure_peer` and `opponent_ready` for peer-specific presentation and
-readiness updates. Preserve these screen-facing responsibilities when
-replacing the mock event source.
+The app routes results back to the hub through the live bridge for transport
+and session events, and through `receive_incoming_invite`,
+`player_invite_accepted`, and `player_invite_declined` for preview flows. Game
+Setup exposes `configure_peer` and the live bridge setup contract for
+peer-specific presentation and readiness updates. Preserve these screen-facing
+responsibilities when replacing the remaining mock event source.
 
 ## Mock scenarios
 
@@ -84,7 +87,8 @@ the UI preference model independent of the eventual transport or discovery
 implementation. Persistence and consent wording should be settled with the
 Settings UI; do not treat the current in-memory defaults as a final policy.
 
-The player rows are static UI fixtures today. Their names, presence labels,
-and Recent markers are not an account or identity model. A later UI pass can
-cover loading and empty-list presentation when those states are ready to
-review; no connection behavior is specified here.
+The player rows are observations from Rust's installation-local recent-peer
+index. A row means that this installation successfully connected to that peer;
+it does not claim that the peer is online now. Rust owns the index and its
+newest-first ordering, while Godot renders the populated, empty, or unavailable
+state.

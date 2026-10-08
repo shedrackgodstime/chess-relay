@@ -83,6 +83,7 @@ func _on_p2p_requested() -> void:
 	hub.incoming_invite_responded.connect(_on_incoming_invite_responded)
 	hub.game_setup_requested.connect(_on_peer_setup_requested)
 	_show_screen(hub)
+	hub.configure_recent_players(_net(), _identity_path())
 	_mock_multiplayer.start_hub_session()
 
 
@@ -197,7 +198,9 @@ func _on_game_leave_requested() -> void:
 func _on_net_peer_connected(peer: String) -> void:
 	_net_peer = peer
 	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).peer_linked(peer)
+		var hub := _current_screen as MultiplayerHubScreen
+		hub.refresh_recent_players(_net(), _identity_path())
+		hub.peer_linked(peer)
 
 
 func _on_net_game_started() -> void:

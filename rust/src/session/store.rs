@@ -19,6 +19,7 @@
 //! ```
 
 use super::log::LogEntry;
+use super::log::PeerId;
 use std::backtrace::Backtrace;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -27,6 +28,12 @@ use std::path::{Path, PathBuf};
 const MAGIC: &[u8; 6] = b"CRLOG1";
 /// File format version.
 const FILE_VERSION: u16 = 1;
+/// File magic for the local recent-peer index.
+const RECENT_MAGIC: &[u8; 6] = b"CRPEER";
+/// Recent-peer index format version.
+const RECENT_FILE_VERSION: u16 = 1;
+/// Bound local history so the index cannot grow without limit.
+const MAX_RECENT_PEERS: usize = 20;
 
 /// Local persistence behind an interface: save entries, load them back.
 pub trait LogStore {
@@ -128,6 +135,72 @@ impl From<postcard::Error> for StoreError {
 /// File-backed log store at a platform-provided path.
 pub struct FileStore {
     path: PathBuf,
+}
+
+/// Rust-owned local index of peers observed through successful network links.
+///
+/// Ordering is the freshness contract: index zero is the most recently
+/// connected peer. Peer IDs are deduplicated, and the index is bounded.
+pub struct RecentPeerStore {
+    path: PathBuf,
+}
+
+impl RecentPeerStore {
+    /// Stores the index at `path`.
+    #[must_use]
+    pub fn new(path: &Path) -> Self {
+        Self {
+            path: path.to_path_buf(),
+        }
+    }
+
+    /// Loads the ordered peer index, empty when it does not exist.
+    pub fn load(&self) -> Result<Vec<PeerId>, StoreError> {
+        let bytes = match std::fs::read(&self.path) {
+            Ok(bytes) => bytes,
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(err) => return Err(err.into()),
+        };
+        if bytes.len() < 8 || &bytes[..6] != RECENT_MAGIC {
+            return Err(StoreError::decode("bad recent-peer magic".to_string()));
+        }
+        if u16::from_le_bytes(
+            bytes[6..8]
+                .try_into()
+                .map_err(|_| StoreError::decode("short recent-peer header".to_string()))?,
+        ) != RECENT_FILE_VERSION
+        {
+            return Err(StoreError::decode(
+                "unsupported recent-peer version".to_string(),
+            ));
+        }
+        let peers: Vec<PeerId> = postcard::from_bytes(&bytes[8..])?;
+        if peers.len() > MAX_RECENT_PEERS {
+            return Err(StoreError::decode(
+                "recent-peer index exceeds bound".to_string(),
+            ));
+        }
+        if peers.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(StoreError::decode(
+                "recent-peer index contains duplicates".to_string(),
+            ));
+        }
+        Ok(peers)
+    }
+
+    /// Records one successfully connected peer as the newest entry.
+    pub fn record(&mut self, peer: PeerId) -> Result<(), StoreError> {
+        let mut peers = self.load()?;
+        peers.retain(|known| *known != peer);
+        peers.insert(0, peer);
+        peers.truncate(MAX_RECENT_PEERS);
+        let mut bytes = Vec::with_capacity(8 + peers.len() * 34);
+        bytes.extend_from_slice(RECENT_MAGIC);
+        bytes.extend_from_slice(&RECENT_FILE_VERSION.to_le_bytes());
+        bytes.extend(postcard::to_stdvec(&peers)?);
+        std::fs::write(&self.path, bytes)?;
+        Ok(())
+    }
 }
 
 impl FileStore {
@@ -282,6 +355,23 @@ mod tests {
             7
         ));
         assert!(FileStore::new(&path).load().unwrap().is_empty());
+    }
+
+    #[test]
+    fn recent_peer_store_deduplicates_and_orders_by_latest_connection() {
+        let path = std::env::temp_dir().join(format!(
+            "chess-relay-recent-peers-{}-{}.bin",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let first = PeerId::of(&SigningKey::from_bytes(&[3u8; 32]));
+        let second = PeerId::of(&SigningKey::from_bytes(&[4u8; 32]));
+        let mut store = RecentPeerStore::new(&path);
+        store.record(first).unwrap();
+        store.record(second).unwrap();
+        store.record(first).unwrap();
+        assert_eq!(store.load().unwrap(), vec![first, second]);
+        std::fs::remove_file(path).ok();
     }
 
     #[test]
