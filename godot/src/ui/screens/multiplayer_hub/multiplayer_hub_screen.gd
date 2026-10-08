@@ -32,6 +32,7 @@ const CODE_LENGTH := 6
 ## different kind of one.
 @onready var _flow: InviteFlowCard = %InviteFlowCard
 @onready var _player_rows: VBoxContainer = %PlayerRows
+@onready var _empty_players_label: Label = %EmptyPlayersLabel
 @onready var _profile_status: Label = %ProfileStatus
 @onready var _create_invite_button: Button = %CreateInviteButton
 @onready var _join_game_button: Button = %JoinGameButton
@@ -66,29 +67,17 @@ func _ready() -> void:
 	_join_game_button.pressed.connect(_begin_join_flow)
 	(_discovery_settings_button).pressed.connect(_show_discovery_settings)
 	_build_discovery_dialog()
-	_populate_mock_players()
+	_show_empty_players()
 	get_viewport().size_changed.connect(_update_responsive_layout)
 	_update_responsive_layout()
 
 
-func _populate_mock_players() -> void:
-	_player_rows.add_child(_build_mock_player_row("Ayo", "Nearby", false))
-	_player_rows.add_child(_build_mock_player_row("KnightOwl", "Online", false))
-	_player_rows.add_child(_build_mock_player_row("Kemi", "Nearby", true))
-	_player_rows.add_child(_build_mock_player_row("RookRunner", "Online", true))
-
-
-## A person in the list. The row is a scene and this only says who it is.
-##
-## The row used to be built here, out of seven nodes, in a loop over mock names.
-## That put a reusable piece of interface inside one screen's script, where it
-## could not be seen or edited in the editor and could not be used anywhere else.
-func _build_mock_player_row(player_name: String, presence: String, is_recent: bool) -> PlayerRow:
-	var row := PLAYER_ROW_SCENE.instantiate() as PlayerRow
-	row.invite_pressed.connect(_show_mock_invite.bind(player_name))
-	row.configure(player_name, presence, is_recent)
-	_player_rows_added.append(row)
-	return row
+## The list is intentionally empty until an authoritative discovery/recent-data
+## source is wired through the application contract. Invented player rows are
+## worse than an explicit empty state because they imply real availability.
+func _show_empty_players() -> void:
+	_player_rows.show()
+	_empty_players_label.show()
 
 
 func _show_mock_invite(player_name: String) -> void:

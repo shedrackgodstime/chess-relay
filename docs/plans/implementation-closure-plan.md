@@ -126,7 +126,8 @@ handshake, and session outcomes.
 
 ### Phase 4 — Remove invented recent/discovery state
 
-Status: `Confirmed` — `RECENT-001`.
+Status: `Implemented` for removing fabricated rows; authoritative data source
+remains open — `RECENT-001`.
 
 Current evidence: `MultiplayerHubScreen._populate_mock_players()` inserts four
 hardcoded rows; `MockMultiplayerService` fabricates invites, incoming players,
@@ -136,8 +137,11 @@ and readiness.
   sessions, discovered peers, or both. They are different data sets.
 - Put the chosen data behind a Rust-owned query/persistence contract.
 - Render an honest loading, empty, unavailable, or populated state.
-- Remove hardcoded names and fake readiness from production flow. Keep mocks
-  only in tests, injected behind the same interface.
+- Remove hardcoded recent/player names from production flow. The separate mock
+  invite/readiness flows remain explicitly open until their backend contract is
+  implemented; they must not be presented as real network state.
+- Until the source exists, render an explicit empty state instead of pretending
+  that the feature is populated.
 - Add persistence and empty/error/reload tests.
 
 Exit condition: every displayed row has a real source, stable identity, defined
