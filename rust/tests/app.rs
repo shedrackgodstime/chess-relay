@@ -227,6 +227,28 @@ fn remote_draw_offer_and_accept_ingests() {
 }
 
 #[test]
+fn restore_replays_an_open_draw_offer_for_the_bridge() {
+    let (mut host, _guest, white, black) = playing_pair();
+    host.handle(&Command::SubmitMove {
+        peer: white,
+        mv: "e2e4".parse().unwrap(),
+    })
+    .unwrap();
+    host.handle(&Command::OfferDraw { peer: black }).unwrap();
+    let entries = guest_log(&host);
+
+    let mut restored = App::with_local(host_secret());
+    restored.admit(guest_secret());
+    let events = restored.restore(entries).unwrap();
+
+    assert!(matches!(
+        events.first(),
+        Some(Event::DrawOffered { by, .. }) if *by == black
+    ));
+    assert!(matches!(events.get(1), Some(Event::GameStarted)));
+}
+
+#[test]
 fn remote_abort_ingests() {
     let (mut host, mut guest, _white, black) = playing_pair();
     let events = guest.handle(&Command::Abort { peer: black }).unwrap();

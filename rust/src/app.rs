@@ -548,8 +548,22 @@ impl App {
         let session = Session::resume(entries)?;
         self.session = Some(session);
         let session = self.session()?;
+        let open_offer = session.open_offer().and_then(|seq| {
+            session
+                .log()
+                .iter()
+                .find(|entry| entry.seq == seq)
+                .map(|entry| (entry.mover, seq))
+        });
         match session.state() {
-            SessionState::Playing => Ok(vec![Event::GameStarted]),
+            SessionState::Playing => {
+                let mut events = Vec::new();
+                if let Some((by, seq)) = open_offer {
+                    events.push(Event::DrawOffered { by, seq });
+                }
+                events.push(Event::GameStarted);
+                Ok(events)
+            }
             SessionState::Finished(reason) => Ok(vec![Event::GameEnded { reason }]),
             _ => Ok(Vec::new()),
         }

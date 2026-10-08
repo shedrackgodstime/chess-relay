@@ -441,6 +441,12 @@ impl Session {
         self.game.as_ref()
     }
 
+    /// The sequence of the currently open draw offer, if any.
+    #[must_use]
+    pub fn open_offer(&self) -> Option<u64> {
+        self.open_offer
+    }
+
     /// Whether `side` has marked ready.
     #[must_use]
     pub fn is_ready(&self, side: Color) -> bool {
