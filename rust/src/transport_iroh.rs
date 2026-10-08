@@ -103,7 +103,7 @@ impl Endpoint for IrohEndpoint {
             .endpoint
             .connect(parsed.endpoint_addr().clone(), GAME_ALPN)
             .await
-            .map_err(|_| TransportError::unavailable())?;
+            .map_err(|err| TransportError::unavailable_with_detail(err.to_string()))?;
         Ok(IrohConnection { connection })
     }
 

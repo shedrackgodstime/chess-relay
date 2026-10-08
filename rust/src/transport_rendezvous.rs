@@ -135,14 +135,28 @@ pub async fn resolve_ticket(
         .map_err(|_| TransportError::unavailable())?;
     let deadline = tokio::time::Instant::now() + timeout;
     while tokio::time::Instant::now() < deadline {
-        if let Ok(packet) = client.resolve(&public_key, ResolvePolicy::CacheFirst).await
-            && let Some(ticket) = ticket_from_packet(&packet)
-        {
-            return Ok(ticket);
+        match client.resolve(&public_key, ResolvePolicy::CacheFirst).await {
+            Ok(packet) => {
+                if let Some(ticket) = ticket_from_packet(&packet) {
+                    return Ok(ticket);
+                }
+            }
+            Err(err) => {
+                // Keep polling: transient relay/DNS failures are expected on
+                // mobile. The final error must still tell the caller that
+                // discovery failed, rather than looking like a hang.
+                if tokio::time::Instant::now() + RESOLVE_INTERVAL >= deadline {
+                    return Err(TransportError::unavailable_with_detail(format!(
+                        "rendezvous lookup failed: {err}"
+                    )));
+                }
+            }
         }
         tokio::time::sleep(RESOLVE_INTERVAL).await;
     }
-    Err(TransportError::unavailable())
+    Err(TransportError::unavailable_with_detail(
+        "rendezvous record not found before timeout".to_string(),
+    ))
 }
 
 /// Overwrites the record with an empty tombstone so the code dies now

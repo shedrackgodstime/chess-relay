@@ -1400,11 +1400,11 @@ async fn join_task(
         Ok(_) => ticket.clone(),
         Err(_) => match crate::resolve_ticket(&ticket, Duration::from_secs(120)).await {
             Ok(resolved) => resolved.to_string(),
-            Err(_) => {
+            Err(err) => {
                 note(
                     &core,
                     generation,
-                    NetNote::Error(format!("code not found: {ticket}")),
+                    NetNote::Error(format!("invite discovery failed for {ticket}: {err}")),
                 );
                 return;
             }
@@ -1414,7 +1414,11 @@ async fn join_task(
     let conn = match endpoint.connect(&dial).await {
         Ok(conn) => conn,
         Err(err) => {
-            note(&core, generation, NetNote::Error(short_error(&err)));
+            note(
+                &core,
+                generation,
+                NetNote::Error(format!("invite dial failed: {err}")),
+            );
             return;
         }
     };
