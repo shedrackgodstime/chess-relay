@@ -86,25 +86,17 @@ and the state it represents remain easy to confuse.
 
 ### C-SOT-03 — Startup events can be lost before screen subscription
 
-**Status:** new.  
+**Status:** implemented and protected for owned startup and borrowed snapshot
+re-entry.
 **Severity:** High
 
-GameScreen._start_bridge() starts or restores the bridge before connecting its
-signals:
+`GameScreen` now attaches its bridge signals before calling `start_resumable()`
+or `start_ai()`. It also reads a current FEN, turn, move number, and terminal
+session snapshot after wiring, so a borrowed network bridge remains correct
+when `game_started` happened before the screen was instantiated.
 
-- startup call: [game_screen.gd:126](../../godot/src/ui/screens/game/game_screen.gd:126);
-- signal wiring: [game_screen.gd:143](../../godot/src/ui/screens/game/game_screen.gd:143).
-
-Rust emits startup events synchronously. A game_started, game_ended, or
-bridge_error emitted during start_resumable() or start_ai() can therefore be
-missed by the screen.
-
-This is especially significant for a restored finished game: Rust can already
-know the session is finished while Godot's _finished remains false because the
-game_ended event was emitted before the connection existed.
-
-Borrowed network bridges have the same class of risk when the session reaches
-game_started before the game screen is instantiated and connected.
+Protection: the Godot full suite passes with the rebuilt extension, including
+resume persistence and the bridge-backed game screen checks.
 
 ### C-SOT-04 — Restored draw offers are not reconstructed at the bridge boundary
 

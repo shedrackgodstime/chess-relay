@@ -169,6 +169,10 @@ remains open — `LIFECYCLE-001`.
 - Retire workers/endpoints atomically; stale generations cannot publish facts.
 - Make startup, shutdown, screen re-entry, and repeated start/stop idempotent.
 - Verify the session cannot remain live-looking after its driver dies.
+- Attach GameScreen observers before owned startup and synchronize borrowed
+  screens from the authoritative snapshot after attachment.
+- Treat a configured new match as an explicit fresh start; a finished save is
+  stale for resume-for-play and is purged before the replacement session.
 - Keep the transport-connected, session-created, ready, and game-started
   transitions distinct in the Godot screen flow; transport connection opens
   setup, host starts the session, guest marks its assigned side ready, and only
@@ -213,7 +217,8 @@ report distinguishes verified behavior from unavailable evidence.
 | `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality; app restart still open |
 | `JOIN-001` | Short-code implementation is not the displayed/used host contract | Implemented | Host-code → resolver contract and UI wiring; live rendezvous still open |
 | `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; full gate passes |
-| `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring + stale-generation tests; two-process UI integration still open |
+| `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring, startup-order protection, snapshot synchronization, and stale-generation tests; two-process UI integration still open |
+| `SAVE-001` | New games can be hijacked by persisted or finished sessions | Verified | Explicit fresh-start contract, finished-save rejection/purge in both resume paths, and Godot AI regression; user-facing Resume action remains a separate product surface |
 | `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |
 
 ## Session handoff rule

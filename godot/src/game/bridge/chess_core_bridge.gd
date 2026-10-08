@@ -84,22 +84,30 @@ func start() -> void:
 		_core.call(&"start")
 
 
-## Starts with a persistent identity, resuming the saved game if any.
+## Starts with a persistent identity, resuming the saved game unless `fresh`
+## explicitly requests a new match.
 ## Returns true when a saved game resumed. Paths are absolute platform
 ## paths (Godot resolves `user://` before calling).
-func start_resumable(identity_path: String, save_path: String) -> bool:
+func start_resumable(identity_path: String, save_path: String, fresh: bool = false) -> bool:
 	if _core == null:
 		return false
-	var restored: bool = _core.call(&"start_resumable", identity_path, save_path)
+	var restored: bool = _core.call(&"start_resumable", identity_path, save_path, fresh)
 	return restored
 
 
 ## Starts a local Rust-AI game. Search runs off the scene thread and the AI
 ## move returns through the same move_applied signal as human input.
-func start_ai(identity_path: String, save_path: String, side: String, difficulty: String) -> bool:
+func start_ai(
+	identity_path: String,
+	save_path: String,
+	side: String,
+	difficulty: String,
+	fresh: bool = false,
+) -> bool:
 	if _core == null:
 		return false
-	var started: bool = _core.call(&"start_ai", identity_path, save_path, side, difficulty)
+	var started: bool = _core.call(
+		&"start_ai", identity_path, save_path, side, difficulty, fresh)
 	return started
 
 
@@ -180,6 +188,14 @@ func move_number() -> int:
 		return 1
 	var number: int = _core.call(&"move_number")
 	return number
+
+
+## Whether the authoritative session is terminal, including after restore.
+func session_finished() -> bool:
+	if _core == null:
+		return false
+	var finished: bool = _core.call(&"session_finished")
+	return finished
 
 
 ## Resigns the side to move. Returns false when refused.

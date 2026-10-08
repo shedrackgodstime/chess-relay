@@ -177,15 +177,17 @@ impl ChessRelayBridge {
         }
     }
 
-    /// Starts with a persistent identity, resuming the saved game if any.
+    /// Starts with a persistent identity, resuming the saved game if any
+    /// unless `fresh` explicitly requests a new match.
     ///
     /// Loads the local seed from `identity_path` (generating and saving
     /// one on first run), then restores the log at `save_path` when it
-    /// holds a playable or finished session. Returns true when a saved
-    /// game resumed. Paths come from the platform (`user://` resolved by
-    /// Godot); this layer only reads and writes bytes.
+    /// holds an in-progress session. Finished logs are stale for
+    /// resume-for-play and are purged before a fresh session is created.
+    /// Returns true when a saved game resumed. Paths come from the platform
+    /// (`user://` resolved by Godot); this layer only reads and writes bytes.
     #[func]
-    fn start_resumable(&mut self, identity_path: String, save_path: String) -> bool {
+    fn start_resumable(&mut self, identity_path: String, save_path: String, fresh: bool) -> bool {
         let seed = match load_or_create_seed(&identity_path) {
             Ok(seed) => seed,
             Err(err) => {
@@ -193,27 +195,38 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if fresh && let Err(err) = clear_saved_game(&save_path) {
+            self.emit_error(&err.to_string());
+            return false;
+        }
         // Same spike peer model as start(): one device plays both sides
         // until transport arrives. Only the local identity persists.
         let local_key = SigningKey::from_bytes(&seed);
         let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
-        let (restored, events) = {
+        let (restored, events, stale_finished) = {
             let mut core = self.lock();
             core.save_path = Some(save_path.clone());
             let mut app = App::with_local(local_key.clone());
             app.admit(peer_key.clone());
-            match crate::session::FileStore::new(std::path::Path::new(&save_path)).load() {
-                Ok(entries) if !entries.is_empty() => match app.restore(entries) {
-                    Ok(events) => {
+            match (!fresh)
+                .then(|| crate::session::FileStore::new(std::path::Path::new(&save_path)).load())
+            {
+                Some(Ok(entries)) if !entries.is_empty() => match app.restore(entries) {
+                    Ok(events) if !contains_game_end(&events) => {
                         core.app = Some(app);
                         core.me = PeerId::of(&local_key);
-                        (true, events)
+                        (true, events, false)
                     }
-                    Err(_) => (false, Vec::new()),
+                    Ok(_) => (false, Vec::new(), true),
+                    Err(_) => (false, Vec::new(), false),
                 },
-                _ => (false, Vec::new()),
+                _ => (false, Vec::new(), false),
             }
         };
+        if stale_finished && let Err(err) = clear_saved_game(&save_path) {
+            self.emit_error(&err.to_string());
+            return false;
+        }
         if restored {
             self.emit_all(&events);
             return true;
@@ -239,6 +252,7 @@ impl ChessRelayBridge {
         save_path: String,
         side: GString,
         difficulty: GString,
+        fresh: bool,
     ) -> bool {
         let old_net = {
             let mut core = self.lock();
@@ -258,6 +272,10 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if fresh && let Err(err) = clear_saved_game(&save_path) {
+            self.emit_error(&err.to_string());
+            return false;
+        }
         let local_key = SigningKey::from_bytes(&seed);
         let ai_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
         let local_peer = PeerId::of(&local_key);
@@ -266,26 +284,37 @@ impl ChessRelayBridge {
         let side = side.to_string();
         let local_is_black = side.eq_ignore_ascii_case("black")
             || (side.eq_ignore_ascii_case("random") && local_peer.bytes()[0] & 1 == 1);
-        let (events, errors, restored) = {
+        let (events, errors, restored, stale_finished) = {
             let mut core = self.lock();
             core.save_path = Some(save_path.clone());
             let mut app = App::with_local(local_key.clone());
             app.admit(ai_key.clone());
-            let restored_events =
-                match crate::session::FileStore::new(std::path::Path::new(&save_path)).load() {
-                    Ok(entries) if !entries.is_empty() => app.restore(entries).ok(),
-                    _ => None,
-                };
-            if let Some(events) = restored_events {
-                core.app = Some(app);
-                core.me = local_peer;
-                (events, Vec::new(), true)
-            } else {
-                let (events, errors) =
-                    start_ai_fresh(&mut core, app, local_key, ai_key, local_is_black);
-                (events, errors, false)
+            let restored_events = (!fresh).then(|| {
+                crate::session::FileStore::new(std::path::Path::new(&save_path))
+                    .load()
+                    .ok()
+                    .filter(|entries| !entries.is_empty())
+                    .and_then(|entries| app.restore(entries).ok())
+            });
+            let restored_events = restored_events.flatten();
+            match restored_events {
+                Some(events) if !contains_game_end(&events) => {
+                    core.app = Some(app);
+                    core.me = local_peer;
+                    (events, Vec::new(), true, false)
+                }
+                Some(_) => (Vec::new(), Vec::new(), false, true),
+                None => {
+                    let (events, errors) =
+                        start_ai_fresh(&mut core, app, local_key, ai_key, local_is_black);
+                    (events, errors, false, false)
+                }
             }
         };
+        if stale_finished && let Err(err) = clear_saved_game(&save_path) {
+            self.emit_error(&err.to_string());
+            return false;
+        }
         for message in &errors {
             self.emit_error(message);
         }
@@ -717,6 +746,22 @@ impl ChessRelayBridge {
                 (moves / 2 + 1) as i64
             }
             _ => 1,
+        }
+    }
+
+    /// Whether the authoritative session is terminal, including after restore.
+    #[func]
+    fn session_finished(&self) -> bool {
+        match self
+            .lock()
+            .app
+            .as_ref()
+            .and_then(|app| app.query(&Query::SessionState).ok())
+        {
+            Some(QueryResult::SessionState(view)) => {
+                matches!(view.state, crate::session::SessionState::Finished(_))
+            }
+            _ => false,
         }
     }
 
@@ -1755,6 +1800,21 @@ fn load_or_create_seed(path: &str) -> Result<[u8; 32], crate::session::StoreErro
     let mut seed = [0u8; 32];
     seed.copy_from_slice(&bytes);
     Ok(seed)
+}
+
+/// Removes the previous local match before an explicit fresh start.
+fn clear_saved_game(path: &str) -> Result<(), crate::session::StoreError> {
+    match std::fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(err) => Err(err.into()),
+    }
+}
+
+fn contains_game_end(events: &[Event]) -> bool {
+    events
+        .iter()
+        .any(|event| matches!(event, Event::GameEnded { .. }))
 }
 
 /// Keeps identity material and the peer index in the same installation-owned

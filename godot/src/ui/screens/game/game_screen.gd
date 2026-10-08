@@ -25,6 +25,7 @@ var _is_multiplayer := false
 var _is_ai := false
 var _ai_side := "White"
 var _ai_difficulty := "Medium"
+var _fresh_start := false
 var _active_clock_side := "white"
 # Out-of-scope furniture, not timekeeping: application_core.md puts the
 # clock out of v1 (the host would be timekeeper). This strip only shows
@@ -61,6 +62,7 @@ func configure_ai(side: String, difficulty: String) -> void:
 	_is_ai = true
 	_ai_side = side
 	_ai_difficulty = difficulty
+	_fresh_start = true
 
 
 func _ready() -> void:
@@ -73,7 +75,7 @@ func _ready() -> void:
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
 	_start_bridge()
-	_rebuild_position()
+	_sync_bridge_snapshot()
 	if _is_multiplayer and _bridge.fen().is_empty():
 		_header.set_center_text("Waiting for opponent...")
 
@@ -127,15 +129,33 @@ func _start_bridge() -> void:
 	if _bridge == null:
 		_bridge = ChessCoreBridge.new()
 		add_child(_bridge)
-		var restored := false
-		if _is_ai:
-			restored = _bridge.start_ai(_abs(IDENTITY_FILE), _abs(AI_SAVE_FILE), _ai_side, _ai_difficulty)
-		else:
-			restored = _bridge.start_resumable(_abs(IDENTITY_FILE), _abs(SAVE_FILE))
-		if restored:
-			_header.set_center_text("Game restored")
 	_picker.chosen.connect(_on_promotion_chosen)
 	_connect_bridge_signals()
+	if _owns_bridge:
+		var restored := false
+		if _is_ai:
+			restored = _bridge.start_ai(
+				_abs(IDENTITY_FILE), _abs(AI_SAVE_FILE), _ai_side, _ai_difficulty, _fresh_start)
+		else:
+			restored = _bridge.start_resumable(
+				_abs(IDENTITY_FILE), _abs(SAVE_FILE), _fresh_start)
+		if restored:
+			_header.set_center_text("Game restored")
+
+
+## Reconstructs presentation from the current core snapshot after wiring.
+## This covers borrowed bridges whose startup events happened before this
+## screen existed, as well as restored owned sessions.
+func _sync_bridge_snapshot() -> void:
+	if not _bridge.is_available() or _bridge.fen().is_empty():
+		return
+	_rebuild_position()
+	_active_clock_side = _bridge.turn()
+	_move_number_label.text = "M%d" % _bridge.move_number()
+	_update_clock_strip()
+	if _bridge.session_finished():
+		_finished = true
+		_header.set_center_text("Game over")
 
 
 ## One wiring for owned and borrowed bridges alike. A borrowed bridge

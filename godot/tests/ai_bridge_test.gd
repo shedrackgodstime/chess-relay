@@ -40,9 +40,10 @@ func _run() -> void:
 		_check(
 			bridge.start_ai(
 				ProjectSettings.globalize_path("user://chess_relay_identity.key"),
-				save_path,
-				"White",
-				"Easy"),
+					save_path,
+					"White",
+					"Easy",
+					true),
 			"AI game starts through the bridge")
 		_check(bridge.submit_move("e2e4"), "human move enters the application command path")
 		_move_uci = ""
@@ -53,6 +54,20 @@ func _run() -> void:
 		_check(_started, "AI game emits game_started")
 		_check(not _move_uci.is_empty(), "AI returns a move through move_applied")
 		_check(bridge.turn() == "white", "AI reply advances the authoritative turn")
+		_check(bridge.save_game(), "AI move persists before fresh start")
+		_check(bridge.resign(), "finished AI session can be recorded")
+		_check(bridge.save_game(), "finished AI session persists before fresh start")
+		_check(
+			bridge.start_ai(
+				ProjectSettings.globalize_path("user://chess_relay_identity.key"),
+				save_path,
+				"White",
+				"Easy",
+				true),
+			"fresh AI start retires the previous save")
+		_check(
+			bridge.fen().begins_with("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR"),
+			"fresh AI start does not restore the previous position")
 		bridge.stop_ai()
 
 	bridge.queue_free()
