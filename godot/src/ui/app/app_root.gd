@@ -140,7 +140,7 @@ func _show_game_screen(
 	var game := GAME_SCREEN.instantiate() as GameScreen
 	_net_game_active = false
 	if is_multiplayer:
-		game.configure_peer(_net_if_live())
+		game.configure_peer(_net_if_live(), _net_peer)
 		_net_game_active = _net_bridge != null
 	else:
 		game.configure_ai(ai_side, ai_difficulty)

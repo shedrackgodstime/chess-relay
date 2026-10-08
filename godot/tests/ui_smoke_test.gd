@@ -317,7 +317,7 @@ func _check_game_screen() -> void:
 	await process_frame
 	var clock_strip := game.get_node("HUD/HUDRoot/ClockStrip") as PanelContainer
 	_check(clock_strip != null, "game screen has a compact clock strip")
-	_check(_label(clock_strip, "Content/OpponentClock").text == "MORGAN  09:58",
+	_check(_label(clock_strip, "Content/OpponentClock").text == "OPPONENT  09:58",
 		"clock strip shows the opponent clock")
 	_check(_label(clock_strip, "Content/PlayerClock").text == "10:00  YOU",
 		"clock strip shows the local clock")

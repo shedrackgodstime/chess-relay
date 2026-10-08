@@ -26,6 +26,7 @@ var _is_ai := false
 var _ai_side := "White"
 var _ai_difficulty := "Medium"
 var _fresh_start := false
+var _opponent_name := "Opponent"
 var _active_clock_side := "white"
 # Out-of-scope furniture, not timekeeping: application_core.md puts the
 # clock out of v1 (the host would be timekeeper). This strip only shows
@@ -49,8 +50,9 @@ var _owns_bridge := true
 
 ## Marks a networked game. With a bridge the screen borrows the live
 ## session; without one it behaves as before (tests, previews).
-func configure_peer(bridge: ChessCoreBridge = null) -> void:
+func configure_peer(bridge: ChessCoreBridge = null, opponent_name: String = "Opponent") -> void:
 	_is_multiplayer = true
+	_opponent_name = opponent_name if not opponent_name.is_empty() else "Opponent"
 	if bridge != null:
 		_bridge = bridge
 		_owns_bridge = false
@@ -97,7 +99,7 @@ func _on_clock_tick() -> void:
 
 
 func _update_clock_strip() -> void:
-	_opponent_clock.text = "MORGAN  %s" % _format_clock(_black_seconds)
+	_opponent_clock.text = "%s  %s" % [_opponent_name.to_upper(), _format_clock(_black_seconds)]
 	_player_clock.text = "%s  YOU" % _format_clock(_white_seconds)
 	var active_color := Color(1.0, 0.94, 0.82, 1.0)
 	var idle_color := Color(0.72, 0.66, 0.58, 1.0)

@@ -169,7 +169,7 @@ is F-09, listed.**
 | Setup section titles, empty cards | F-01 lifecycle inversion; §2 | F-01 |
 | "Enter game" on a live game | Session started in Rust, not on click | F-01 |
 | Clock counting 10:00 → 09:58 | Local `Timer`, no core sync | F-09 |
-| Opponent named "MORGAN" | Hard-coded string in `game_screen.tscn` | F-09 |
+| Opponent named "MORGAN" | Replaced with the authoritative peer label when available, with neutral `OPPONENT` fallback | closed |
 | Time control presets | Never read by anything | F-09 |
 | "Chess960" | 0% support in `chess_core` | F-09 |
 | Discovery toggles | Removed; hub now reports discovery unavailable and directs users to invite codes | closed |
