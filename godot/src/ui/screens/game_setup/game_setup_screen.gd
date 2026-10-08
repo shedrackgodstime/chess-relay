@@ -108,27 +108,33 @@ func _apply_peer_setup() -> void:
 ## Network setup owns the user-visible transition into the session. The host
 ## chooses a side and starts; the guest waits for the host and then marks ready.
 func _apply_net_setup() -> void:
-	_time_choice.hide()
-	_variant_choice.hide()
 	_custom_time_controls.hide()
 	_difficulty_choice.hide()
+	_side_choice.show()
+	_time_choice.show()
+	_variant_choice.show()
 	var mine := _net_bridge.my_side()
 	var mine_shown := mine.capitalize() if not mine.is_empty() else "…"
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine_shown)
 	_opponent_card.set_side(theirs)
 	if _peer_kind == "create":
+		_side_choice.set_enabled(true)
+		_time_choice.set_enabled(true)
+		_variant_choice.set_enabled(true)
 		_play_button.text = "Start game"
 		_play_button.tooltip_text = "Choose your side and start the session"
 		_ready_label.text = "Choose your side, then start the game"
-		_settings_summary.text = "You choose the sides · Standard"
+		_play_button.disabled = false
 	else:
-		_side_choice.hide()
+		_side_choice.set_enabled(false)
+		_time_choice.set_enabled(false)
+		_variant_choice.set_enabled(false)
 		_play_button.text = "Ready"
 		_play_button.tooltip_text = "Tell the host you are ready"
-		_ready_label.text = "Waiting for the host to start the session"
-		_settings_summary.text = "Waiting for the host"
-	_play_button.disabled = false
+		_ready_label.text = "Waiting for the host to create the session"
+		_settings_summary.text = _format_time_summary() + "  ·  " + _variant_choice.get_selected_choice()
+		_play_button.disabled = true
 
 
 func _on_net_session_created(_white: String, _black: String, _host: String) -> void:
@@ -142,6 +148,7 @@ func _on_net_session_created(_white: String, _black: String, _host: String) -> v
 		_ready_label.text = "Game created · waiting for opponent to be ready"
 	else:
 		_ready_label.text = "Game created · mark yourself ready"
+		_play_button.disabled = false
 
 
 func _update_header_visibility() -> void:
@@ -355,8 +362,6 @@ func _update_custom_time_visibility() -> void:
 
 
 func _update_summary() -> void:
-	if _net_bridge != null:
-		return
 	var time_summary := _format_time_summary()
 	var variant := _variant_choice.get_selected_choice()
 	if _peer_setup:

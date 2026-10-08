@@ -1305,7 +1305,7 @@ fn start_network(
         .map_err(|err| err.to_string())?;
     let endpoint = runtime
         .block_on(crate::IrohEndpoint::bind_with_seed(seed))
-        .map_err(|_| "endpoint bind failed".to_string())?;
+        .map_err(|err| format!("endpoint bind failed: {err}"))?;
     let me = PeerId::of(&secret);
     if endpoint.id_bytes() != me.bytes() {
         return Err("endpoint identity diverged from peer identity".to_string());

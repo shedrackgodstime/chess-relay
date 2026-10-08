@@ -113,7 +113,7 @@ pub struct TransportError {
 #[derive(Debug)]
 enum TransportErrorKind {
     /// Dial string rejected, or no peer reachable.
-    Unavailable,
+    Unavailable(Option<String>),
     /// Use after close, or the peer went away.
     Closed,
     /// A received frame did not decode.
@@ -122,7 +122,11 @@ enum TransportErrorKind {
 
 impl TransportError {
     pub(crate) fn unavailable() -> Self {
-        Self::bare(TransportErrorKind::Unavailable)
+        Self::bare(TransportErrorKind::Unavailable(None))
+    }
+
+    pub(crate) fn unavailable_with_detail(detail: String) -> Self {
+        Self::bare(TransportErrorKind::Unavailable(Some(detail)))
     }
 
     pub(crate) fn closed() -> Self {
@@ -144,7 +148,7 @@ impl TransportError {
     /// Whether dialling or reachability failed.
     #[must_use]
     pub fn is_unavailable(&self) -> bool {
-        matches!(self.kind, TransportErrorKind::Unavailable)
+        matches!(self.kind, TransportErrorKind::Unavailable(_))
     }
 
     /// Whether the connection is gone.
@@ -168,8 +172,13 @@ impl TransportError {
 
 impl Display for TransportError {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let summary = match self.kind {
-            TransportErrorKind::Unavailable => "peer unavailable",
+        let summary = match &self.kind {
+            TransportErrorKind::Unavailable(detail) => {
+                if let Some(detail) = detail {
+                    return write!(f, "transport error: peer unavailable ({detail})");
+                }
+                "peer unavailable"
+            }
             TransportErrorKind::Closed => "connection closed",
             TransportErrorKind::Wire => "undecodable frame",
         };

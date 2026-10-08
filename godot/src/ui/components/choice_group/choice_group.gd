@@ -51,6 +51,11 @@ func get_selected_choice() -> String:
 	return choices[selected_index]
 
 
+func set_enabled(enabled: bool) -> void:
+	for button in _buttons:
+		button.disabled = not enabled
+
+
 func _build_options() -> void:
 	for index in range(choices.size()):
 		var option_button := Button.new()

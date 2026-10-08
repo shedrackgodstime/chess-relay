@@ -50,7 +50,7 @@ impl IrohEndpoint {
             .alpns(vec![game_alpn.to_vec(), voice_alpn.to_vec()])
             .bind()
             .await
-            .map_err(|_| TransportError::unavailable())?;
+            .map_err(|err| TransportError::unavailable_with_detail(err.to_string()))?;
         Ok(Self { endpoint })
     }
 
@@ -67,7 +67,7 @@ impl IrohEndpoint {
             .alpns(vec![GAME_ALPN.to_vec(), VOICE_ALPN.to_vec()])
             .bind()
             .await
-            .map_err(|_| TransportError::unavailable())?;
+            .map_err(|err| TransportError::unavailable_with_detail(err.to_string()))?;
         Ok(Self { endpoint })
     }
 
