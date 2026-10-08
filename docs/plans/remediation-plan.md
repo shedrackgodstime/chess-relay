@@ -66,7 +66,7 @@ Phase 2: Lifecycle & Handshake Decoupling (Restoring Setup Authority)
 Phase 3: Structural Deconstruction & Transport Modernization
   ├── 3.1 Extract Tokio runtime and network tasks from `bridge.rs` into a dedicated `network` service
   ├── 3.2 Upgrade `transport_iroh.rs` from per-message uni-streams to persistent framed streams
-  ├── 3.3 Expose pkarr 6-character short codes in `bridge.rs` and `MultiplayerHubScreen`
+  ├── 3.3 Expose pkarr 8-character short codes in `bridge.rs` and `MultiplayerHubScreen`
   └── 3.4 Resolve phantom UI controls (remove/wire real clock controls, clarify Chess960)
   └── Gate 3: `make check` all green, CI workflows pass.
 ```
@@ -176,8 +176,8 @@ Phase 3: Structural Deconstruction & Transport Modernization
 * Replace opening a uni-stream per message with persistent framing over bidirectional QUIC streams.
 
 ### Task 3.3: Expose pkarr Short Codes
-* Expose `host_game_with_code()` returning 6-character short codes via `transport_rendezvous.rs`.
-* Allow joining via 6-character code in `MultiplayerHubScreen`.
+* Expose `host_game_with_code()` returning 8-character short codes via `transport_rendezvous.rs`.
+* Allow joining via 8-character code in `MultiplayerHubScreen`.
 
 ### Task 3.4: Resolve UI Furniture
 * Remove or implement real time controls.

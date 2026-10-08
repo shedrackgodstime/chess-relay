@@ -57,7 +57,7 @@ replacing the mock event source.
 and local to UI development:
 
 - A created invite connects a mock opponent after two seconds unless canceled.
-- `ABC-123` is the successful join example; other well-formed codes exercise
+- `ABC-23456` is the successful join example; other well-formed eight-character codes exercise
   the failure and retry state.
 - A listed-player invite is accepted for Ayo and Kemi, and declined for
   KnightOwl and RookRunner, so both outcomes can be reviewed.

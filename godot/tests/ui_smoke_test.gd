@@ -270,7 +270,7 @@ func _check_hub_interactions() -> void:
 	_check(hub._active_invite_flow.is_empty() and hub._invite_grid.visible,
 		"hub restores invite choices after cancel")
 	hub._join_game_button.pressed.emit()
-	hub._on_join_code_changed("ABC234")
+	hub._on_join_code_changed("ABC23456")
 	_check(hub._join_button.disabled == false, "hub enables join for valid code")
 	hub._on_join_pressed()
 	_check(hub._active_invite_flow == "join-connecting", "hub enters join connecting state")

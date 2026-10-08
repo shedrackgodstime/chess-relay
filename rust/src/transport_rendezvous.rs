@@ -1,4 +1,4 @@
-//! Short-code rendezvous: join a game with six characters, no server.
+//! Short-code rendezvous: join a game with eight characters, no server.
 //!
 //! The UI promises short invite codes while Iroh tickets are long. This
 //! closes that gap the way irosh's wormhole does: both sides derive the
@@ -10,7 +10,7 @@
 //!
 //! Security posture, stated plainly: anyone holding or guessing the code
 //! derives the same keypair and can read — or overwrite — the record.
-//! Six characters are enumerable by a determined scanner. What saves the
+//! Eight characters are still enumerable by a determined scanner. What saves the
 //! game is everything above this layer: the guest connects to *an*
 //! endpoint, but the session only proceeds on signed genesis, and the UI
 //! already gates joining on host accept/decline. A squatter gets a knock

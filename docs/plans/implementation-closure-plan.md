@@ -110,7 +110,8 @@ does not silently create a new identity; deliberate reset is the only rotation.
 
 Status: `Implemented`; live rendezvous verification remains open — `JOIN-001`.
 
-Current evidence: `host_game()` generates and publishes a six-character code;
+Current evidence: `host_game()` deterministically derives and publishes an
+eight-character code from the persistent endpoint identity;
 the Godot host card displays/copies that code; join input sends the code to the
 Rust resolver. Offline shape and bridge tests pass. A live relay round trip is
 still intentionally separate and is not claimed here.

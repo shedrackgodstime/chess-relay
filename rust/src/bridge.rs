@@ -21,6 +21,7 @@ use crate::session::{LogEntry, LogStore, PeerId};
 use crate::transport::{Connection, Endpoint as _, TransportError};
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
+use sha2::{Digest, Sha256};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -351,14 +352,8 @@ impl ChessRelayBridge {
                 return GString::new();
             }
         };
-        let code = match generate_invite_code() {
-            Ok(code) => code,
-            Err(message) => {
-                self.leave_network();
-                self.emit_error(&message);
-                return GString::new();
-            }
-        };
+        let endpoint_id = launch.endpoint.id_bytes();
+        let code = invite_code_from_endpoint_id(&endpoint_id);
         let publisher = {
             let core = self.lock();
             core.net.as_ref().map(|net| net.runtime.handle().clone())
@@ -1714,18 +1709,33 @@ fn load_or_create_seed(path: &str) -> Result<[u8; 32], crate::session::StoreErro
     Ok(seed)
 }
 
-const INVITE_CODE_ALPHABET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-const INVITE_CODE_LENGTH: usize = 6;
+const INVITE_CODE_ALPHABET: &[u8] = b"23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+const INVITE_CODE_LENGTH: usize = 8;
 
-/// Generates the user-facing invitation code for a hosted game.
-fn generate_invite_code() -> Result<String, String> {
-    let mut bytes = [0u8; INVITE_CODE_LENGTH];
-    getrandom::getrandom(&mut bytes).map_err(|_| "no randomness available".to_string())?;
-    let code = bytes
-        .into_iter()
-        .map(|byte| INVITE_CODE_ALPHABET[usize::from(byte) % INVITE_CODE_ALPHABET.len()] as char)
-        .collect();
-    Ok(code)
+/// Derives the stable user-facing invitation code from the endpoint identity.
+///
+/// The endpoint identity is already public in the dial ticket, so this does
+/// not expose a new secret. Five bits per character gives an exact mapping to
+/// the 32-character alphabet without modulo bias.
+fn invite_code_from_endpoint_id(endpoint_id: &[u8; 32]) -> String {
+    let hash = Sha256::digest(endpoint_id);
+    let mut code = String::with_capacity(INVITE_CODE_LENGTH);
+    let mut bits = 0u64;
+    let mut bit_count = 0u8;
+
+    for &byte in hash.as_slice() {
+        bits = (bits << 8) | u64::from(byte);
+        bit_count += 8;
+        while bit_count >= 5 && code.len() < INVITE_CODE_LENGTH {
+            bit_count -= 5;
+            let index = ((bits >> bit_count) & 0b1_1111) as usize;
+            code.push(INVITE_CODE_ALPHABET[index] as char);
+        }
+        if code.len() == INVITE_CODE_LENGTH {
+            break;
+        }
+    }
+    code
 }
 
 struct ChessRelayExtension;
@@ -2248,12 +2258,16 @@ mod tests {
     }
 
     #[test]
-    fn generated_invite_code_has_the_public_shape() {
-        let code = generate_invite_code().expect("randomness is available");
+    fn invite_code_is_stable_and_has_the_public_shape() {
+        let first_id = [7u8; 32];
+        let second_id = [8u8; 32];
+        let code = invite_code_from_endpoint_id(&first_id);
         assert_eq!(code.len(), INVITE_CODE_LENGTH);
         assert!(
             code.bytes()
                 .all(|byte| INVITE_CODE_ALPHABET.contains(&byte))
         );
+        assert_eq!(code, invite_code_from_endpoint_id(&first_id));
+        assert_ne!(code, invite_code_from_endpoint_id(&second_id));
     }
 }

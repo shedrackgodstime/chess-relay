@@ -23,8 +23,8 @@ const DISCOVERY_DIALOG_SCENE: PackedScene = preload(
 const PLAYER_ROW_SCENE: PackedScene = preload(
 	"res://src/ui/components/player_row/player_row.tscn")
 
-const CODE_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-const CODE_LENGTH := 6
+const CODE_ALPHABET := "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+const CODE_LENGTH := 8
 
 @onready var _invite_grid: GridContainer = %InviteGrid
 ## The card the running flow fills. A component rather than a panel built here,
@@ -303,7 +303,7 @@ func _begin_join_flow() -> void:
 	_invite_grid.hide()
 	_flow.show()
 	_set_player_invites_enabled(false)
-	_flow.show_flow("Join a game", "Enter the six-character code someone shared with you.")
+	_flow.show_flow("Join a game", "Enter the eight-character code someone shared with you.")
 	_join_field = _flow.add_content(_code_field()) as LineEdit
 	_join_field.text_changed.connect(_on_join_code_changed)
 	_join_echo = _flow.add_status("", &"Caption")
@@ -465,7 +465,7 @@ func _update_responsive_layout(width: float = -1.0) -> void:
 
 func _code_field() -> LineEdit:
 	var field := LineEdit.new()
-	field.placeholder_text = "ABC-123"
+	field.placeholder_text = "ABC-23456"
 	field.max_length = CODE_LENGTH + 1
 	field.custom_minimum_size.y = 48
 	return field
