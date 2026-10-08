@@ -1759,6 +1759,14 @@ async fn on_msg<C: Connection>(
             if !is_current(core, generation) {
                 return Err(());
             }
+            if variant != "Standard" {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error(format!("unsupported network variant: {variant}")),
+                );
+                return Err(());
+            }
             note(
                 core,
                 generation,

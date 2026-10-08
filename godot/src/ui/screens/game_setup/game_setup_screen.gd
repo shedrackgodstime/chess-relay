@@ -60,7 +60,10 @@ func _ready() -> void:
 func _configure_choices() -> void:
 	_side_choice.configure("Choose Color", ["White", "Black", "Random"], 3, 0)
 	_time_choice.configure("Time Control", ["1 | 0", "3 | 2", "5 | 3", "10 | 0", "15 | 10", "Custom"], 3, 2)
-	_variant_choice.configure("Variant", ["Standard", "Chess960"], 2, 0)
+	# The Rust core currently has one authoritative starting position. Do not
+	# offer a Chess960 choice that would render as selected but start standard
+	# chess underneath.
+	_variant_choice.configure("Variant", ["Standard"], 1, 0)
 	_difficulty_choice.configure("Difficulty", ["Easy", "Medium", "Hard"], 3, 1)
 
 

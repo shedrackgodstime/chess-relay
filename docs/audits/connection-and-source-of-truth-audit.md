@@ -203,7 +203,10 @@ selection. Those values never crossed the wire, while side assignment lived in
 the Rust genesis. The host now sends a `Setup` snapshot immediately after the
 required `Hello` message. The guest applies the snapshot before enabling
 `Ready`, so the visible setup is deterministic and cannot be confirmed before
-the host's choices arrive.
+the host's choices arrive. Unsupported variants are rejected at the wire
+boundary; the UI exposes only the core-supported Standard variant. Time-control
+choices are synchronized as preview metadata because the clock is explicitly
+out of v1 and has no Rust authority yet.
 
 ## What is already documented elsewhere
 
