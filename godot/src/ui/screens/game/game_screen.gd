@@ -41,6 +41,7 @@ var _capture_targets: Array[String] = []
 var _castle_targets: Array[String] = []
 var _pending_promotion := ""
 var _finished := false
+var _network_local_loaded := false
 var _bridge: ChessCoreBridge
 ## When false the bridge belongs to the app root (networked game) and
 ## this screen only borrows it: no resume, no save, no resign-on-leave
@@ -52,6 +53,11 @@ var _owns_bridge := true
 ## session; without one it behaves as before (tests, previews).
 func configure_peer(bridge: ChessCoreBridge = null, opponent_name: String = "Opponent") -> void:
 	_is_multiplayer = true
+	# Hide before the node enters the tree. GameStarted can be emitted by the
+	# borrowed bridge during the same transition that creates this screen.
+	var board := get_node_or_null("%Board") as ChessBoardView
+	if board != null:
+		board.visible = false
 	_opponent_name = opponent_name if not opponent_name.is_empty() else "Opponent"
 	if bridge != null:
 		_bridge = bridge
@@ -87,7 +93,7 @@ func _ready() -> void:
 	if _is_multiplayer:
 		_board.visible = false
 		_header.set_center_text("Waiting for opponent to load...")
-		_bridge.mark_network_loaded()
+		_network_local_loaded = _bridge.mark_network_loaded()
 		if _bridge.network_peer_loaded():
 			_reveal_network_board()
 
@@ -199,11 +205,13 @@ func _on_core_game_started() -> void:
 
 
 func _on_peer_loaded() -> void:
-	if _is_multiplayer:
+	if _is_multiplayer and _network_local_loaded:
 		_reveal_network_board()
 
 
 func _reveal_network_board() -> void:
+	if not _network_local_loaded or not _bridge.network_peer_loaded():
+		return
 	_board.visible = true
 	_header.set_center_text("Game started · %s to move" % _bridge.turn().capitalize())
 

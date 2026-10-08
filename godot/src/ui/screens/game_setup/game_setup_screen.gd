@@ -52,6 +52,10 @@ func _ready() -> void:
 	_update_summary()
 	if _peer_setup:
 		_apply_peer_setup()
+		# The host snapshot may have arrived before this screen subscribed.
+		# Re-read the bridge-owned value after all @onready controls exist.
+		if _peer_kind == "join":
+			call_deferred("_apply_saved_net_setup")
 
 
 ## Choice content owned here in code (see ChoiceGroup.configure): the

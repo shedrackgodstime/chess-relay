@@ -66,6 +66,8 @@ pub enum Msg {
     /// Host-owned setup snapshot. Sent after [`Msg::LobbyHello`] and may be
     /// repeated while the host changes the lobby selections.
     Setup {
+        /// Monotonic host-owned lobby revision; stale streams are ignored.
+        revision: u64,
         side: String,
         time: String,
         variant: String,
@@ -255,6 +257,7 @@ mod tests {
                 version: PROTOCOL_VERSION,
             },
             Msg::Setup {
+                revision: 1,
                 side: "White".to_string(),
                 time: "5 | 3".to_string(),
                 variant: "Standard".to_string(),

@@ -49,6 +49,7 @@ struct CoreState {
     net: Option<NetState>,
     net_notes: VecDeque<NetNote>,
     network_setup: Option<NetworkSetup>,
+    next_setup_revision: u64,
     network_peer_loaded: bool,
     ai: Option<AiState>,
     /// Bumped on every host/join/leave so late tasks from a retired
@@ -58,6 +59,7 @@ struct CoreState {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct NetworkSetup {
+    revision: u64,
     side: String,
     time: String,
     variant: String,
@@ -100,6 +102,7 @@ struct NetState {
 #[derive(Debug)]
 enum NetCmd {
     UpdateSetup {
+        revision: u64,
         side: String,
         time: String,
         variant: String,
@@ -107,6 +110,7 @@ enum NetCmd {
     Loaded,
     HostStarted {
         genesis: Box<LogEntry>,
+        revision: u64,
         side: String,
         time: String,
         variant: String,
@@ -519,7 +523,7 @@ impl ChessRelayBridge {
     /// Creates the genesis session and notifies the session driver.
     #[func]
     fn start_network_game(&mut self, side: GString, time: GString, variant: GString) -> bool {
-        let (events, genesis) = {
+        let (events, genesis, revision) = {
             let mut core = self.lock();
             if core.net.is_none() {
                 drop(core);
@@ -532,6 +536,10 @@ impl ChessRelayBridge {
                 self.emit_error("no guest connected");
                 return false;
             };
+            let revision = core
+                .network_setup
+                .as_ref()
+                .map_or(0, |setup| setup.revision);
             let side_str = side.to_string().to_lowercase();
             let (white, black) = match side_str.as_str() {
                 "black" => (guest, me),
@@ -569,12 +577,13 @@ impl ChessRelayBridge {
                 self.emit_error("failed to create genesis");
                 return false;
             };
-            (events, genesis)
+            (events, genesis, revision)
         };
         self.emit_all(&events);
         if let Some(tx) = self.lock().net.as_ref().map(|n| n.cmd_tx.clone()) {
             let _ = tx.send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                revision,
                 side: side.to_string(),
                 time: time.to_string(),
                 variant: variant.to_string(),
@@ -612,7 +621,13 @@ impl ChessRelayBridge {
             self.emit_error("unsupported network variant");
             return false;
         }
+        let revision = {
+            let mut core = self.lock();
+            core.next_setup_revision = core.next_setup_revision.saturating_add(1);
+            core.next_setup_revision
+        };
         let setup = NetworkSetup {
+            revision,
             side: side.to_string(),
             time: time.to_string(),
             variant: variant.to_string(),
@@ -630,6 +645,7 @@ impl ChessRelayBridge {
         if let Some(tx) = tx {
             if tx
                 .send(NetCmd::UpdateSetup {
+                    revision: setup.revision,
                     side: setup.side,
                     time: setup.time,
                     variant: setup.variant,
@@ -1467,6 +1483,7 @@ fn start_network(
     core.me = me;
     core.remote_peer = None;
     core.network_setup = None;
+    core.next_setup_revision = 0;
     core.network_peer_loaded = false;
     core.recent_peers_path = Some(recent_path);
     core.app = Some(App::with_local(secret));
@@ -1678,8 +1695,8 @@ async fn drive_session<C: Connection>(
         tokio::select! {
             cmd = cmd_rx.recv() => {
                 match cmd {
-                    Some(NetCmd::UpdateSetup { side, time, variant }) => {
-                        if !host_role || conn.send(&Msg::Setup { side, time, variant }).await.is_err() {
+                    Some(NetCmd::UpdateSetup { revision, side, time, variant }) => {
+                        if !host_role || conn.send(&Msg::Setup { revision, side, time, variant }).await.is_err() {
                             note(core, generation, NetNote::Disconnected);
                             return;
                         }
@@ -1692,6 +1709,7 @@ async fn drive_session<C: Connection>(
                     }
                     Some(NetCmd::HostStarted {
                         genesis,
+                        revision,
                         side,
                         time,
                         variant,
@@ -1705,6 +1723,7 @@ async fn drive_session<C: Connection>(
                         }
                         if conn
                             .send(&Msg::Setup {
+                                revision,
                                 side,
                                 time,
                                 variant,
@@ -1804,6 +1823,7 @@ async fn send_resume_snapshot<C: Connection>(
     if host_role {
         if let Some(setup) = setup {
             conn.send(&Msg::Setup {
+                revision: setup.revision,
                 side: setup.side,
                 time: setup.time,
                 variant: setup.variant,
@@ -2072,6 +2092,7 @@ async fn on_msg<C: Connection>(
             Ok(())
         }
         Msg::Setup {
+            revision,
             side,
             time,
             variant,
@@ -2089,7 +2110,15 @@ async fn on_msg<C: Connection>(
             }
             {
                 let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                if guard
+                    .network_setup
+                    .as_ref()
+                    .is_some_and(|current| current.revision > revision)
+                {
+                    return Ok(());
+                }
                 guard.network_setup = Some(NetworkSetup {
+                    revision,
                     side: side.clone(),
                     time: time.clone(),
                     variant: variant.clone(),
@@ -2502,6 +2531,7 @@ mod tests {
         host_tx
             .send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                revision: 1,
                 side: "White".to_string(),
                 time: "5 | 3".to_string(),
                 variant: "Standard".to_string(),
@@ -2648,6 +2678,7 @@ mod tests {
         host_tx
             .send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                revision: 1,
                 side: "White".to_string(),
                 time: "5 | 3".to_string(),
                 variant: "Standard".to_string(),
@@ -2772,6 +2803,7 @@ mod tests {
         host_tx
             .send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                revision: 1,
                 side: "White".to_string(),
                 time: "5 | 3".to_string(),
                 variant: "Standard".to_string(),
