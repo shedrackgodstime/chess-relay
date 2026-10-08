@@ -146,8 +146,8 @@ state.
 
 ### C-SOT-06 — Failed connection attempts do not consistently retire the bridge
 
-**Status:** fixed for the setup-to-lobby path; retain as a regression check for
-all future network screen transitions.  
+**Status:** fixed for setup-to-lobby and failed hub/setup attempts; retain as a
+regression check for all future network screen transitions.  
 **Severity:** Medium
 
 When the bridge reports a network error, AppRoot routes the message to the hub
@@ -161,7 +161,8 @@ without calling `_leave_network()`, so the old endpoint and driver remained
 owned by `AppRoot` while the UI presented a fresh lobby. The transition now
 retires the borrowed bridge before creating the replacement hub; the peer sees
 the existing `peer_disconnected` path and the lobby displays “Opponent
-disconnected.”
+disconnected.” Network errors now also retire the bridge after the visible
+failure is rendered, so retry cannot inherit the failed runtime.
 
 ## Event and state transitions currently in play
 

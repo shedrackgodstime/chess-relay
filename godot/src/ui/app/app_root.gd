@@ -183,8 +183,10 @@ func _on_net_game_started() -> void:
 func _on_net_network_error(message: String) -> void:
 	if _current_screen is MultiplayerHubScreen:
 		(_current_screen as MultiplayerHubScreen).notify_network_error(message)
+		_leave_network()
 	elif _current_screen is GameSetupScreen:
 		(_current_screen as GameSetupScreen).notify_net_issue(message)
+		_leave_network()
 
 
 func _on_net_peer_disconnected() -> void:
