@@ -25,6 +25,8 @@ extends Node
 signal move_applied(sequence: int, uci: String, by: String, agreed: bool)
 ## Emitted when the core has assigned both sides for a session.
 signal session_created(white: String, black: String, host: String)
+## Emitted when the host's setup snapshot arrives after the Hello handshake.
+signal setup_changed(side: String, time: String, variant: String)
 ## Emitted when play begins.
 signal game_started
 ## Emitted when either side changed readiness.
@@ -67,6 +69,9 @@ func _ready() -> void:
 	_core.connect(&"session_created",
 		func(white: String, black: String, host: String) -> void:
 			session_created.emit(white, black, host))
+	_core.connect(&"setup_changed",
+		func(side: String, time: String, variant: String) -> void:
+			setup_changed.emit(side, time, variant))
 	_core.connect(&"game_started", func() -> void: game_started.emit())
 	_core.connect(&"ready_changed", func(peer: String) -> void: ready_changed.emit(peer))
 	_core.connect(&"game_ended", func(reason: String) -> void: game_ended.emit(reason))
@@ -241,10 +246,10 @@ func set_ready(side: String) -> void:
 
 
 ## Starts a host session after the transport peer is connected.
-func start_network_game(side: String) -> bool:
+func start_network_game(side: String, time: String, variant: String) -> bool:
 	if _core == null:
 		return false
-	var accepted: bool = _core.call(&"start_network_game", side)
+	var accepted: bool = _core.call(&"start_network_game", side, time, variant)
 	return accepted
 
 

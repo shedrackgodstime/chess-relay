@@ -16,6 +16,7 @@ records the concrete paths that make the behavior appear unpredictable:
 
 - a dead transport leaves a locally playable-looking session alive;
 - transport-connected is reported before the session handshake is complete;
+- setup controls were local-only, so the two setup screens could disagree;
 - startup events can be emitted before the Godot screen subscribes;
 - restored draw-offer state is not reconstructed in the bridge;
 - Godot shadow state is not always initialized from Rust state;
@@ -191,6 +192,18 @@ disconnected.”
 
 The missing durable transition is the right-hand branch: the connection is no
 longer usable, but NetState and the session remain available to local calls.
+
+### C-SOT-07 — Setup choices were local-only
+
+**Status:** transport snapshot added; game-rule enforcement remains a separate
+follow-up because the current session core still starts standard chess only.
+
+The setup screen previously let each peer render its own time and variant
+selection. Those values never crossed the wire, while side assignment lived in
+the Rust genesis. The host now sends a `Setup` snapshot immediately after the
+required `Hello` message. The guest applies the snapshot before enabling
+`Ready`, so the visible setup is deterministic and cannot be confirmed before
+the host's choices arrive.
 
 ## What is already documented elsewhere
 

@@ -55,6 +55,13 @@ pub enum Msg {
         /// Session-fixing entry, co-signed later like any genesis.
         genesis: LogEntry,
     },
+    /// Host-owned setup snapshot. Sent only after `Hello` so the first
+    /// message ordering contract remains intact.
+    Setup {
+        side: String,
+        time: String,
+        variant: String,
+    },
     /// Readiness notification for a participant.
     Ready {
         /// Ready peer.

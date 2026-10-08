@@ -90,7 +90,12 @@ struct NetState {
 /// Driver input: local progress or lifecycle events worth sending to the peer.
 #[derive(Debug)]
 enum NetCmd {
-    HostStarted { genesis: Box<LogEntry> },
+    HostStarted {
+        genesis: Box<LogEntry>,
+        side: String,
+        time: String,
+        variant: String,
+    },
     SendReady,
     Flush,
 }
@@ -106,6 +111,11 @@ struct NetLaunch {
 #[derive(Debug)]
 enum NetNote {
     Connected(PeerId),
+    Setup {
+        side: String,
+        time: String,
+        variant: String,
+    },
     /// Slice C pushes this when its driver sees the peer go away.
     #[allow(dead_code)]
     Disconnected,
@@ -136,6 +146,8 @@ impl ChessRelayBridge {
     fn session_created(white: GString, black: GString, host: GString);
     #[signal]
     fn ready_changed(peer: GString);
+    #[signal]
+    fn setup_changed(side: GString, time: GString, variant: GString);
     #[signal]
     fn game_started();
     #[signal]
@@ -485,7 +497,7 @@ impl ChessRelayBridge {
     /// Starts the networked game as host with the chosen side ("white", "black", "random").
     /// Creates the genesis session and notifies the session driver.
     #[func]
-    fn start_network_game(&mut self, side: GString) -> bool {
+    fn start_network_game(&mut self, side: GString, time: GString, variant: GString) -> bool {
         let (events, genesis) = {
             let mut core = self.lock();
             if core.net.is_none() {
@@ -542,6 +554,9 @@ impl ChessRelayBridge {
         if let Some(tx) = self.lock().net.as_ref().map(|n| n.cmd_tx.clone()) {
             let _ = tx.send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                side: side.to_string(),
+                time: time.to_string(),
+                variant: variant.to_string(),
             });
         }
         true
@@ -932,6 +947,16 @@ impl INode for ChessRelayBridge {
                     }
                     let peer = GString::from(&peer.to_string());
                     self.signals().peer_connected().emit(&peer);
+                }
+                NetNote::Setup {
+                    side,
+                    time,
+                    variant,
+                } => {
+                    let side = GString::from(side.as_str());
+                    let time = GString::from(time.as_str());
+                    let variant = GString::from(variant.as_str());
+                    self.signals().setup_changed().emit(&side, &time, &variant);
                 }
                 NetNote::Disconnected => {
                     self.signals().peer_disconnected().emit();
@@ -1492,11 +1517,28 @@ async fn drive_session<C: Connection>(
         tokio::select! {
             cmd = cmd_rx.recv() => {
                 match cmd {
-                    Some(NetCmd::HostStarted { genesis }) => {
+                    Some(NetCmd::HostStarted {
+                        genesis,
+                        side,
+                        time,
+                        variant,
+                    }) => {
                         if conn.send(&Msg::Hello {
                             version: PROTOCOL_VERSION,
                             genesis: *genesis,
                         }).await.is_err() {
+                            note(&core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                        if conn
+                            .send(&Msg::Setup {
+                                side,
+                                time,
+                                variant,
+                            })
+                            .await
+                            .is_err()
+                        {
                             note(&core, generation, NetNote::Disconnected);
                             return;
                         }
@@ -1707,6 +1749,25 @@ async fn on_msg<C: Connection>(
                 return Err(());
             }
             let _ = apply(core, Command::NotePeerReady { peer });
+            Ok(())
+        }
+        Msg::Setup {
+            side,
+            time,
+            variant,
+        } => {
+            if !is_current(core, generation) {
+                return Err(());
+            }
+            note(
+                core,
+                generation,
+                NetNote::Setup {
+                    side,
+                    time,
+                    variant,
+                },
+            );
             Ok(())
         }
         Msg::Entry(entry) => {
@@ -2011,6 +2072,9 @@ mod tests {
         host_tx
             .send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                side: "White".to_string(),
+                time: "5 | 3".to_string(),
+                variant: "Standard".to_string(),
             })
             .unwrap();
 
@@ -2142,6 +2206,9 @@ mod tests {
         host_tx
             .send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                side: "White".to_string(),
+                time: "5 | 3".to_string(),
+                variant: "Standard".to_string(),
             })
             .unwrap();
 
@@ -2271,6 +2338,9 @@ mod tests {
         host_tx
             .send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
+                side: "White".to_string(),
+                time: "5 | 3".to_string(),
+                variant: "Standard".to_string(),
             })
             .unwrap();
 

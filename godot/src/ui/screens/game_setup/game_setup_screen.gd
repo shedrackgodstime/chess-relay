@@ -26,6 +26,7 @@ var _peer_name := "Opponent"
 var _peer_kind := "peer"
 var _local_ready := false
 var _opponent_is_ready := false
+var _remote_setup_received := false
 var _header_menu_layer: Control
 ## The live networked session, when this setup fronts one. Set for
 ## code/host flows only; mock invite flows have no session and keep
@@ -87,6 +88,8 @@ func configure_net_bridge(bridge: ChessCoreBridge) -> void:
 	_net_bridge = bridge
 	if not _net_bridge.session_created.is_connected(_on_net_session_created):
 		_net_bridge.session_created.connect(_on_net_session_created)
+	if not _net_bridge.setup_changed.is_connected(_on_net_setup_changed):
+		_net_bridge.setup_changed.connect(_on_net_setup_changed)
 	if is_node_ready() and _peer_setup:
 		_apply_peer_setup()
 
@@ -134,7 +137,25 @@ func _apply_net_setup() -> void:
 		_play_button.tooltip_text = "Tell the host you are ready"
 		_ready_label.text = "Waiting for the host to create the session"
 		_settings_summary.text = _format_time_summary() + "  ·  " + _variant_choice.get_selected_choice()
-		_play_button.disabled = true
+		_play_button.disabled = not _remote_setup_received
+
+
+func _on_net_setup_changed(_side: String, time: String, variant: String) -> void:
+	if _net_bridge == null or _peer_kind != "join":
+		return
+	_remote_setup_received = true
+	for index in range(_time_choice.choices.size()):
+		if _time_choice.choices[index] == time:
+			_time_choice.set_selection(index)
+			break
+	for index in range(_variant_choice.choices.size()):
+		if _variant_choice.choices[index] == variant:
+			_variant_choice.set_selection(index)
+			break
+	_update_custom_time_visibility()
+	_update_summary()
+	_ready_label.text = "Host settings received · mark yourself ready"
+	_play_button.disabled = false
 
 
 func _on_net_session_created(_white: String, _black: String, _host: String) -> void:
@@ -192,7 +213,11 @@ func _on_custom_time_changed(_value: float) -> void:
 func _on_play_pressed() -> void:
 	if _net_bridge != null:
 		if _peer_kind == "create":
-			if _net_bridge.start_network_game(selected_ai_side()):
+			if _net_bridge.start_network_game(
+				selected_ai_side(),
+				_time_choice.get_selected_choice(),
+				_variant_choice.get_selected_choice(),
+			):
 				_play_button.disabled = true
 				_ready_label.text = "Game started · waiting for opponent to be ready"
 		else:
