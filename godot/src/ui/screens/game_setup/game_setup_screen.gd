@@ -185,6 +185,8 @@ func _update_screen_columns(width: float = -1.0) -> void:
 
 func _on_side_changed(_choice: String, _index: int) -> void:
 	_update_side_cards()
+	if _net_bridge != null and _peer_kind == "create":
+		_net_bridge.set_network_side(_side_choice.get_selected_choice())
 	_update_summary()
 
 

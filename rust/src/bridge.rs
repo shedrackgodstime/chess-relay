@@ -493,7 +493,7 @@ impl ChessRelayBridge {
     /// Creates the genesis session and notifies the session driver.
     #[func]
     fn start_network_game(&mut self, side: GString) -> bool {
-        let (events, genesis, white, black) = {
+        let (events, genesis) = {
             let mut core = self.lock();
             if core.net.is_none() {
                 drop(core);
@@ -543,14 +543,13 @@ impl ChessRelayBridge {
                 self.emit_error("failed to create genesis");
                 return false;
             };
-            (events, genesis, white, black)
+            (events, genesis)
         };
         self.emit_all(&events);
         if let Some(tx) = self.lock().net.as_ref().map(|n| n.cmd_tx.clone()) {
             let _ = tx.send(NetCmd::HostStarted {
                 genesis: Box::new(genesis),
             });
-            let _ = tx.send(NetCmd::Setup { white, black });
         }
         true
     }
