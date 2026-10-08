@@ -1693,7 +1693,11 @@ async fn flush_unsent<C: Connection>(
         match guard.app.as_ref().map(|app| app.query(&Query::MoveLog)) {
             Some(Ok(QueryResult::MoveLog(entries))) => entries
                 .into_iter()
-                .filter(|entry| entry.seq >= *sent_seq)
+                // The local log also contains entries received from the
+                // peer. Only the local author's entries belong on this
+                // outbound stream; resending a remote entry makes the peer
+                // reject it as out-of-order on the next flush.
+                .filter(|entry| entry.mover == guard.me && entry.seq >= *sent_seq)
                 .collect(),
             _ => Vec::new(),
         }
@@ -2184,8 +2188,8 @@ mod tests {
 
     /// Handshake plus one move across memory links: the host starts the
     /// match as White, the guest receives genesis and auto-acknowledges
-    /// readiness, both start, and the host's pawn push reaches the guest.
-    /// and host's pawn push reaches guest and is agreed with identical positions.
+    /// readiness, both start, and both sides can exchange moves without
+    /// resending the peer's already-received entries.
     #[tokio::test]
     async fn session_drives_handshake_and_move_over_memory() {
         let hub = MemoryTransport::new();
@@ -2297,6 +2301,26 @@ mod tests {
         poll_until(|| has_move_agreed(&host_core, 1)).await;
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
         assert!(fen_of(&guest_core).contains("4P3/8"));
+
+        {
+            let mut guard = guest_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let app = guard.app.as_mut().expect("guest session live");
+            let events = app
+                .handle(&Command::SubmitMove {
+                    peer: guest_peer,
+                    mv: "e7e5".parse().unwrap(),
+                })
+                .expect("guest reply legal after host move");
+            let mut all = events;
+            all.extend(app.drain());
+            guard.outbox.extend(all);
+        }
+        guest_tx.send(NetCmd::Flush).unwrap();
+        poll_until(|| move_log_len(&host_core) == 3 && move_log_len(&guest_core) == 3).await;
+        poll_until(|| has_move_agreed(&guest_core, 2)).await;
+        assert_eq!(fen_of(&host_core), fen_of(&guest_core));
 
         drop(host_tx);
         drop(guest_tx);
