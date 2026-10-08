@@ -22,7 +22,10 @@ pub const GAME_ALPN: &[u8] = b"chess-relay/1";
 /// Reserved voice ALPN: served on the same endpoint, unused in v1.
 pub const VOICE_ALPN: &[u8] = b"chess-relay-voice/1";
 
-/// Iroh-backed endpoint.
+/// Iroh-backed endpoint. Clone shares the underlying endpoint, so a
+/// link task can accept on its own handle while the bridge keeps one
+/// for closing: no mutex ever spans an accept.
+#[derive(Clone)]
 pub struct IrohEndpoint {
     endpoint: iroh::Endpoint,
 }

@@ -36,6 +36,12 @@ signal draw_answered(by: String, accept: bool)
 ## Emitted for anything the core refused or could not do. Also the only way a
 ## screen learns the bridge failed to load at all.
 signal bridge_error(message: String)
+## Emitted when the session driver links a peer. `peer` is its identity.
+signal peer_connected(peer: String)
+## Emitted when the peer link drops.
+signal peer_disconnected
+## Emitted when the link fails without dropping (bad ticket, lost code).
+signal network_error(message: String)
 
 const BRIDGE_CLASS := &"ChessRelayBridge"
 const UNAVAILABLE_MESSAGE := "Chess engine unavailable"
@@ -62,6 +68,9 @@ func _ready() -> void:
 	_core.connect(&"draw_offered", func(by: String, seq: int) -> void: draw_offered.emit(by, seq))
 	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
+	_core.connect(&"peer_connected", func(peer: String) -> void: peer_connected.emit(peer))
+	_core.connect(&"peer_disconnected", func() -> void: peer_disconnected.emit())
+	_core.connect(&"network_error", func(message: String) -> void: network_error.emit(message))
 
 
 ## Starts a fresh ephemeral session (tests and spike flows).
@@ -78,6 +87,21 @@ func start_resumable(identity_path: String, save_path: String) -> bool:
 		return false
 	var restored: bool = _core.call(&"start_resumable", identity_path, save_path)
 	return restored
+
+
+## Starts a local Rust-AI game. Search runs off the scene thread and the AI
+## move returns through the same move_applied signal as human input.
+func start_ai(identity_path: String, save_path: String, side: String, difficulty: String) -> bool:
+	if _core == null:
+		return false
+	var started: bool = _core.call(&"start_ai", identity_path, save_path, side, difficulty)
+	return started
+
+
+## Cancels a local AI search and retires its worker.
+func stop_ai() -> void:
+	if _core != null:
+		_core.call(&"stop_ai")
 
 
 ## Persists the current move log. Returns false with no session.
@@ -179,3 +203,37 @@ func submit_move(uci: String) -> bool:
 func set_ready(side: String) -> void:
 	if _core != null:
 		_core.call(&"set_ready", side)
+
+
+## This device's side ("white"/"black"), or "" before the session has sides.
+## Networked input gates on this; hotseat play ignores it.
+func my_side() -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"my_side"))
+
+
+## Hosts a networked game. Returns the ticket the guest dials, or ""
+## when hosting failed (see `bridge_error`). Linking runs in the
+## background; `peer_connected` reports the guest.
+func host_game() -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"host_game"))
+
+
+## Joins a networked game over `ticket` (or a rendezvous code).
+## Returns false only when setup failed outright; dial success or
+## failure reports through `peer_connected` / `network_error`.
+func join_game(ticket: String) -> bool:
+	if _core == null:
+		return false
+	var accepted: bool = _core.call(&"join_game", ticket)
+	return accepted
+
+
+## Leaves the networked game, closing the endpoint and retiring the
+## session driver. Safe with no network up.
+func leave_network() -> void:
+	if _core != null:
+		_core.call(&"leave_network")

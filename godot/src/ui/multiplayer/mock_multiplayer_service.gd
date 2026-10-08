@@ -1,10 +1,14 @@
 class_name MockMultiplayerService
 extends Node
 
-## Local-only event source for exercising the multiplayer UI without a transport.
-signal hosted_opponent_joined(opponent_name: String)
-signal join_succeeded(opponent_name: String)
-signal join_failed
+## Local-only event source for exercising the multiplayer UI without a backend.
+##
+## What is still faked here, and why: player invites, incoming invites,
+## and the setup ready-dance have no transport backend yet (no
+## discovery, no pre-game config channel), so the mock holds their UI
+## shapes until one lands. Hosting and joining are NOT faked anymore:
+## the app root drives those through the real bridge, and their mock
+## paths were deleted so a timer can never impersonate a peer again.
 signal player_invite_accepted(player_name: String)
 signal player_invite_declined(player_name: String)
 signal incoming_invite_received(player_name: String)
@@ -13,41 +17,15 @@ signal opponent_ready
 
 const MOCK_DELAY := 2.0
 
-var active_code := ""
-var _host_generation := 0
-var _join_generation := 0
 var _invite_generation := 0
 var _incoming_invite_generation := 0
 var _ready_generation := 0
 
 
 func cancel_pending_requests() -> void:
-	_host_generation += 1
-	_join_generation += 1
 	_invite_generation += 1
 	_incoming_invite_generation += 1
 	_ready_generation += 1
-	active_code = ""
-
-
-func start_hosting(code: String) -> void:
-	active_code = _normalize(code)
-	_host_generation += 1
-	_finish_hosting_after_delay(_host_generation)
-
-
-func cancel_hosting() -> void:
-	_host_generation += 1
-	active_code = ""
-
-
-func join(code: String) -> void:
-	_join_generation += 1
-	_finish_join_after_delay(_normalize(code), _join_generation)
-
-
-func cancel_join() -> void:
-	_join_generation += 1
 
 
 func invite_player(player_name: String) -> void:
@@ -73,22 +51,6 @@ func request_player_ready() -> void:
 	_finish_ready_after_delay(_ready_generation)
 
 
-func _finish_hosting_after_delay(generation: int) -> void:
-	await get_tree().create_timer(MOCK_DELAY).timeout
-	if generation == _host_generation and not active_code.is_empty():
-		hosted_opponent_joined.emit("Morgan")
-
-
-func _finish_join_after_delay(code: String, generation: int) -> void:
-	await get_tree().create_timer(MOCK_DELAY).timeout
-	if generation != _join_generation:
-		return
-	if code == "ABC123" or (not active_code.is_empty() and code == active_code):
-		join_succeeded.emit("Morgan")
-	else:
-		join_failed.emit()
-
-
 func _finish_player_invite_after_delay(player_name: String, generation: int) -> void:
 	await get_tree().create_timer(MOCK_DELAY).timeout
 	if generation != _invite_generation:
@@ -109,7 +71,3 @@ func _finish_ready_after_delay(generation: int) -> void:
 	await get_tree().create_timer(MOCK_DELAY).timeout
 	if generation == _ready_generation:
 		opponent_ready.emit()
-
-
-func _normalize(code: String) -> String:
-	return code.replace("-", "").replace(" ", "").to_upper()

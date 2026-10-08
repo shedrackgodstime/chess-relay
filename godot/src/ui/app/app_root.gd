@@ -28,15 +28,21 @@ const MockMultiplayerServiceScript := preload(
 
 var _current_screen: Control
 var _mock_multiplayer: MockMultiplayerService
+## The networked session owner. Created on demand for the multiplayer
+## flow and handed to the game screen, so host/join outlive the hub and
+## the setup screen. Null until first use and after a full leave.
+var _net_bridge: ChessCoreBridge = null
+## True while the shown game screen plays on `_net_bridge`.
+var _net_game_active := false
+## Last linked peer identity, for naming the setup screen once the
+## session (not just the transport) is ready.
+var _net_peer := ""
 
 
 func _ready() -> void:
 	get_window().min_size = MIN_WINDOW_SIZE
 	_mock_multiplayer = MockMultiplayerServiceScript.new()
 	add_child(_mock_multiplayer)
-	_mock_multiplayer.hosted_opponent_joined.connect(notify_invite_opponent_connected)
-	_mock_multiplayer.join_succeeded.connect(notify_join_connected)
-	_mock_multiplayer.join_failed.connect(notify_join_failed)
 	_mock_multiplayer.player_invite_accepted.connect(_on_player_invite_accepted)
 	_mock_multiplayer.player_invite_declined.connect(_on_player_invite_declined)
 	_mock_multiplayer.incoming_invite_received.connect(_on_incoming_invite_received)
@@ -56,13 +62,17 @@ func _on_play_computer_requested() -> void:
 	var setup := GAME_SETUP_SCREEN.instantiate() as GameSetupScreen
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
-	setup.play_requested.connect(_show_game_screen.bind(false))
+	setup.play_requested.connect(_on_computer_setup_play.bind(setup))
 	_show_screen(setup)
+
+
+func _on_computer_setup_play(setup: GameSetupScreen) -> void:
+	_show_game_screen(false, setup.selected_ai_side(), setup.selected_ai_difficulty())
 
 
 func _on_p2p_requested() -> void:
 	var hub := MULTIPLAYER_HUB_SCREEN.instantiate() as MultiplayerHubScreen
-	hub.back_requested.connect(_show_home_screen)
+	hub.back_requested.connect(_on_hub_back_requested)
 	hub.create_requested.connect(_on_invite_created)
 	hub.create_cancelled.connect(_on_invite_cancelled)
 	hub.join_requested.connect(_on_join_requested)
@@ -75,24 +85,52 @@ func _on_p2p_requested() -> void:
 	_mock_multiplayer.start_hub_session()
 
 
-func _on_invite_created(code: String) -> void:
-	invite_created.emit(code)
-	_mock_multiplayer.start_hosting(code)
+## Hands the live network bridge to whoever needs it, wiring its
+## link signals once. Screens use the node; they never own it.
+func _net() -> ChessCoreBridge:
+	if _net_bridge == null:
+		_net_bridge = ChessCoreBridge.new()
+		add_child(_net_bridge)
+		_net_bridge.peer_connected.connect(_on_net_peer_connected)
+		_net_bridge.network_error.connect(_on_net_network_error)
+		_net_bridge.peer_disconnected.connect(_on_net_peer_disconnected)
+		_net_bridge.game_started.connect(_on_net_game_started)
+	return _net_bridge
+
+
+func _on_hub_back_requested() -> void:
+	_leave_network()
+	_show_home_screen()
+
+
+func _on_invite_created() -> void:
+	invite_created.emit("")
+	var ticket := _net().host_game()
+	if ticket.is_empty():
+		_leave_network()
+		if _current_screen is MultiplayerHubScreen:
+			(_current_screen as MultiplayerHubScreen).host_failed()
+		return
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).show_host_ticket(ticket)
 
 
 func _on_invite_cancelled() -> void:
-	_mock_multiplayer.cancel_hosting()
+	_leave_network()
 	invite_cancelled.emit()
 
 
-func _on_join_requested(code: String) -> void:
-	join_requested.emit(code)
-	_mock_multiplayer.join(code)
+func _on_join_requested(ticket: String) -> void:
+	join_requested.emit(ticket)
+	if not _net().join_game(ticket):
+		_leave_network()
+		if _current_screen is MultiplayerHubScreen:
+			(_current_screen as MultiplayerHubScreen).join_failed()
 
 
-func _on_join_cancelled(code: String) -> void:
-	_mock_multiplayer.cancel_join()
-	join_cancelled.emit(code)
+func _on_join_cancelled(ticket: String) -> void:
+	_leave_network()
+	join_cancelled.emit(ticket)
 
 
 func _on_player_invite_requested(player_name: String) -> void:
@@ -115,18 +153,106 @@ func _on_incoming_invite_responded(player_name: String, accepted: bool) -> void:
 func _on_peer_setup_requested(opponent_name: String, setup_kind: String) -> void:
 	var setup := GAME_SETUP_SCREEN.instantiate() as GameSetupScreen
 	setup.configure_peer(opponent_name, setup_kind)
+	if (setup_kind == "create" or setup_kind == "join") and _net_if_live() != null:
+		setup.configure_net_bridge(_net_if_live())
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
 	setup.play_requested.connect(_show_game_screen.bind(true))
 	_show_screen(setup)
 
 
-func _show_game_screen(is_multiplayer: bool = false) -> void:
+func _show_game_screen(
+	is_multiplayer: bool = false,
+	ai_side: String = "White",
+	ai_difficulty: String = "Medium",
+) -> void:
 	var game := GAME_SCREEN.instantiate() as GameScreen
+	_net_game_active = false
 	if is_multiplayer:
-		game.configure_peer()
-	game.leave_requested.connect(_show_home_screen)
+		game.configure_peer(_net_if_live())
+		_net_game_active = _net_bridge != null
+	else:
+		game.configure_ai(ai_side, ai_difficulty)
+	game.leave_requested.connect(_on_game_leave_requested)
 	_show_screen(game)
+
+
+## Leaving a networked game retires its session; leaving a local game
+## changes nothing but the screen.
+func _on_game_leave_requested() -> void:
+	if _net_game_active:
+		_net_game_active = false
+		_leave_network()
+	_show_home_screen()
+
+
+## Routes link signals to the hub when it is showing; the game screen
+## hears the same bridge directly for in-game display.
+##
+## Link-up only rewords the hub's status. The hub advances to setup on
+## `game_started`: the handshake (ready + genesis agreement both ways)
+## must complete first, otherwise one side sits in setup while the
+## other is still failing to join.
+## TEMP-DIAG screen tag for the trace lines below. Removed with them.
+func _trace_screen() -> String:
+	if _current_screen is MultiplayerHubScreen:
+		return "hub"
+	if _current_screen is GameSetupScreen:
+		return "setup"
+	if _current_screen is GameScreen:
+		return "game"
+	if _current_screen is HomeScreen:
+		return "home"
+	return "none"
+
+
+func _on_net_peer_connected(peer: String) -> void:
+	print("NET-TRACE app: peer_connected peer=%s screen=%s" % [peer.left(8), _trace_screen()]) # TEMP-DIAG
+	_net_peer = peer
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).peer_linked()
+
+
+func _on_net_game_started() -> void:
+	print("NET-TRACE app: game_started screen=%s" % _trace_screen()) # TEMP-DIAG
+	if _current_screen is MultiplayerHubScreen:
+		var opponent := _net_peer if not _net_peer.is_empty() else "Opponent"
+		(_current_screen as MultiplayerHubScreen).opponent_connected(opponent)
+
+
+func _on_net_network_error(message: String) -> void:
+	print("NET-TRACE app: network_error %s" % message) # TEMP-DIAG
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).notify_network_error(message)
+	elif _current_screen is GameSetupScreen:
+		(_current_screen as GameSetupScreen).notify_net_issue(message)
+
+
+func _on_net_peer_disconnected() -> void:
+	print("NET-TRACE app: peer_disconnected") # TEMP-DIAG
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).notify_network_error("Opponent disconnected.")
+	elif _current_screen is GameSetupScreen:
+		(_current_screen as GameSetupScreen).notify_net_issue("Opponent disconnected.")
+
+
+## The live bridge, if any. Null when no networked session exists, so
+## mock flows (player invites) fall back to local boards instead of
+## binding a real endpoint for nothing.
+func _net_if_live() -> ChessCoreBridge:
+	return _net_bridge
+
+
+## Retires the networked session, if any, and drops its bridge so a
+## retired session can never be adopted later. Safe to call with none
+## up: leaving the hub, cancelling a flow, and leaving a game all
+## funnel here so a half-open link never outlives its screen.
+func _leave_network() -> void:
+	if _net_bridge != null:
+		_net_bridge.leave_network()
+		_net_bridge.queue_free()
+		_net_bridge = null
+	_net_peer = ""
 
 
 func _on_game_setup_leave_requested(is_peer_setup: bool) -> void:
@@ -153,27 +279,6 @@ func _on_player_invite_declined(player_name: String) -> void:
 func _on_opponent_ready() -> void:
 	if _current_screen is GameSetupScreen:
 		(_current_screen as GameSetupScreen).opponent_ready()
-
-
-## UI outcome hooks for the future multiplayer service.
-func notify_invite_opponent_connected(opponent_name: String = "Opponent") -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).opponent_connected(opponent_name)
-
-
-func notify_invite_opponent_left() -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).opponent_left()
-
-
-func notify_join_failed() -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).join_failed()
-
-
-func notify_join_connected(opponent_name: String = "Opponent") -> void:
-	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).join_connected(opponent_name)
 
 
 func _show_screen(screen: Control) -> void:

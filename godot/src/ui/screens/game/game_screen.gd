@@ -18,9 +18,13 @@ const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
 const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
 const IDENTITY_FILE := "user://chess_relay_identity.key"
 const SAVE_FILE := "user://chess_relay_save.bin"
+const AI_SAVE_FILE := "user://chess_relay_ai_save.bin"
 const FEN_PIECE_TYPES := {"p": "pawn", "n": "knight", "b": "bishop", "r": "rook", "q": "queen", "k": "king"}
 var _camera_scale := 1.0
 var _is_multiplayer := false
+var _is_ai := false
+var _ai_side := "White"
+var _ai_difficulty := "Medium"
 var _active_clock_side := "white"
 # Out-of-scope furniture, not timekeeping: application_core.md puts the
 # clock out of v1 (the host would be timekeeper). This strip only shows
@@ -36,12 +40,27 @@ var _castle_targets: Array[String] = []
 var _pending_promotion := ""
 var _finished := false
 var _bridge: ChessCoreBridge
+## When false the bridge belongs to the app root (networked game) and
+## this screen only borrows it: no resume, no save, no resign-on-leave
+## beyond its own side.
+var _owns_bridge := true
 
 
-func configure_peer() -> void:
+## Marks a networked game. With a bridge the screen borrows the live
+## session; without one it behaves as before (tests, previews).
+func configure_peer(bridge: ChessCoreBridge = null) -> void:
 	_is_multiplayer = true
+	if bridge != null:
+		_bridge = bridge
+		_owns_bridge = false
 	if is_node_ready():
 		_update_header_visibility()
+
+
+func configure_ai(side: String, difficulty: String) -> void:
+	_is_ai = true
+	_ai_side = side
+	_ai_difficulty = difficulty
 
 
 func _ready() -> void:
@@ -55,6 +74,8 @@ func _ready() -> void:
 	_update_camera_framing()
 	_start_bridge()
 	_rebuild_position()
+	if _is_multiplayer and _bridge.fen().is_empty():
+		_header.set_center_text("Waiting for opponent...")
 
 
 func _update_header_visibility() -> void:
@@ -103,16 +124,44 @@ func _format_clock(seconds: int) -> String:
 ## opponent until the transport path replaces it in Phase 7. Do not build
 ## networked features on local play.
 func _start_bridge() -> void:
-	_bridge = ChessCoreBridge.new()
-	add_child(_bridge)
+	if _bridge == null:
+		_bridge = ChessCoreBridge.new()
+		add_child(_bridge)
+		var restored := false
+		if _is_ai:
+			restored = _bridge.start_ai(_abs(IDENTITY_FILE), _abs(AI_SAVE_FILE), _ai_side, _ai_difficulty)
+		else:
+			restored = _bridge.start_resumable(_abs(IDENTITY_FILE), _abs(SAVE_FILE))
+		if restored:
+			_header.set_center_text("Game restored")
+	_picker.chosen.connect(_on_promotion_chosen)
+	_connect_bridge_signals()
+
+
+## One wiring for owned and borrowed bridges alike. A borrowed bridge
+## may still be handshaking, so the first game start rebuilds too.
+func _connect_bridge_signals() -> void:
 	_bridge.move_applied.connect(_on_core_move_applied)
+	_bridge.game_started.connect(_on_core_game_started)
 	_bridge.game_ended.connect(_on_core_game_ended)
 	_bridge.draw_offered.connect(_on_core_draw_offered)
 	_bridge.draw_answered.connect(_on_core_draw_answered)
 	_bridge.bridge_error.connect(_on_bridge_error)
-	_picker.chosen.connect(_on_promotion_chosen)
-	if _bridge.start_resumable(_abs(IDENTITY_FILE), _abs(SAVE_FILE)):
-		_header.set_center_text("Game restored")
+	_bridge.network_error.connect(_on_net_error)
+	_bridge.peer_disconnected.connect(_on_peer_disconnected)
+
+
+func _on_core_game_started() -> void:
+	_rebuild_position()
+	_header.set_center_text("Game started · %s to move" % _bridge.turn().capitalize())
+
+
+func _on_peer_disconnected() -> void:
+	_header.set_center_text("Opponent disconnected")
+
+
+func _on_net_error(message: String) -> void:
+	_header.set_center_text(message)
 
 
 ## Platform paths stay platform business: Godot resolves `user://` per
@@ -275,6 +324,11 @@ func _on_piece_pressed(piece: ChessPieceView) -> void:
 	if not _selected_piece_square.is_empty() and square in _legal_targets:
 		_on_square_pressed(square)
 		return
+	# Ownership applies when selecting a source piece. It must not block an
+	# opponent piece that is the destination of an already-selected capture.
+	if (_is_multiplayer or _is_ai) and piece.side != _bridge.my_side():
+		_header.set_center_text("Waiting for opponent")
+		return
 	_select_square(square, piece.side, piece.piece_type)
 
 
@@ -380,14 +434,22 @@ func _on_core_move_applied(seq: int, uci: String, by: String, agreed: bool) -> v
 	_active_clock_side = _bridge.turn()
 	_update_clock_strip()
 	_header.set_center_text("Move %d · %s to move" % [move_number, _active_clock_side.capitalize()])
-	_bridge.save_game()
+	_save_if_local()
+
+
+## Persists the log for owned (local) sessions only. A borrowed
+## networked session must never touch the local save: its peers are
+## not the resume path's spike pair.
+func _save_if_local() -> void:
+	if _owns_bridge:
+		_bridge.save_game()
 
 
 func _on_core_game_ended(reason: String) -> void:
 	_finished = true
 	_pending_promotion = ""
 	_picker.close()
-	_bridge.save_game()
+	_save_if_local()
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_board.set_capture_moves([])
@@ -476,6 +538,9 @@ func _open_game_menu() -> void:
 
 
 func _offer_draw() -> void:
+	if (_is_multiplayer or _is_ai) and _bridge.turn() != _bridge.my_side():
+		_header.set_center_text("Waiting for opponent")
+		return
 	if not _bridge.offer_draw():
 		return
 	var answer := ConfirmationDialog.new()
@@ -510,9 +575,13 @@ func _confirm_leave() -> void:
 	confirmation.get_ok_button().theme_type_variation = &"ModalDangerButton"
 	confirmation.get_cancel_button().theme_type_variation = &"ModalSecondaryButton"
 	confirmation.confirmed.connect(func() -> void:
+		if _is_ai:
+			_bridge.stop_ai()
 		# Leaving mid-game resigns the side to move; the result is logged
-		# like any other session action.
-		_bridge.resign()
+		# like any other session action. Networked, only our own side
+		# may resign: leaving on the opponent's turn just leaves.
+		if not _is_multiplayer or _bridge.turn() == _bridge.my_side():
+			_bridge.resign()
 		leave_requested.emit()
 		confirmation.queue_free()
 	)

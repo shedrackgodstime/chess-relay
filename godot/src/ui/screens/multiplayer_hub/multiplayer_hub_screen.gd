@@ -4,10 +4,10 @@ extends Control
 const FLOW_ACTION_SIZE := Vector2(144.0, 48.0)
 
 signal back_requested
-signal create_requested(code: String)
+signal create_requested
 signal create_cancelled
-signal join_requested(code: String)
-signal join_cancelled(code: String)
+signal join_requested(ticket: String)
+signal join_cancelled(ticket: String)
 signal player_invite_requested(player_name: String)
 signal player_invite_cancelled
 signal incoming_invite_responded(player_name: String, accepted: bool)
@@ -25,6 +25,9 @@ const PLAYER_ROW_SCENE: PackedScene = preload(
 
 const CODE_ALPHABET := "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 const CODE_LENGTH := 6
+## Short codes stay exactly six characters; anything this long is a
+## pasted ticket and skips code normalization and validation.
+const TICKET_MIN_LENGTH := 20
 
 @onready var _invite_grid: GridContainer = %InviteGrid
 ## The card the running flow fills. A component rather than a panel built here,
@@ -208,26 +211,85 @@ func _on_create_invite() -> void:
 	_flow.show()
 	_set_player_invites_enabled(false)
 	_flow.show_flow("", "")
-	_flow.add_status("YOUR GAME CODE", &"Caption")
-	_create_code_label = _flow.add_code(_generate_invite_code())
-	_copy_button = _flow.add_action("Copy code")
+	_create_status = _flow.add_status("Starting host...")
+	_flow_cancel_button(_cancel_create_wait)
+	create_requested.emit()
+
+
+## Backend calls this with the ticket once hosting is up. The guest
+## dials it; until short-code publishing lands this string is the
+## whole invitation, copied to the clipboard like a code.
+func show_host_ticket(ticket: String) -> void:
+	if not _create_waiting or _active_invite_flow != "create":
+		return
+	_flow.show_flow("", "")
+	_flow.add_status("YOUR GAME TICKET", &"Caption")
+	_create_code_label = _flow.add_code(ticket)
+	_copy_button = _flow.add_action("Copy ticket")
 	_copy_button.pressed.connect(_on_copy_code)
 	_create_status = _flow.add_status("Waiting for opponent...")
 	_flow_cancel_button(_cancel_create_wait)
-	create_requested.emit(_create_code_label.text)
 
 
-## Backend calls this when the room reports that an opponent has joined.
-func opponent_connected(opponent_name: String = "Opponent") -> void:
+## Backend calls this when hosting failed outright.
+func host_failed(reason: String = "") -> void:
 	if not _create_waiting or _active_invite_flow != "create":
 		return
-	_create_status.text = "Opponent connected."
-	_copy_button.hide()
 	_create_waiting = false
-	game_setup_requested.emit(opponent_name, "create")
+	_flow.show_flow("", "")
+	if reason.is_empty():
+		reason = "Could not start hosting."
+	_flow.add_status(reason)
+	_flow_cancel_button(_reset_invite_flow)
+
+
+## A network failure routes by flow, carrying the core's reason:
+## a joining attempt fails, a hosting attempt reports, anything else
+## is already gone.
+func notify_network_error(reason: String = "") -> void:
+	if _active_invite_flow == "join-connecting":
+		join_failed(reason)
+	elif _create_waiting and _active_invite_flow == "create":
+		host_failed(reason)
+
+
+## Backend calls this when the link is up but the session handshake is
+## still running. The flow stays put: advancing to setup happens in
+## `opponent_connected`, which now means the session is ready, not
+## just the transport. (Advancing on link-up sent the host to setup
+## while the guest was still handshaking — and the guest's failure
+## then looked like a mystery instead of a failed handshake.)
+func peer_linked() -> void:
+	if _active_invite_flow == "create" and _create_waiting and _create_status != null:
+		_create_status.text = "Opponent connected · starting game..."
+	elif _active_invite_flow == "join-connecting" and _join_status != null:
+		_join_status.text = "Connected · starting game..."
+
+
+## Backend calls this when the session is ready (game started), not
+## when the transport merely linked. Only this advances out of the hub.
+## Both flows advance here: the host from its create card, the guest
+## from its join card. (Gating this on the create flow alone stranded
+## every guest on "starting game" with a live session underneath —
+## found via the NET-TRACE handshake log, not guessed.)
+func opponent_connected(opponent_name: String = "Opponent") -> void:
+	if _active_invite_flow == "create" and _create_waiting:
+		_create_status.text = "Opponent connected."
+		_copy_button.hide()
+		_create_waiting = false
+		game_setup_requested.emit(opponent_name, "create")
+		return
+	if _active_invite_flow == "join-connecting" and _join_is_connecting:
+		_join_is_connecting = false
+		game_setup_requested.emit(opponent_name, "join")
+		return
 
 
 ## Backend calls this if the opponent leaves before setup begins.
+## No caller yet: a dropped pre-setup peer currently ends the flow
+## through `host_failed`, because nothing re-accepts after the driver
+## exits. Kept for the re-accept flow, which will return the card to
+## waiting instead of ending it.
 func opponent_left() -> void:
 	if not _create_waiting or _active_invite_flow != "create":
 		return
@@ -241,7 +303,7 @@ func _on_copy_code() -> void:
 	_create_status.text = "Waiting for opponent..."
 	get_tree().create_timer(1.6).timeout.connect(func() -> void:
 		if is_instance_valid(_copy_button):
-			_copy_button.text = "Copy code"
+			_copy_button.text = "Copy ticket"
 	)
 
 
@@ -257,7 +319,7 @@ func _begin_join_flow() -> void:
 	_invite_grid.hide()
 	_flow.show()
 	_set_player_invites_enabled(false)
-	_flow.show_flow("Join with a code", "Enter the code someone shared with you.")
+	_flow.show_flow("Join a game", "Enter the ticket someone shared with you.")
 	_join_field = _flow.add_content(_code_field()) as LineEdit
 	_join_field.text_changed.connect(_on_join_code_changed)
 	_join_echo = _flow.add_status("", &"Caption")
@@ -281,15 +343,15 @@ func _focus_join_field() -> void:
 
 
 func _on_join_code_changed(value: String) -> void:
-	_current_join_code = _normalize_invite_code(value)
+	_current_join_code = _normalize_join_target(value)
 	var readable := _format_invite_code(_current_join_code)
 	_join_echo.text = readable
 	_join_echo.visible = not readable.is_empty()
-	_join_button.disabled = not _is_valid_invite_code(_current_join_code)
+	_join_button.disabled = not _is_valid_join_target(_current_join_code)
 
 
 func _on_join_pressed() -> void:
-	if not _is_valid_invite_code(_current_join_code):
+	if not _is_valid_join_target(_current_join_code):
 		return
 	_join_field.hide()
 	_join_button.hide()
@@ -303,24 +365,21 @@ func _on_join_pressed() -> void:
 	join_requested.emit(_current_join_code)
 
 
-## Backend calls this when the entered code cannot be reached.
-func join_failed() -> void:
+## Backend calls this when the entered ticket cannot be reached.
+## `reason` carries the core's words; without it every failure reads
+## the same and the real cause (bad ticket, lost code, dead relay) is
+## undebuggable on device.
+func join_failed(reason: String = "") -> void:
 	if not _join_is_connecting or _active_invite_flow != "join-connecting":
 		return
 	_join_is_connecting = false
 	_active_invite_flow = "join-failed"
-	_join_status.text = "Check the game code and try again."
+	if reason.is_empty():
+		reason = "Check the game ticket and try again."
+	_join_status.text = reason
 	_join_echo.text = "Couldn't connect."
 	_join_retry_button.show()
 	_join_cancel_button.show()
-
-
-## Backend calls this when the invite code has connected successfully.
-func join_connected(opponent_name: String = "Opponent") -> void:
-	if not _join_is_connecting or _active_invite_flow != "join-connecting":
-		return
-	_join_is_connecting = false
-	game_setup_requested.emit(opponent_name, "join")
 
 
 func _retry_join() -> void:
@@ -329,7 +388,7 @@ func _retry_join() -> void:
 	_join_echo.text = _format_invite_code(_current_join_code)
 	_join_field.show()
 	_join_button.show()
-	_join_button.disabled = not _is_valid_invite_code(_current_join_code)
+	_join_button.disabled = not _is_valid_join_target(_current_join_code)
 	_join_retry_button.hide()
 	_join_cancel_button.show()
 
@@ -384,18 +443,12 @@ func _flow_cancel_button(action: Callable) -> Button:
 ## appears it should become a scene of its own, like PlayerRow did.
 
 
-func _generate_invite_code() -> String:
-	var rng := RandomNumberGenerator.new()
-	rng.randomize()
-	var result := ""
-	for index in CODE_LENGTH:
-		if index == 3:
-			result += "-"
-		result += CODE_ALPHABET[rng.randi_range(0, CODE_ALPHABET.length() - 1)]
-	return result
-
-
-func _normalize_invite_code(value: String) -> String:
+## What the guest typed: a short code (uppercased, separators dropped)
+## or a pasted ticket (kept whole; tickets carry their own alphabet).
+func _normalize_join_target(value: String) -> String:
+	var trimmed := value.strip_edges()
+	if trimmed.length() >= TICKET_MIN_LENGTH:
+		return trimmed
 	var result := ""
 	for index in value.length():
 		var character := value[index]
@@ -406,9 +459,17 @@ func _normalize_invite_code(value: String) -> String:
 
 
 func _format_invite_code(value: String) -> String:
+	if value.length() >= TICKET_MIN_LENGTH:
+		return "%s...%s" % [value.substr(0, 12), value.right(6)]
 	if value.length() <= 3:
 		return value
 	return "%s-%s" % [value.substr(0, 3), value.substr(3)]
+
+
+func _is_valid_join_target(value: String) -> bool:
+	if value.length() >= TICKET_MIN_LENGTH:
+		return true
+	return _is_valid_invite_code(value)
 
 
 func _is_valid_invite_code(value: String) -> bool:
@@ -428,7 +489,7 @@ func _update_responsive_layout(width: float = -1.0) -> void:
 
 func _code_field() -> LineEdit:
 	var field := LineEdit.new()
-	field.placeholder_text = "ABC-123"
-	field.max_length = 9
+	field.placeholder_text = "ABC-123 or pasted ticket"
+	field.max_length = 512
 	field.custom_minimum_size.y = 48
 	return field

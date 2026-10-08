@@ -27,6 +27,10 @@ var _peer_kind := "peer"
 var _local_ready := false
 var _opponent_is_ready := false
 var _header_menu_layer: Control
+## The live networked session, when this setup fronts one. Set for
+## ticket/host flows only; mock invite flows have no session and keep
+## the old local behavior.
+var _net_bridge: ChessCoreBridge = null
 
 
 func _ready() -> void:
@@ -69,6 +73,24 @@ func configure_peer(opponent_name: String, setup_kind: String) -> void:
 		_apply_peer_setup()
 
 
+func selected_ai_side() -> String:
+	return _side_choice.get_selected_choice()
+
+
+func selected_ai_difficulty() -> String:
+	return _difficulty_choice.get_selected_choice()
+
+
+## Attaches the live networked session. The lobby then shows the
+## session instead of offering choices: sides were fixed when the
+## handshake completed, and color/time/variant/difficulty pickers
+## change nothing on the wire, so they hide instead of lying.
+func configure_net_bridge(bridge: ChessCoreBridge) -> void:
+	_net_bridge = bridge
+	if is_node_ready() and _peer_setup:
+		_apply_peer_setup()
+
+
 func _apply_peer_setup() -> void:
 	_difficulty_choice.hide()
 	_play_button.text = "Ready   ✓"
@@ -76,9 +98,33 @@ func _apply_peer_setup() -> void:
 	_ready_label.text = "Choose your settings, then mark yourself ready"
 	var detail := "Connected player"
 	if _peer_kind == "create" or _peer_kind == "join":
-		detail = "Connected via invite code"
+		# Tickets today; short codes arrive with rendezvous publishing.
+		detail = "Connected via ticket"
 	_opponent_card.configure(_peer_name, "PLAYER", detail)
+	if _net_bridge != null:
+		_apply_net_lobby()
 	_update_summary()
+
+
+## Read-only lobby for a live session: real sides on the cards,
+## theater controls hidden, one honest button. Entering only opens
+## the board of the game that started underneath; it never starts
+## anything, so an early host sees the live game, not a second one.
+func _apply_net_lobby() -> void:
+	_side_choice.hide()
+	_time_choice.hide()
+	_variant_choice.hide()
+	_custom_time_controls.hide()
+	var mine := _net_bridge.my_side()
+	var mine_shown := mine.capitalize() if not mine.is_empty() else "…"
+	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
+	_player_card.set_side(mine_shown)
+	_opponent_card.set_side(theirs)
+	_play_button.text = "Enter game"
+	_play_button.tooltip_text = "Open the live game"
+	_play_button.disabled = false
+	_ready_label.text = "Connected · game is live · enter when ready"
+	_settings_summary.text = "You play %s · Standard · game is live" % mine_shown
 
 
 func _update_header_visibility() -> void:
@@ -120,6 +166,10 @@ func _on_custom_time_changed(_value: float) -> void:
 
 
 func _on_play_pressed() -> void:
+	if _net_bridge != null:
+		# Live session underneath; entering only opens its board.
+		play_requested.emit()
+		return
 	if _peer_setup:
 		_local_ready = true
 		_play_button.disabled = true
@@ -131,14 +181,27 @@ func _on_play_pressed() -> void:
 
 
 ## Mock or backend response for the other player's ready state.
+## Ignored on a live session: both sides are past ready there, and the
+## lobby shows the session instead of a ready dance.
 func opponent_ready() -> void:
-	if not _peer_setup:
+	if not _peer_setup or _net_bridge != null:
 		return
 	_opponent_is_ready = true
 	if _local_ready:
 		_ready_label.text = "Both players ready · UI preview complete"
 	else:
 		_ready_label.text = "Opponent is ready · choose settings and mark yourself ready"
+
+
+## Backend reports the link died after setup opened (the host's final
+## send can fail after its own game-started fired). The session is
+## gone; say so where the user is looking instead of stranding them on
+## a ready screen for a dead game.
+func notify_net_issue(message: String) -> void:
+	if not _peer_setup:
+		return
+	_ready_label.text = message
+	_play_button.disabled = true
 
 
 func _toggle_header_menu() -> void:
@@ -250,6 +313,8 @@ func _on_leave_setup_pressed() -> void:
 
 
 func _update_side_cards() -> void:
+	if _net_bridge != null:
+		return
 	match _side_choice.get_selected_choice():
 		"Black":
 			_player_card.set_side("Black")
@@ -267,6 +332,8 @@ func _update_custom_time_visibility() -> void:
 
 
 func _update_summary() -> void:
+	if _net_bridge != null:
+		return
 	var time_summary := _format_time_summary()
 	var variant := _variant_choice.get_selected_choice()
 	if _peer_setup:

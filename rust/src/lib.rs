@@ -6,6 +6,7 @@
 //! Layout starts flat per the doc ("split only when a real boundary
 //! forces it"). Each module is currently an empty boundary with no logic.
 
+pub mod ai;
 pub mod app;
 pub mod bridge;
 pub mod chess_core;

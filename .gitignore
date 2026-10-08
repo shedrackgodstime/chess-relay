@@ -34,3 +34,6 @@ ref/
 
 # Local temporary downloads and asset comparisons
 /temp/
+
+# Make build stamps (mode tracking for android debug/release)
+.build/
