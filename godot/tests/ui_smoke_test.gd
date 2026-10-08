@@ -287,34 +287,10 @@ func _check_responsive_layouts() -> void:
 	var hub := HUB_SCENE.instantiate() as MultiplayerHubScreen
 	root.add_child(hub)
 	await process_frame
-	# The discovery dialog has to be a scene and has to keep the hub's answers, because
-	# the alternative was copying two booleans in on every opening.
-	var dialog := hub._discovery_dialog
-	_check(dialog != null, "hub holds a discovery dialog")
-	# Read the script off the scene rather than asserting on a type: the point is
-	# that the hub reuses the component scene, and a type check would pass for a
-	# hand-built dialog that happened to be typed the same way.
-	var dialog_script: Script = dialog.get_script()
-	_check(dialog_script != null
-			and dialog_script.resource_path
-			== "res://src/ui/components/discovery_dialog/discovery_dialog.gd",
-		"and it is the shared component scene")
-	hub._discoverable_nearby = false
-	hub._show_discovery_settings()
-	await process_frame
-	_check(dialog.visible, "opening the dialog shows it")
-	_check(dialog.discoverable_nearby == false,
-		"and it opens on the answers in force, not its own defaults")
-	_check(not _button(dialog, "Options/Nearby").button_pressed,
-		"with the control showing that answer")
-	# A typed counter rather than a Dictionary: an int in a Dictionary is a
-	# Variant, and reading it needs a cast the escalating gate refuses.
-	_change_count = 0
-	dialog.discovery_changed.connect(_on_discovery_changed)
-	_button(dialog, "Options/Online").button_pressed = true
-	await process_frame
-	_check(_change_count == 1, "the dialog reports a change")
-	_check(hub._discoverable_online, "and the hub takes it")
+	_check(hub._profile_status.text == "Discovery unavailable",
+		"hub does not claim an unimplemented discovery state")
+	_check(hub._discovery_settings_button.disabled,
+		"discovery settings stay disabled until a backend exists")
 	hub._update_responsive_layout(800.0)
 	_check(hub._invite_grid.columns == 1, "hub stacks invite cards at narrow width")
 	hub._update_responsive_layout(1200.0)
@@ -755,19 +731,6 @@ func _board_view_action(game: Node, index: int) -> Button:
 func _overlay_mesh(board: ChessBoardView, path: String) -> Mesh:
 	var marker := board.get_node(path) as MeshInstance3D
 	return marker.mesh if marker != null else null
-
-
-## Counter for the discovery-dialog signal check.
-##
-## A member rather than a local, because reassigning a lambda's captured local
-## does not modify the outer variable -- a check that counted nothing would have
-## passed. GDScript reports this as a warning; the escalating gate is what turns
-## it into an error.
-var _change_count := 0
-
-
-func _on_discovery_changed(_nearby: bool, _online: bool) -> void:
-	_change_count += 1
 
 
 ## Presses the nth option of a choice group the way a player would.

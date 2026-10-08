@@ -322,7 +322,7 @@ QUIC guarantees in-order delivery *within* a stream, but streams are scheduled a
 1. **Chess960:** `VariantChoice` presents "Standard" and "Chess960". The Rust `chess_core` move generator and board parser have 0% support for Chess960.
 2. **Time Controls:** `TimeChoice` offers presets ("1\|0", "3\|2", "5\|3", "Custom"). When starting a game, this selection is discarded.
 3. **Fabricated Clocks:** In `game_screen.gd`, clocks are hardcoded to `_white_seconds := 600` and decremented by a local Godot timer without core synchronization.
-4. **Discovery Preferences:** The toggles in `DiscoverySettingsDialog` ("Nearby", "Online") only update a local text label and connect to no background service or persistence.
+4. **Discovery Preferences:** The former toggles in `DiscoverySettingsDialog` ("Nearby", "Online") only updated a local text label and connected to no background service or persistence. They have been removed; the hub now reports discovery unavailable and directs users to invite codes.
 5. **Short Invite Codes:** `transport_rendezvous.rs` implements pkarr ticket publishing and resolution, but `bridge.rs` `host_game()` only returns raw, long Iroh tickets. Short-code generation is not exposed to the UI.
 
 #### Impact

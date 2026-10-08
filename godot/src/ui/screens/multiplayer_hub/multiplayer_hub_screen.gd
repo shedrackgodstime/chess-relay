@@ -13,10 +13,6 @@ signal game_setup_requested(opponent_name: String, setup_kind: String)
 ## The list row, loaded here rather than referred to by path at runtime so that a
 ## scene which has gone missing is a load error at startup instead of a null in the
 ## middle of filling the list.
-## The discovery dialog, built once and reused.
-const DISCOVERY_DIALOG_SCENE: PackedScene = preload(
-	"res://src/ui/components/discovery_dialog/discovery_dialog.tscn")
-
 const PLAYER_ROW_SCENE: PackedScene = preload(
 	"res://src/ui/components/player_row/player_row.tscn")
 
@@ -51,17 +47,16 @@ var _join_is_connecting := false
 ## asks each row to do it and the row stays the thing that knows how.
 var _player_rows_added: Array[PlayerRow] = []
 var _active_invite_flow := ""
-var _discoverable_nearby := true
-var _discoverable_online := false
-var _discovery_dialog: DiscoverySettingsDialog = null
 
 
 func _ready() -> void:
 	_back_button.pressed.connect(func() -> void: back_requested.emit())
 	_create_invite_button.pressed.connect(_on_create_invite)
 	_join_game_button.pressed.connect(_begin_join_flow)
-	(_discovery_settings_button).pressed.connect(_show_discovery_settings)
-	_build_discovery_dialog()
+	_profile_status.text = "Discovery unavailable"
+	_profile_status.tooltip_text = "Peer discovery is not implemented; use an invite code."
+	_profile_status.add_theme_color_override("font_color", Color(0.65, 0.65, 0.65, 1.0))
+	_discovery_settings_button.disabled = true
 	_show_empty_players()
 	get_viewport().size_changed.connect(_update_responsive_layout)
 	_update_responsive_layout()
@@ -114,41 +109,6 @@ func _clear_player_rows() -> void:
 		if is_instance_valid(row):
 			row.queue_free()
 	_player_rows_added.clear()
-
-
-## Opens the dialog, with the answers that are currently in force.
-##
-## One dialog for the life of the screen rather than one per opening. It used to be
-## built here each time and freed on close, which meant the two answers had to be
-## copied in each time and could drift from the profile line beside the button.
-func _show_discovery_settings() -> void:
-	_discovery_dialog.discoverable_nearby = _discoverable_nearby
-	_discovery_dialog.discoverable_online = _discoverable_online
-	_discovery_dialog.show_dialog()
-
-
-## One dialog, made once.
-func _build_discovery_dialog() -> void:
-	_discovery_dialog = DISCOVERY_DIALOG_SCENE.instantiate() as DiscoverySettingsDialog
-	add_child(_discovery_dialog)
-	_discovery_dialog.discovery_changed.connect(_on_discovery_changed)
-
-
-func _on_discovery_changed(nearby: bool, online: bool) -> void:
-	_discoverable_nearby = nearby
-	_discoverable_online = online
-	_update_profile_status()
-
-
-func _update_profile_status() -> void:
-	if _discoverable_nearby and _discoverable_online:
-		_profile_status.text = "Discoverable nearby and online"
-	elif _discoverable_nearby:
-		_profile_status.text = "Discoverable nearby"
-	elif _discoverable_online:
-		_profile_status.text = "Discoverable online"
-	else:
-		_profile_status.text = "Not discoverable"
 
 
 func _on_create_invite() -> void:

@@ -218,6 +218,7 @@ report distinguishes verified behavior from unavailable evidence.
 | `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality; app restart still open |
 | `JOIN-001` | Short-code implementation is not the displayed/used host contract | Implemented | Host-code → resolver contract and UI wiring; live rendezvous still open |
 | `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; production no longer instantiates the mock service |
+| `DISCOVERY-001` | Discovery controls claim backend state while only changing a local label | Verified | Discovery dialog removed from production; hub explicitly displays unavailable and directs users to invite codes |
 | `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring, startup-order protection, snapshot synchronization, and stale-generation tests; two-process UI integration still open |
 | `SAVE-001` | New games can be hijacked by persisted or finished sessions | Verified | Explicit fresh-start contract, finished-save rejection/purge in both resume paths, and Godot AI regression; user-facing Resume action remains a separate product surface |
 | `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |

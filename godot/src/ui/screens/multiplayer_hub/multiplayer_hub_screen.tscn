@@ -92,14 +92,15 @@ text = "Guest player"
 unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"QuietLabel"
-text = "Discoverable nearby"
+text = "Discovery unavailable"
 
 [node name="DiscoverySettingsButton" type="Button" parent="Workspace/Margins/Content/ProfileCard/ProfileRow"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "Discovery settings"
+text = "Use invite code"
 theme_type_variation = &"QuietButton"
 accessibility_name = "Open discovery settings"
+disabled = true
 
 [node name="InviteSection" type="VBoxContainer" parent="Workspace/Margins/Content"]
 layout_mode = 2

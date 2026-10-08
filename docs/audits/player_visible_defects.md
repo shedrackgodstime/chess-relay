@@ -172,7 +172,7 @@ is F-09, listed.**
 | Opponent named "MORGAN" | Hard-coded string in `game_screen.tscn` | F-09 |
 | Time control presets | Never read by anything | F-09 |
 | "Chess960" | 0% support in `chess_core` | F-09 |
-| Discovery toggles | Write a local label only | F-09 |
+| Discovery toggles | Removed; hub now reports discovery unavailable and directs users to invite codes | closed |
 | Invite code | Now real (`transport_rendezvous.rs`, commit `8a25602`) | closed |
 
 **Every one of these was written down before being reported.** The `ai`
