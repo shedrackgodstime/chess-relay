@@ -193,6 +193,7 @@ func _connect_bridge_signals() -> void:
 	_bridge.bridge_error.connect(_on_bridge_error)
 	_bridge.network_error.connect(_on_net_error)
 	_bridge.network_reconnecting.connect(_on_net_reconnecting)
+	_bridge.network_quality.connect(_on_net_quality)
 	_bridge.peer_connected.connect(_on_net_reconnected)
 	_bridge.peer_disconnected.connect(_on_peer_disconnected)
 	_bridge.peer_loaded.connect(_on_peer_loaded)
@@ -231,6 +232,10 @@ func _on_peer_disconnected() -> void:
 func _on_net_reconnecting() -> void:
 	_header.set_network_state(GameHeader.NetworkState.DEGRADED)
 	_header.set_center_text("Reconnecting…")
+
+
+func _on_net_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
+	_header.set_network_quality(level, rtt_ms, loss_percent, direct)
 
 
 func _on_net_reconnected(_peer: String) -> void:

@@ -11,7 +11,7 @@
 //! IS the peer identity. The CLI asserts the bytes match.
 
 use super::protocol::Msg;
-use super::transport::{Connection, Endpoint, TransportError, encode_frame};
+use super::transport::{Connection, Endpoint, TransportError, TransportQuality, encode_frame};
 use iroh::{EndpointId, endpoint::presets};
 use iroh_tickets::endpoint::EndpointTicket;
 use std::str::FromStr;
@@ -170,6 +170,22 @@ impl Connection for IrohConnection {
     async fn close(&mut self) -> Result<(), TransportError> {
         self.connection.close(0u32.into(), b"done");
         Ok(())
+    }
+
+    fn quality(&self) -> Option<TransportQuality> {
+        let paths = self.connection.paths();
+        let path = paths
+            .iter()
+            .find(|path| path.is_selected())
+            .or_else(|| paths.iter().next())?;
+        let stats = path.stats();
+        let sent = stats.udp_tx.datagrams.max(1);
+        let loss_percent = ((stats.lost_packets.saturating_mul(100)) / sent).min(100) as u8;
+        Some(TransportQuality {
+            rtt_ms: stats.rtt.as_millis().min(u32::MAX as u128) as u32,
+            loss_percent,
+            direct: path.is_ip(),
+        })
     }
 }
 

@@ -84,6 +84,10 @@ func set_network_state(state: NetworkState) -> void:
 	_network_indicator.call("set_state", state)
 
 
+func set_network_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
+	_network_indicator.call("set_quality", level, rtt_ms, loss_percent, direct)
+
+
 func set_voice_state(state: VoiceState) -> void:
 	_voice_state = state
 	match state:

@@ -44,6 +44,8 @@ signal bridge_error(message: String)
 signal peer_connected(peer: String)
 ## Emitted after a live link drops while the Rust session remains resumable.
 signal network_reconnecting
+## Measured transport quality from Rust/Iroh, shared by every screen.
+signal network_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool)
 ## Emitted when the peer link drops.
 signal peer_disconnected
 ## Emitted when the remote game screen has loaded and is ready for the board.
@@ -84,6 +86,9 @@ func _ready() -> void:
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
 	_core.connect(&"peer_connected", func(peer: String) -> void: peer_connected.emit(peer))
 	_core.connect(&"network_reconnecting", func() -> void: network_reconnecting.emit())
+	_core.connect(&"network_quality",
+		func(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
+			network_quality.emit(level, rtt_ms, loss_percent, direct))
 	_core.connect(&"peer_disconnected", func() -> void: peer_disconnected.emit())
 	_core.connect(&"peer_loaded", func() -> void: peer_loaded.emit())
 	_core.connect(&"network_error", func(message: String) -> void: network_error.emit(message))

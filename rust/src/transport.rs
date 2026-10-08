@@ -49,6 +49,18 @@ pub const FRAME_PREFIX_LEN: usize = 4;
 /// Largest single message accepted (1 MiB; a log entry is ~200 bytes).
 pub const MAX_FRAME_LEN: usize = 1024 * 1024;
 
+/// Measured quality of the currently selected transport path. This is not
+/// radio RSSI; it describes the peer connection the game is using.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TransportQuality {
+    /// Smoothed path RTT in milliseconds.
+    pub rtt_ms: u32,
+    /// Cumulative packet-loss percentage reported by the path.
+    pub loss_percent: u8,
+    /// Whether the selected path is direct IP rather than relay.
+    pub direct: bool,
+}
+
 /// One side of a connection: framed messages both ways.
 ///
 /// Async methods are native (Rust 1.75+), not boxed futures: readability
@@ -63,6 +75,10 @@ pub trait Connection: Send {
     async fn recv(&mut self) -> Result<Msg, TransportError>;
     /// Closes this side; the peer observes closure on receive.
     async fn close(&mut self) -> Result<(), TransportError>;
+    /// Returns measured path quality when the transport exposes it.
+    fn quality(&self) -> Option<TransportQuality> {
+        None
+    }
 }
 
 /// An endpoint that dials tickets and accepts peers.

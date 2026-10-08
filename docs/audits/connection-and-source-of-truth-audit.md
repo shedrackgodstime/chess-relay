@@ -247,6 +247,18 @@ fact is persisted in Rust, so a fast signal cannot be lost before the screen
 subscribes. The board becomes visible only after both devices have loaded their
 network game screen.
 
+### C-SOT-10 — Header bars must represent measured peer quality
+
+**Status:** implemented; automated gates pass; real-device measurements remain
+required.
+
+The header indicator is not radio signal strength. The Rust/Iroh transport now
+reports the selected path's RTT, cumulative packet loss, and direct-versus-
+relay path. Rust derives the quality level and emits one typed quality signal;
+both setup and game screens render that same observation. Lifecycle remains a
+separate fact: connecting, reconnecting, and lost are not inferred from the
+quality bars. Memory transport deliberately reports no fake metrics.
+
 ## What is already documented elsewhere
 
 - F-01 covers the network lifecycle inversion and the hollow setup screen.

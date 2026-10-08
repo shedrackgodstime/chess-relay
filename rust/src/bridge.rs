@@ -18,7 +18,7 @@ use crate::app::{App, Command, Event, Query, QueryResult};
 use crate::chess_core::{Board, Color as ChessColor, Move, Square};
 use crate::protocol::{Msg, PROTOCOL_VERSION};
 use crate::session::{LogEntry, LogStore, PeerId, RecentPeerStore};
-use crate::transport::{Connection, Endpoint as _, TransportError};
+use crate::transport::{Connection, Endpoint as _, TransportError, TransportQuality};
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
 use sha2::{Digest, Sha256};
@@ -131,6 +131,12 @@ struct NetLaunch {
 enum NetNote {
     Connected(PeerId),
     Reconnecting,
+    Quality {
+        level: u8,
+        rtt_ms: u32,
+        loss_percent: u8,
+        direct: bool,
+    },
     Setup {
         side: String,
         time: String,
@@ -187,6 +193,8 @@ impl ChessRelayBridge {
     fn peer_connected(peer: GString);
     #[signal]
     fn network_reconnecting();
+    #[signal]
+    fn network_quality(level: i64, rtt_ms: i64, loss_percent: i64, direct: bool);
     #[signal]
     fn peer_disconnected();
     #[signal]
@@ -1074,6 +1082,19 @@ impl INode for ChessRelayBridge {
                 NetNote::Reconnecting => {
                     self.signals().network_reconnecting().emit();
                 }
+                NetNote::Quality {
+                    level,
+                    rtt_ms,
+                    loss_percent,
+                    direct,
+                } => {
+                    self.signals().network_quality().emit(
+                        i64::from(*level),
+                        i64::from(*rtt_ms),
+                        i64::from(*loss_percent),
+                        *direct,
+                    );
+                }
                 NetNote::Setup {
                     side,
                     time,
@@ -1674,6 +1695,8 @@ async fn drive_session<C: Connection>(
     host_role: bool,
 ) {
     let mut sent_seq = next_local_seq(core);
+    let mut quality_tick = tokio::time::interval(Duration::from_secs(2));
+    quality_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
     if conn
         .send(&Msg::LobbyHello {
             version: PROTOCOL_VERSION,
@@ -1693,6 +1716,16 @@ async fn drive_session<C: Connection>(
     }
     loop {
         tokio::select! {
+            _ = quality_tick.tick() => {
+                if let Some(sample) = conn.quality() {
+                    note(core, generation, NetNote::Quality {
+                        level: quality_level(sample),
+                        rtt_ms: sample.rtt_ms,
+                        loss_percent: sample.loss_percent,
+                        direct: sample.direct,
+                    });
+                }
+            }
             cmd = cmd_rx.recv() => {
                 match cmd {
                     Some(NetCmd::UpdateSetup { revision, side, time, variant }) => {
@@ -1771,6 +1804,15 @@ async fn drive_session<C: Connection>(
                 }
             }
         }
+    }
+}
+
+fn quality_level(sample: TransportQuality) -> u8 {
+    match (sample.rtt_ms, sample.loss_percent) {
+        (0..=100, 0..=1) => 4,
+        (0..=250, 0..=3) => 3,
+        (0..=500, 0..=8) => 2,
+        _ => 1,
     }
 }
 

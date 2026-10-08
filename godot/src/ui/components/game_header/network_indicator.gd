@@ -46,6 +46,21 @@ func set_state(state: int) -> void:
 			_set_visual_state(0, _color("bar_idle"), "Connection: idle")
 
 
+## Applies measured peer-path quality. Lifecycle state remains separate: this
+## method is never used to infer connected/disconnected.
+func set_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
+	var bounded_level := clampi(level, 1, 4)
+	var color := _color("bar_good") if bounded_level >= 3 else _color("bar_connecting")
+	if bounded_level == 1:
+		color = _color("bar_lost")
+	var path_name := "direct" if direct else "relay"
+	_set_visual_state(
+		bounded_level,
+		color,
+		"Connection quality: %d/4 · %d ms · %d%% loss · %s" % [
+			bounded_level, rtt_ms, loss_percent, path_name])
+
+
 func _set_visual_state(count: int, color: Color, description: String) -> void:
 	_active_bars = count
 	_active_color = color

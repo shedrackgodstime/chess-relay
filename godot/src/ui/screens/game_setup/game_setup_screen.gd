@@ -102,6 +102,8 @@ func configure_net_bridge(bridge: ChessCoreBridge) -> void:
 		_net_bridge.peer_connected.connect(_on_net_peer_connected)
 	if not _net_bridge.network_reconnecting.is_connected(_on_net_reconnecting):
 		_net_bridge.network_reconnecting.connect(_on_net_reconnecting)
+	if not _net_bridge.network_quality.is_connected(_on_net_quality):
+		_net_bridge.network_quality.connect(_on_net_quality)
 	if not _net_bridge.peer_disconnected.is_connected(_on_net_peer_disconnected):
 		_net_bridge.peer_disconnected.connect(_on_net_peer_disconnected)
 	if not _net_bridge.network_error.is_connected(_on_net_network_error):
@@ -116,6 +118,10 @@ func _on_net_peer_connected(_peer: String) -> void:
 
 func _on_net_reconnecting() -> void:
 	_header.set_network_state(GameHeader.NetworkState.DEGRADED)
+
+
+func _on_net_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
+	_header.set_network_quality(level, rtt_ms, loss_percent, direct)
 
 
 func _on_net_peer_disconnected() -> void:
