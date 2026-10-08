@@ -218,6 +218,10 @@ func _leave_network() -> void:
 
 func _on_game_setup_leave_requested(is_peer_setup: bool) -> void:
 	if is_peer_setup:
+		# Returning to the multiplayer hub is still a network leave. Keeping the
+		# borrowed bridge alive here leaves the other player in a false lobby
+		# state and lets a later screen reuse a dead session.
+		_leave_network()
 		_on_p2p_requested()
 	else:
 		_show_home_screen()

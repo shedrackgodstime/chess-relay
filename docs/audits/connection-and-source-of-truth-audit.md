@@ -145,8 +145,8 @@ state.
 
 ### C-SOT-06 — Failed connection attempts do not consistently retire the bridge
 
-**Status:** related to F-06 and the existing setup/network audit; this exact
-failure path is new.  
+**Status:** fixed for the setup-to-lobby path; retain as a regression check for
+all future network screen transitions.  
 **Severity:** Medium
 
 When the bridge reports a network error, AppRoot routes the message to the hub
@@ -154,11 +154,13 @@ or setup screen:
 
 [app_root.gd:223](../../godot/src/ui/app/app_root.gd:223).
 
-Those callbacks update presentation state, but do not automatically call
-_leave_network(). The failed bridge and its runtime can remain owned by
-AppRoot while the UI presents a retry or failure state. A later retry may
-retire the old bridge indirectly, but resource state and visible state are
-temporarily inconsistent.
+Those callbacks update presentation state, but failure handling must also retire
+the bridge. The setup screen previously returned to a new multiplayer hub
+without calling `_leave_network()`, so the old endpoint and driver remained
+owned by `AppRoot` while the UI presented a fresh lobby. The transition now
+retires the borrowed bridge before creating the replacement hub; the peer sees
+the existing `peer_disconnected` path and the lobby displays “Opponent
+disconnected.”
 
 ## Event and state transitions currently in play
 
