@@ -69,10 +69,14 @@ func configure_ai(side: String, difficulty: String) -> void:
 
 func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
+	_header.voice_toggle_requested.connect(_on_voice_toggle_requested)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
 	_clock_timer.timeout.connect(_on_clock_tick)
 	_update_header_visibility()
+	if _is_multiplayer:
+		_header.set_network_state(GameHeader.NetworkState.GOOD)
+		_header.set_voice_state(GameHeader.VoiceState.OFF)
 	_update_clock_strip()
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
@@ -210,11 +214,19 @@ func _sync_board_perspective() -> void:
 
 
 func _on_peer_disconnected() -> void:
+	_header.set_network_state(GameHeader.NetworkState.LOST)
 	_header.set_center_text("Opponent disconnected")
 
 
 func _on_net_error(message: String) -> void:
+	_header.set_network_state(GameHeader.NetworkState.LOST)
 	_header.set_center_text(message)
+
+
+func _on_voice_toggle_requested() -> void:
+	# Voice transport is intentionally outside v1. Keep the control honest
+	# instead of implying that a click opened a live channel.
+	_header.set_center_text("Voice chat unavailable")
 
 
 ## Platform paths stay platform business: Godot resolves `user://` per

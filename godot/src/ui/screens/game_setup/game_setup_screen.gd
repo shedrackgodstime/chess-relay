@@ -89,12 +89,31 @@ func selected_ai_difficulty() -> String:
 ## application contract remain interactive; unsupported settings are hidden.
 func configure_net_bridge(bridge: ChessCoreBridge) -> void:
 	_net_bridge = bridge
+	_header.set_network_state(GameHeader.NetworkState.CONNECTING)
 	if not _net_bridge.session_created.is_connected(_on_net_session_created):
 		_net_bridge.session_created.connect(_on_net_session_created)
 	if not _net_bridge.setup_changed.is_connected(_on_net_setup_changed):
 		_net_bridge.setup_changed.connect(_on_net_setup_changed)
+	if not _net_bridge.peer_connected.is_connected(_on_net_peer_connected):
+		_net_bridge.peer_connected.connect(_on_net_peer_connected)
+	if not _net_bridge.peer_disconnected.is_connected(_on_net_peer_disconnected):
+		_net_bridge.peer_disconnected.connect(_on_net_peer_disconnected)
+	if not _net_bridge.network_error.is_connected(_on_net_network_error):
+		_net_bridge.network_error.connect(_on_net_network_error)
 	if is_node_ready() and _peer_setup:
 		_apply_peer_setup()
+
+
+func _on_net_peer_connected(_peer: String) -> void:
+	_header.set_network_state(GameHeader.NetworkState.CONNECTING)
+
+
+func _on_net_peer_disconnected() -> void:
+	_header.set_network_state(GameHeader.NetworkState.LOST)
+
+
+func _on_net_network_error(_message: String) -> void:
+	_header.set_network_state(GameHeader.NetworkState.LOST)
 
 
 func _apply_peer_setup() -> void:
@@ -205,6 +224,7 @@ func _publish_net_setup() -> void:
 func _on_net_session_created(_white: String, _black: String, _host: String) -> void:
 	if _net_bridge == null:
 		return
+	_header.set_network_state(GameHeader.NetworkState.GOOD)
 	var mine := _net_bridge.my_side()
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine.capitalize() if not mine.is_empty() else "…")
