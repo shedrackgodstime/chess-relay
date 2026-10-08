@@ -177,7 +177,7 @@ remains open — `LIFECYCLE-001`.
 - Keep the transport-connected, session-created, ready, and game-started
   transitions distinct in the Godot screen flow; transport connection opens
   setup, the host owns live setup and the single Start action, the guest
-  observes and auto-acknowledges, and only `game_started` opens the board.
+  observes and auto-acknowledges, and the peer-loaded barrier opens the board.
 
 Exit condition: event order, revision, generation, and terminal-state behavior
 are covered by integration tests rather than inferred from timing.
