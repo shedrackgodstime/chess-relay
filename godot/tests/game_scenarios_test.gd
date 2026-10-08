@@ -304,13 +304,16 @@ func _scenario_draw_offer() -> void:
 	_play(game, "e2e4")
 	game._open_game_menu()
 	await process_frame
-	var menu := game.get_node_or_null("GameMenu")
+	var menu := HeaderMenu.find_in(game)
 	_check(menu != null, "menu opens with an offer action")
 	if menu == null:
 		game.queue_free()
 		return
-	var offer := menu.get_child(0).get_child(0) as Button
-	_check(offer.text == "Offer draw", "menu offers a draw first")
+	var offer := menu.find_item("Offer draw")
+	_check(offer != null and offer.text == "Offer draw", "menu offers a draw first")
+	if offer == null:
+		game.queue_free()
+		return
 	offer.pressed.emit()
 	await process_frame
 	var answer: ConfirmationDialog = null
@@ -353,13 +356,16 @@ func _scenario_resign() -> void:
 	_play(game, "e2e4")
 	game._open_game_menu()
 	await process_frame
-	var menu := game.get_node_or_null("GameMenu")
+	var menu := HeaderMenu.find_in(game)
 	_check(menu != null, "menu opens with a leave action")
 	if menu == null:
 		game.queue_free()
 		return
-	var leave := menu.get_child(0).get_child(1) as Button
-	_check(leave.text == "Leave game", "menu offers leaving second")
+	var leave := menu.find_item("Leave game")
+	_check(leave != null and leave.text == "Leave game", "menu offers leaving second")
+	if leave == null:
+		game.queue_free()
+		return
 	leave.pressed.emit()
 	await process_frame
 	var confirmation: ConfirmationDialog = null

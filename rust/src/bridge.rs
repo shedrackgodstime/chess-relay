@@ -50,11 +50,35 @@ struct CoreState {
     net_notes: VecDeque<NetNote>,
     network_setup: Option<NetworkSetup>,
     next_setup_revision: u64,
+    network_snapshot: NetworkSnapshot,
     network_peer_loaded: bool,
     ai: Option<AiState>,
     /// Bumped on every host/join/leave so late tasks from a retired
     /// network go silent instead of emitting stale signals.
     net_generation: u64,
+}
+
+/// Durable transport observation consumed by every UI surface. Quality is
+/// peer-path quality, not device radio RSSI.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct NetworkSnapshot {
+    lifecycle: String,
+    level: i64,
+    rtt_ms: i64,
+    loss_percent: i64,
+    direct: bool,
+}
+
+impl Default for NetworkSnapshot {
+    fn default() -> Self {
+        Self {
+            lifecycle: "idle".to_string(),
+            level: 0,
+            rtt_ms: -1,
+            loss_percent: -1,
+            direct: false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,6 +219,14 @@ impl ChessRelayBridge {
     fn network_reconnecting();
     #[signal]
     fn network_quality(level: i64, rtt_ms: i64, loss_percent: i64, direct: bool);
+    #[signal]
+    fn network_snapshot_changed(
+        lifecycle: GString,
+        level: i64,
+        rtt_ms: i64,
+        loss_percent: i64,
+        direct: bool,
+    );
     #[signal]
     fn peer_disconnected();
     #[signal]
@@ -681,6 +713,24 @@ impl ChessRelayBridge {
         values
     }
 
+    /// Durable network observation for screens that bind after an event was
+    /// emitted. The order is lifecycle, level, RTT ms, loss percent, direct.
+    #[func]
+    fn network_snapshot(&self) -> PackedStringArray {
+        let snapshot = self.lock().network_snapshot.clone();
+        let mut values = PackedStringArray::new();
+        values.push(&GString::from(snapshot.lifecycle.as_str()));
+        values.push(&GString::from(snapshot.level.to_string().as_str()));
+        values.push(&GString::from(snapshot.rtt_ms.to_string().as_str()));
+        values.push(&GString::from(snapshot.loss_percent.to_string().as_str()));
+        values.push(&GString::from(if snapshot.direct {
+            "true"
+        } else {
+            "false"
+        }));
+        values
+    }
+
     /// Persists the current move log to the configured save path.
     ///
     /// No-op (false) without a path or session; the screen calls this
@@ -1117,6 +1167,17 @@ impl INode for ChessRelayBridge {
                 }
             }
         }
+        if !notes.is_empty() {
+            let snapshot = { self.lock().network_snapshot.clone() };
+            let lifecycle = GString::from(snapshot.lifecycle.as_str());
+            self.signals().network_snapshot_changed().emit(
+                &lifecycle,
+                snapshot.level,
+                snapshot.rtt_ms,
+                snapshot.loss_percent,
+                snapshot.direct,
+            );
+        }
     }
 }
 
@@ -1505,6 +1566,10 @@ fn start_network(
     core.remote_peer = None;
     core.network_setup = None;
     core.next_setup_revision = 0;
+    core.network_snapshot = NetworkSnapshot {
+        lifecycle: "connecting".to_string(),
+        ..NetworkSnapshot::default()
+    };
     core.network_peer_loaded = false;
     core.recent_peers_path = Some(recent_path);
     core.app = Some(App::with_local(secret));
@@ -1532,6 +1597,10 @@ fn start_network(
 /// Holding the guard across shutdown deadlocks the scene thread.
 fn begin_retire(core: &mut CoreState) -> Option<NetState> {
     core.net_generation += 1;
+    core.network_snapshot = NetworkSnapshot {
+        lifecycle: "lost".to_string(),
+        ..NetworkSnapshot::default()
+    };
     core.net_notes.clear();
     core.net.take()
 }
@@ -1667,6 +1736,33 @@ fn is_current(core: &Arc<Mutex<CoreState>>, generation: u64) -> bool {
 fn note(core: &Arc<Mutex<CoreState>>, generation: u64, note: NetNote) {
     let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if guard.net_generation == generation {
+        match &note {
+            NetNote::Connected(_) => {
+                guard.network_snapshot.lifecycle = "connected".to_string();
+            }
+            NetNote::Reconnecting => {
+                guard.network_snapshot.lifecycle = "degraded".to_string();
+            }
+            NetNote::Quality {
+                level,
+                rtt_ms,
+                loss_percent,
+                direct,
+            } => {
+                guard.network_snapshot.lifecycle = "connected".to_string();
+                guard.network_snapshot.level = i64::from(*level);
+                guard.network_snapshot.rtt_ms = i64::from(*rtt_ms);
+                guard.network_snapshot.loss_percent = i64::from(*loss_percent);
+                guard.network_snapshot.direct = *direct;
+            }
+            NetNote::Disconnected | NetNote::Error(_) => {
+                guard.network_snapshot.lifecycle = "lost".to_string();
+                guard.network_snapshot.level = 0;
+                guard.network_snapshot.rtt_ms = -1;
+                guard.network_snapshot.loss_percent = -1;
+            }
+            NetNote::Setup { .. } | NetNote::PeerLoaded => {}
+        }
         guard.net_notes.push_back(note);
     }
 }

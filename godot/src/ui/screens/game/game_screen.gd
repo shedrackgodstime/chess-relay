@@ -63,7 +63,7 @@ func configure_peer(bridge: ChessCoreBridge = null, opponent_name: String = "Opp
 		_bridge = bridge
 		_owns_bridge = false
 	if is_node_ready():
-		_update_header_visibility()
+		_header.set_peer_context(_is_multiplayer)
 
 
 func configure_ai(side: String, difficulty: String) -> void:
@@ -75,14 +75,10 @@ func configure_ai(side: String, difficulty: String) -> void:
 
 func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
-	_header.voice_toggle_requested.connect(_on_voice_toggle_requested)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
 	_clock_timer.timeout.connect(_on_clock_tick)
-	_update_header_visibility()
-	if _is_multiplayer:
-		_header.set_network_state(GameHeader.NetworkState.GOOD)
-		_header.set_voice_state(GameHeader.VoiceState.OFF)
+	_header.set_peer_context(_is_multiplayer)
 	_update_clock_strip()
 	_camera.target = CAMERA_TARGET
 	_update_camera_framing()
@@ -96,10 +92,6 @@ func _ready() -> void:
 		_network_local_loaded = _bridge.mark_network_loaded()
 		if _bridge.network_peer_loaded():
 			_reveal_network_board()
-
-
-func _update_header_visibility() -> void:
-	_header.set_visibility(_is_multiplayer, _is_multiplayer, true, true)
 
 
 func _on_clock_tick() -> void:
@@ -193,10 +185,9 @@ func _connect_bridge_signals() -> void:
 	_bridge.bridge_error.connect(_on_bridge_error)
 	_bridge.network_error.connect(_on_net_error)
 	_bridge.network_reconnecting.connect(_on_net_reconnecting)
-	_bridge.network_quality.connect(_on_net_quality)
-	_bridge.peer_connected.connect(_on_net_reconnected)
 	_bridge.peer_disconnected.connect(_on_peer_disconnected)
 	_bridge.peer_loaded.connect(_on_peer_loaded)
+	_header.bind_net_bridge(_bridge)
 
 
 func _on_core_game_started() -> void:
@@ -225,32 +216,15 @@ func _sync_board_perspective() -> void:
 
 
 func _on_peer_disconnected() -> void:
-	_header.set_network_state(GameHeader.NetworkState.LOST)
 	_header.set_center_text("Opponent disconnected")
 
 
 func _on_net_reconnecting() -> void:
-	_header.set_network_state(GameHeader.NetworkState.DEGRADED)
 	_header.set_center_text("Reconnecting…")
 
 
-func _on_net_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
-	_header.set_network_quality(level, rtt_ms, loss_percent, direct)
-
-
-func _on_net_reconnected(_peer: String) -> void:
-	_header.set_network_state(GameHeader.NetworkState.GOOD)
-
-
 func _on_net_error(message: String) -> void:
-	_header.set_network_state(GameHeader.NetworkState.LOST)
 	_header.set_center_text(message)
-
-
-func _on_voice_toggle_requested() -> void:
-	# Voice transport is intentionally outside v1. Keep the control honest
-	# instead of implying that a click opened a live channel.
-	_header.set_center_text("Voice chat unavailable")
 
 
 ## Platform paths stay platform business: Godot resolves `user://` per
@@ -634,33 +608,11 @@ func _on_bridge_error(message: String) -> void:
 
 
 func _open_game_menu() -> void:
-	var menu := PanelContainer.new()
-	menu.name = "GameMenu"
-	menu.theme_type_variation = &"Card"
-	menu.custom_minimum_size = Vector2(220.0, 0.0)
-	var actions := VBoxContainer.new()
-	actions.add_theme_constant_override("separation", 6)
-	menu.add_child(actions)
-	var offer := Button.new()
-	offer.text = "Offer draw"
-	offer.custom_minimum_size.y = 42.0
-	offer.theme_type_variation = &"QuietButton"
-	offer.pressed.connect(func() -> void:
-		menu.queue_free()
-		_offer_draw()
+	HeaderMenu.toggle_in(
+		self,
+		["Offer draw", "Leave game"],
+		[_offer_draw, _confirm_leave]
 	)
-	actions.add_child(offer)
-	var leave := Button.new()
-	leave.text = "Leave game"
-	leave.custom_minimum_size.y = 42.0
-	leave.theme_type_variation = &"QuietButton"
-	leave.pressed.connect(func() -> void:
-		menu.queue_free()
-		_confirm_leave()
-	)
-	actions.add_child(leave)
-	add_child(menu)
-	menu.position = Vector2(maxf(size.x - 244.0, 16.0), 96.0)
 
 
 func _offer_draw() -> void:
@@ -671,26 +623,17 @@ func _offer_draw() -> void:
 
 
 func _confirm_leave() -> void:
-	var confirmation := ConfirmationDialog.new()
-	confirmation.theme_type_variation = &"ModalDialog"
-	confirmation.title = "Leave game?"
-	confirmation.dialog_text = "Leave this game and return to the home screen?"
-	confirmation.dialog_autowrap = true
-	confirmation.get_label().horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	confirmation.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	confirmation.ok_button_text = "Leave game"
-	confirmation.cancel_button_text = "Stay"
-	confirmation.get_ok_button().theme_type_variation = &"ModalDangerButton"
-	confirmation.get_cancel_button().theme_type_variation = &"ModalSecondaryButton"
-	confirmation.confirmed.connect(func() -> void:
-		if _is_ai:
-			_bridge.stop_ai()
-		# Leaving mid-game resigns the side; the result is logged
-		# like any other session action.
-		_bridge.resign()
-		leave_requested.emit()
-		confirmation.queue_free()
+	HeaderMenu.confirm_in(
+		self,
+		"Leave game?",
+		"Leave this game and return to the home screen?",
+		"Leave game",
+		"Stay",
+		func() -> void:
+			if _is_ai:
+				_bridge.stop_ai()
+			# Leaving mid-game resigns the side; the result is logged
+			# like any other session action.
+			_bridge.resign()
+			leave_requested.emit()
 	)
-	confirmation.canceled.connect(confirmation.queue_free)
-	add_child(confirmation)
-	confirmation.popup_centered(Vector2i(460, 220))

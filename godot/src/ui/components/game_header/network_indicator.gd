@@ -14,10 +14,18 @@ const BAR_TOPS: Array[float] = [24.0, 18.0, 12.0, 6.0]
 const BAR_CENTERS: Array[float] = [10.5, 18.0, 25.5, 33.0]
 const BAR_BASELINE := 30.0
 const BAR_WIDTH := 3.9
+## Ban overlay shares the meter's 36-unit space and stroke weight, so LOST reads
+## as the same faint ghost signal with a prohibition mark on top rather than a
+## second visual language. Direction matches the Lucide ban diagonal (NW-SE).
+const BAN_CENTER := Vector2(18.0, 18.0)
+const BAN_RADIUS := 13.5
+const BAN_POINTS := 48
+const BAN_DIAGONAL := 0.7071
 
 var _active_bars := 0
 var _active_color := Color.WHITE
 var _ghost_color := Color.WHITE
+var _show_ban := false
 
 
 func _ready() -> void:
@@ -35,15 +43,15 @@ func _color(item: String) -> Color:
 func set_state(state: int) -> void:
 	match state:
 		State.CONNECTING:
-			_set_visual_state(1, _color("bar_connecting"), "Connection: connecting")
+			_set_visual_state(1, _color("bar_connecting"), "Connection: connecting", false)
 		State.DEGRADED:
-			_set_visual_state(2, _color("bar_connecting"), "Connection: degraded")
+			_set_visual_state(2, _color("bar_connecting"), "Connection: degraded", false)
 		State.GOOD:
-			_set_visual_state(3, _color("bar_good"), "Connection: good")
+			_set_visual_state(3, _color("bar_good"), "Connection: good", false)
 		State.LOST:
-			_set_visual_state(1, _color("bar_lost"), "Connection: lost")
+			_set_visual_state(0, _color("bar_lost"), "Connection: lost", true)
 		_:
-			_set_visual_state(0, _color("bar_idle"), "Connection: idle")
+			_set_visual_state(0, _color("bar_idle"), "Connection: idle", false)
 
 
 ## Applies measured peer-path quality. Lifecycle state remains separate: this
@@ -58,12 +66,14 @@ func set_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> vo
 		bounded_level,
 		color,
 		"Connection quality: %d/4 · %d ms · %d%% loss · %s" % [
-			bounded_level, rtt_ms, loss_percent, path_name])
+			bounded_level, rtt_ms, loss_percent, path_name],
+		false)
 
 
-func _set_visual_state(count: int, color: Color, description: String) -> void:
+func _set_visual_state(count: int, color: Color, description: String, show_ban: bool) -> void:
 	_active_bars = count
 	_active_color = color
+	_show_ban = show_ban
 	tooltip_text = description
 	queue_redraw()
 
@@ -85,3 +95,10 @@ func _draw() -> void:
 		draw_rect(rect, _ghost_color)
 		if index < _active_bars:
 			draw_rect(rect, _active_color)
+	if _show_ban:
+		var center := origin + BAN_CENTER * scale_factor
+		var radius := BAN_RADIUS * scale_factor
+		var width := BAR_WIDTH * scale_factor
+		draw_arc(center, radius, 0.0, TAU, BAN_POINTS, _active_color, width, true)
+		var diag := Vector2(radius * BAN_DIAGONAL, radius * BAN_DIAGONAL)
+		draw_line(center - diag, center + diag, _active_color, width, true)

@@ -46,6 +46,9 @@ signal peer_connected(peer: String)
 signal network_reconnecting
 ## Measured transport quality from Rust/Iroh, shared by every screen.
 signal network_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool)
+## Complete durable network observation; emitted after any network transition.
+signal network_snapshot_changed(
+	lifecycle: String, level: int, rtt_ms: int, loss_percent: int, direct: bool)
 ## Emitted when the peer link drops.
 signal peer_disconnected
 ## Emitted when the remote game screen has loaded and is ready for the board.
@@ -89,6 +92,9 @@ func _ready() -> void:
 	_core.connect(&"network_quality",
 		func(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
 			network_quality.emit(level, rtt_ms, loss_percent, direct))
+	_core.connect(&"network_snapshot_changed",
+		func(lifecycle: String, level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
+			network_snapshot_changed.emit(lifecycle, level, rtt_ms, loss_percent, direct))
 	_core.connect(&"peer_disconnected", func() -> void: peer_disconnected.emit())
 	_core.connect(&"peer_loaded", func() -> void: peer_loaded.emit())
 	_core.connect(&"network_error", func(message: String) -> void: network_error.emit(message))
@@ -292,6 +298,12 @@ func network_setup() -> PackedStringArray:
 	if _core == null:
 		return PackedStringArray()
 	return _core.call(&"network_setup")
+
+
+func network_snapshot() -> PackedStringArray:
+	if _core == null:
+		return PackedStringArray()
+	return _core.call(&"network_snapshot")
 
 
 ## This device's side ("white"/"black"), or "" before the session has sides.

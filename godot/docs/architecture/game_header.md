@@ -13,11 +13,30 @@ network service.
   or call `set_visibility(show_network, show_voice, show_center, show_menu)`.
 - Call `set_center_text(text)` with screen-owned presentation text. Setup can
   use a screen title; gameplay can show whose turn it is and the move count.
+- Call `set_peer_context(is_peer)` for the shared solo/peer visibility rule
+  (solo hides network and voice; peer shows them). `set_visibility` remains
+  for one-off cases such as the multiplayer hub.
+- Call `bind_net_bridge(bridge)` to mirror the meter off a live bridge
+  (`CONNECTING` on bind, then `GOOD` / `DEGRADED` / quality / `LOST` off the
+  bridge signals). The signal-to-state map lives here, not once per screen;
+  screens keep subscriptions only for screen-owned center text. The header
+  releases the binding on exit or rebind, so borrowed bridges need no screen
+  teardown.
 - Call `set_network_state(GameHeader.NetworkState)` with `IDLE`, `CONNECTING`,
-  `DEGRADED`, `GOOD`, or `LOST`.
-- Call `set_voice_state(GameHeader.VoiceState)` with `OFF`, `REQUESTING`, or
-  `LIVE`; call `set_remote_speaking(bool)` to show the remote-speaker marker.
-- Handle `menu_requested` and `voice_toggle_requested` in the owning screen.
+  `DEGRADED`, `GOOD`, or `LOST` only for bridge-less previews; bound screens
+  never touch it.
+- Voice transport does not exist in v1, so the mic notes its own
+  unavailability (`voice_transport_available` is false, presses stay `OFF`
+  with a "Voice chat unavailable" tooltip and emit nothing). Flip
+  `set_voice_transport_available(true)` when the transport lands; then
+  `set_voice_state(GameHeader.VoiceState)` with `OFF`, `REQUESTING`, or
+  `LIVE` works as before and presses emit `voice_toggle_requested`.
+- Call `set_remote_speaking(bool)` to show the remote-speaker marker.
+- Handle `menu_requested` in the owning screen by passing item content to
+  `HeaderMenu.toggle_in(self, [[label, action], ...])`. Layer, backdrop,
+  card, outside-click and ESC dismissal live in `header_menu.gd`, once for
+  every screen; the screen keeps labels, order, and what each action does.
+  `HeaderMenu.confirm_in(...)` covers the shared destructive confirm shape.
   These signals express user intent; the owner performs navigation or voice
   work and updates presentation through the setters.
 

@@ -214,9 +214,9 @@ func _check_participant_and_setup_states() -> void:
 	setup._custom_increment.value = 5
 	_check("10 min" in setup._settings_summary.text, "setup updates custom time summary")
 	setup._toggle_header_menu()
-	_check(setup._header_menu_layer != null, "setup opens header menu")
-	setup._close_header_menu()
-	_check(setup._header_menu_layer == null, "setup closes header menu")
+	_check(HeaderMenu.is_open_in(setup), "setup opens header menu")
+	HeaderMenu.close_in(setup)
+	_check(not HeaderMenu.is_open_in(setup), "setup closes header menu")
 	setup.configure_peer("Morgan", "peer")
 	await process_frame
 	setup._on_leave_setup_pressed()

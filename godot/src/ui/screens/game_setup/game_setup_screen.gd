@@ -27,7 +27,6 @@ var _peer_kind := "peer"
 var _local_ready := false
 var _opponent_is_ready := false
 var _remote_setup_received := false
-var _header_menu_layer: Control
 ## The live networked session, when this setup fronts one. Set for
 ## code/host flows only; mock invite flows have no session and keep
 ## the old local behavior.
@@ -44,13 +43,17 @@ func _ready() -> void:
 	_play_button.pressed.connect(_on_play_pressed)
 	_header.menu_requested.connect(_toggle_header_menu)
 	_configure_choices()
-	_update_header_visibility()
+	_header.set_peer_context(_peer_setup)
 	_update_screen_columns()
 	call_deferred("_update_screen_columns")
 	_update_side_cards()
 	_update_custom_time_visibility()
 	_update_summary()
 	if _peer_setup:
+		if _net_bridge != null:
+			# configure_net_bridge can run before this scene enters the tree;
+			# @onready controls are valid only after this point.
+			_header.bind_net_bridge(_net_bridge)
 		_apply_peer_setup()
 		# The host snapshot may have arrived before this screen subscribed.
 		# Re-read the bridge-owned value after all @onready controls exist.
@@ -77,7 +80,7 @@ func configure_peer(opponent_name: String, setup_kind: String) -> void:
 	_peer_name = opponent_name
 	_peer_kind = setup_kind
 	if is_node_ready():
-		_update_header_visibility()
+		_header.set_peer_context(_peer_setup)
 		_apply_peer_setup()
 
 
@@ -93,43 +96,13 @@ func selected_ai_difficulty() -> String:
 ## application contract remain interactive; unsupported settings are hidden.
 func configure_net_bridge(bridge: ChessCoreBridge) -> void:
 	_net_bridge = bridge
-	_header.set_network_state(GameHeader.NetworkState.CONNECTING)
 	if not _net_bridge.session_created.is_connected(_on_net_session_created):
 		_net_bridge.session_created.connect(_on_net_session_created)
 	if not _net_bridge.setup_changed.is_connected(_on_net_setup_changed):
 		_net_bridge.setup_changed.connect(_on_net_setup_changed)
-	if not _net_bridge.peer_connected.is_connected(_on_net_peer_connected):
-		_net_bridge.peer_connected.connect(_on_net_peer_connected)
-	if not _net_bridge.network_reconnecting.is_connected(_on_net_reconnecting):
-		_net_bridge.network_reconnecting.connect(_on_net_reconnecting)
-	if not _net_bridge.network_quality.is_connected(_on_net_quality):
-		_net_bridge.network_quality.connect(_on_net_quality)
-	if not _net_bridge.peer_disconnected.is_connected(_on_net_peer_disconnected):
-		_net_bridge.peer_disconnected.connect(_on_net_peer_disconnected)
-	if not _net_bridge.network_error.is_connected(_on_net_network_error):
-		_net_bridge.network_error.connect(_on_net_network_error)
 	if is_node_ready() and _peer_setup:
+		_header.bind_net_bridge(bridge)
 		_apply_peer_setup()
-
-
-func _on_net_peer_connected(_peer: String) -> void:
-	_header.set_network_state(GameHeader.NetworkState.GOOD)
-
-
-func _on_net_reconnecting() -> void:
-	_header.set_network_state(GameHeader.NetworkState.DEGRADED)
-
-
-func _on_net_quality(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
-	_header.set_network_quality(level, rtt_ms, loss_percent, direct)
-
-
-func _on_net_peer_disconnected() -> void:
-	_header.set_network_state(GameHeader.NetworkState.LOST)
-
-
-func _on_net_network_error(_message: String) -> void:
-	_header.set_network_state(GameHeader.NetworkState.LOST)
 
 
 func _apply_peer_setup() -> void:
@@ -240,7 +213,6 @@ func _publish_net_setup() -> void:
 func _on_net_session_created(_white: String, _black: String, _host: String) -> void:
 	if _net_bridge == null:
 		return
-	_header.set_network_state(GameHeader.NetworkState.GOOD)
 	var mine := _net_bridge.my_side()
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine.capitalize() if not mine.is_empty() else "…")
@@ -251,10 +223,6 @@ func _on_net_session_created(_white: String, _black: String, _host: String) -> v
 		_ready_label.text = "Game created · waiting for host to start"
 		_play_button.text = "Waiting for host"
 		_play_button.disabled = true
-
-
-func _update_header_visibility() -> void:
-	_header.set_visibility(_peer_setup, _peer_setup, true, true)
 
 
 func _notification(what: int) -> void:
@@ -342,111 +310,30 @@ func notify_net_issue(message: String) -> void:
 
 
 func _toggle_header_menu() -> void:
-	if _header_menu_layer != null:
-		_close_header_menu()
-		return
-	_open_header_menu()
-
-
-func _open_header_menu() -> void:
-	_header_menu_layer = Control.new()
-	_header_menu_layer.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_header_menu_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_header_menu_layer)
-
-	# A Panel rather than a ColorRect so the wash is a theme item. A ColorRect takes
-	# its colour from the node and nowhere else, which would put one more value in this
-	# script that a re-theme could not reach.
-	var backdrop := Panel.new()
-	backdrop.theme_type_variation = &"ModalBackdrop"
-	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
-	backdrop.gui_input.connect(_on_header_menu_backdrop_input)
-	_header_menu_layer.add_child(backdrop)
-
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_header_menu_layer.add_child(center)
-
-	var menu_card := PanelContainer.new()
-	menu_card.custom_minimum_size = Vector2(300.0, 0.0)
-	menu_card.theme_type_variation = &"Card"
-	menu_card.mouse_filter = Control.MOUSE_FILTER_STOP
-	center.add_child(menu_card)
-	var actions := VBoxContainer.new()
-	actions.add_theme_constant_override("separation", 8)
-	menu_card.add_child(actions)
-	actions.add_child(_header_menu_item("Settings", _on_header_settings_pressed))
 	var leave_label := "Leave game" if _peer_setup else "Return to Home"
-	actions.add_child(_header_menu_item(leave_label, _on_leave_setup_pressed))
-
-
-func _header_menu_item(label: String, action: Callable) -> Button:
-	var button := Button.new()
-	button.text = label
-	button.accessibility_name = label
-	button.custom_minimum_size.y = 48.0
-	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	button.theme_type_variation = &"QuietButton"
-	button.pressed.connect(action)
-	return button
-
-
-func _on_header_menu_backdrop_input(event: InputEvent) -> void:
-	if not ChessBoardView.is_selecting_press(event):
-		return
-	_close_header_menu()
-	get_viewport().set_input_as_handled()
-
-
-func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and _header_menu_layer != null:
-		var key := event as InputEventKey
-		if key.pressed and key.keycode == KEY_ESCAPE:
-			_close_header_menu()
-			get_viewport().set_input_as_handled()
-
-
-func _close_header_menu() -> void:
-	if _header_menu_layer == null:
-		return
-	_header_menu_layer.queue_free()
-	_header_menu_layer = null
+	HeaderMenu.toggle_in(
+		self,
+		["Settings", leave_label],
+		[_on_header_settings_pressed, _on_leave_setup_pressed]
+	)
 
 
 func _on_header_settings_pressed() -> void:
-	_close_header_menu()
 	settings_requested.emit()
 
 
 func _on_leave_setup_pressed() -> void:
-	_close_header_menu()
 	if not _peer_setup:
 		leave_requested.emit(false)
 		return
-	var confirmation := ConfirmationDialog.new()
-	confirmation.theme_type_variation = &"ModalDialog"
-	confirmation.title = "Leave game?"
-	confirmation.dialog_text = "You’ll disconnect from %s and return to Multiplayer." % _peer_name
-	confirmation.dialog_autowrap = true
-	confirmation.ok_button_text = "Leave game"
-	confirmation.cancel_button_text = "Stay"
-	confirmation.get_label().horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	confirmation.get_label().autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var leave_button := confirmation.get_ok_button()
-	leave_button.accessibility_name = "Leave the game"
-	leave_button.theme_type_variation = &"ModalDangerButton"
-	var stay_button := confirmation.get_cancel_button()
-	stay_button.accessibility_name = "Stay in the game"
-	stay_button.theme_type_variation = &"ModalSecondaryButton"
-	confirmation.confirmed.connect(func() -> void:
-		leave_requested.emit(true)
-		confirmation.queue_free()
+	HeaderMenu.confirm_in(
+		self,
+		"Leave game?",
+		"You’ll disconnect from %s and return to Multiplayer." % _peer_name,
+		"Leave game",
+		"Stay",
+		func() -> void: leave_requested.emit(true)
 	)
-	confirmation.canceled.connect(confirmation.queue_free)
-	add_child(confirmation)
-	confirmation.popup_centered(Vector2i(460, 220))
 
 
 func _update_side_cards() -> void:

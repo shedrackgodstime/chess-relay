@@ -19,6 +19,10 @@ const CONTROL_SIZE := 48.0
 const TITLE_MAX_WIDTH := 320.0
 const TITLE_LEFT_RESERVED := 88.0
 const TITLE_RIGHT_RESERVED := 140.0
+## Voice transport is outside v1, so the mic notes its own unavailability here
+## instead of each screen repeating it (previously via center text, or not at
+## all when no handler was connected). Flip when the transport lands.
+const VOICE_UNAVAILABLE_TOOLTIP := "Voice chat unavailable"
 
 @export_group("Content")
 @export var center_text := ""
@@ -28,6 +32,11 @@ const TITLE_RIGHT_RESERVED := 140.0
 @export var show_voice_control := false
 @export var show_center_text := true
 @export var show_menu_button := true
+
+@export_group("Voice")
+## True once a voice transport exists. False keeps the mic honest: presses are
+## noted on the control itself and never read as a live channel.
+@export var voice_transport_available := false
 
 @onready var _network_indicator: Control = %NetworkIndicator
 @onready var _voice_cluster: Control = %VoiceCluster
@@ -39,6 +48,9 @@ const TITLE_RIGHT_RESERVED := 140.0
 @onready var _menu_button: Button = %MenuButton
 
 var _voice_state := VoiceState.OFF
+## The live bridge this header mirrors. Screens lend it; the header subscribes
+## for meter presentation only and releases on exit or rebind.
+var _net_bridge: ChessCoreBridge = null
 
 
 func _ready() -> void:
@@ -49,7 +61,11 @@ func _ready() -> void:
 	_center_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_update_layout()
 	set_voice_state(VoiceState.OFF)
+	if not voice_transport_available:
+		_mic_button.tooltip_text = VOICE_UNAVAILABLE_TOOLTIP
 	set_network_state(NetworkState.IDLE)
+	if _net_bridge != null:
+		_apply_network_snapshot()
 
 
 func _notification(what: int) -> void:
@@ -72,6 +88,8 @@ func set_visibility(
 	if not show_voice_control:
 		set_voice_state(VoiceState.OFF)
 		set_remote_speaking(false)
+		if not voice_transport_available:
+			_mic_button.tooltip_text = VOICE_UNAVAILABLE_TOOLTIP
 
 
 ## Pass screen-owned content; the header has no chess-state dependency.
@@ -105,6 +123,65 @@ func set_voice_state(state: VoiceState) -> void:
 
 func set_remote_speaking(speaking: bool) -> void:
 	_remote_speaking_dot.visible = speaking and show_voice_control
+
+
+## Single visibility policy for peer contexts. Solo play hides network and
+## voice; peer play shows them. Center text and menu stay always on.
+func set_peer_context(is_peer: bool) -> void:
+	set_visibility(is_peer, is_peer, true, true)
+
+
+## Mirrors the meter off a live bridge. One subscription covers every screen,
+## so the signal-to-state map lives here and not once per screen. Screens keep
+## their own subscriptions only for screen-owned text.
+func bind_net_bridge(bridge: ChessCoreBridge) -> void:
+	unbind_net_bridge()
+	_net_bridge = bridge
+	if not _net_bridge.network_snapshot_changed.is_connected(_on_network_snapshot_changed):
+		_net_bridge.network_snapshot_changed.connect(_on_network_snapshot_changed)
+	if is_node_ready():
+		_apply_network_snapshot()
+
+
+func unbind_net_bridge() -> void:
+	if not is_instance_valid(_net_bridge):
+		_net_bridge = null
+		return
+	if _net_bridge.network_snapshot_changed.is_connected(_on_network_snapshot_changed):
+		_net_bridge.network_snapshot_changed.disconnect(_on_network_snapshot_changed)
+	_net_bridge = null
+
+
+func _apply_network_snapshot() -> void:
+	if _net_bridge == null or not is_node_ready():
+		return
+	var snapshot := _net_bridge.network_snapshot()
+	if snapshot.size() != 5:
+		return
+	var lifecycle := snapshot[0]
+	var level := int(snapshot[1])
+	var rtt_ms := int(snapshot[2])
+	var loss_percent := int(snapshot[3])
+	var direct := snapshot[4] == "true"
+	match lifecycle:
+		"connecting": set_network_state(NetworkState.CONNECTING)
+		"degraded": set_network_state(NetworkState.DEGRADED)
+		"lost": set_network_state(NetworkState.LOST)
+		"connected":
+			if level > 0:
+				set_network_quality(level, rtt_ms, loss_percent, direct)
+			else:
+				set_network_state(NetworkState.GOOD)
+		_: set_network_state(NetworkState.IDLE)
+
+
+## Declares whether voice transport exists. With none, the mic stays OFF and
+## carries its own unavailable note.
+func set_voice_transport_available(available: bool) -> void:
+	voice_transport_available = available
+	if not available and is_node_ready():
+		set_voice_state(VoiceState.OFF)
+		_mic_button.tooltip_text = VOICE_UNAVAILABLE_TOOLTIP
 
 
 func _apply_visibility() -> void:
@@ -149,8 +226,21 @@ func _update_layout() -> void:
 
 
 func _on_mic_pressed() -> void:
+	if not voice_transport_available:
+		set_voice_state(VoiceState.OFF)
+		_mic_button.tooltip_text = VOICE_UNAVAILABLE_TOOLTIP
+		return
 	voice_toggle_requested.emit()
 
 
 func _on_menu_pressed() -> void:
 	menu_requested.emit()
+
+
+func _exit_tree() -> void:
+	unbind_net_bridge()
+
+
+func _on_network_snapshot_changed(
+	_lifecycle: String, _level: int, _rtt_ms: int, _loss_percent: int, _direct: bool) -> void:
+	_apply_network_snapshot()
