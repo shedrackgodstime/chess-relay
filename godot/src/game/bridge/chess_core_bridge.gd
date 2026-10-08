@@ -40,8 +40,6 @@ signal draw_answered(by: String, accept: bool)
 signal bridge_error(message: String)
 ## Emitted when the session driver links a peer. `peer` is its identity.
 signal peer_connected(peer: String)
-## Emitted when the host publishes pre-session side assignment.
-signal setup_changed(mine: String, opponent: String)
 ## Emitted when the peer link drops.
 signal peer_disconnected
 ## Emitted when the link fails without dropping (bad ticket, lost code).
@@ -76,8 +74,6 @@ func _ready() -> void:
 	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
 	_core.connect(&"peer_connected", func(peer: String) -> void: peer_connected.emit(peer))
-	_core.connect(&"setup_changed",
-		func(mine: String, opponent: String) -> void: setup_changed.emit(mine, opponent))
 	_core.connect(&"peer_disconnected", func() -> void: peer_disconnected.emit())
 	_core.connect(&"network_error", func(message: String) -> void: network_error.emit(message))
 
@@ -249,14 +245,6 @@ func start_network_game(side: String) -> bool:
 	if _core == null:
 		return false
 	var accepted: bool = _core.call(&"start_network_game", side)
-	return accepted
-
-
-## Publishes the host's selected side before the session starts.
-func set_network_side(side: String) -> bool:
-	if _core == null:
-		return false
-	var accepted: bool = _core.call(&"set_network_side", side)
 	return accepted
 
 
