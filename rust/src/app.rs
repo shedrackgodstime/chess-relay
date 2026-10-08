@@ -607,42 +607,87 @@ impl App {
     }
 
     /// Ingests a remote move entry: validates, applies, agrees, queues.
+    /// Ingests a remote log entry: validates, applies, agrees (moves), queues.
     ///
-    /// Moves only; remote lifecycle sync arrives with the protocol.
     /// Queues [`Event::MoveApplied`] (or [`Event::MoveRejected`] plus
-    /// the error) for [`App::drain`].
+    /// the error) or lifecycle events for [`App::drain`].
     ///
     /// # Errors
     ///
     /// Returns [`AppError`] on any validation failure.
     pub fn ingest_remote(&mut self, entry: &LogEntry) -> Result<(), AppError> {
-        let LogPayload::Move { mv } = entry.payload else {
-            return Err(AppError::bad_command(
-                "remote lifecycle sync arrives with protocol".to_string(),
-            ));
-        };
-        let agreer = self.agreeing_peer(entry.mover)?;
-        let local_secret = self.key_for(agreer)?.clone();
-        let session = self.session_mut()?;
-        if let Err(err) = session.receive(entry).and_then(|()| session.replay_game()) {
-            self.outbox.push(Event::MoveRejected {
-                reason: err.to_string(),
-            });
-            return Err(err.into());
+        match entry.payload {
+            LogPayload::Move { mv } => {
+                let agreer = self.agreeing_peer(entry.mover)?;
+                let local_secret = self.key_for(agreer)?.clone();
+                let (apply_res, agree_res, finished) = {
+                    let session = self.session_mut()?;
+                    let apply_res = session.receive(entry).and_then(|()| session.replay_game());
+                    let agree_res = if apply_res.is_ok() {
+                        session.agree(&local_secret, entry.seq)
+                    } else {
+                        Ok(())
+                    };
+                    let finished = finished_reason(session);
+                    (apply_res, agree_res, finished)
+                };
+                if let Err(err) = apply_res {
+                    self.outbox.push(Event::MoveRejected {
+                        reason: err.to_string(),
+                    });
+                    return Err(err.into());
+                }
+                if let Err(err) = agree_res {
+                    self.outbox.push(Event::MoveRejected {
+                        reason: err.to_string(),
+                    });
+                    return Err(err.into());
+                }
+                self.outbox.push(Event::MoveApplied {
+                    seq: entry.seq,
+                    mv,
+                    by: entry.mover,
+                    agreed: true,
+                });
+                if let Some(reason) = finished {
+                    self.outbox.push(Event::GameEnded { reason });
+                }
+                Ok(())
+            }
+            LogPayload::DrawOffer => {
+                self.session_mut()?.receive(entry)?;
+                self.outbox.push(Event::DrawOffered {
+                    by: entry.mover,
+                    seq: entry.seq,
+                });
+                Ok(())
+            }
+            LogPayload::DrawAccept { .. } => {
+                let reason = {
+                    let session = self.session_mut()?;
+                    session.receive(entry)?;
+                    finish_of(session)
+                };
+                self.outbox.push(Event::DrawAnswered {
+                    by: entry.mover,
+                    accept: true,
+                });
+                self.outbox.push(Event::GameEnded { reason });
+                Ok(())
+            }
+            LogPayload::Resign | LogPayload::Abort => {
+                let reason = {
+                    let session = self.session_mut()?;
+                    session.receive(entry)?;
+                    finish_of(session)
+                };
+                self.outbox.push(Event::GameEnded { reason });
+                Ok(())
+            }
+            LogPayload::Genesis { .. } => Err(AppError::bad_command(
+                "genesis is handled during session setup".to_string(),
+            )),
         }
-        if let Err(err) = session.agree(&local_secret, entry.seq) {
-            self.outbox.push(Event::MoveRejected {
-                reason: err.to_string(),
-            });
-            return Err(err.into());
-        }
-        self.outbox.push(Event::MoveApplied {
-            seq: entry.seq,
-            mv,
-            by: entry.mover,
-            agreed: true,
-        });
-        Ok(())
     }
 
     /// Takes queued off-frame events (bridge drains this per frame).

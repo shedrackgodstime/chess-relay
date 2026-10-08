@@ -887,6 +887,44 @@ impl Session {
         }
         let other = self.other_peer(entry.mover);
         entry.verify_sigs(other)?;
+        match entry.payload {
+            LogPayload::Genesis { .. } | LogPayload::Move { .. } => {}
+            LogPayload::DrawOffer => {
+                self.require_playing()?;
+                if self.open_offer.is_some() {
+                    return Err(SessionError::not_ready());
+                }
+                self.open_offer = Some(entry.seq);
+            }
+            LogPayload::DrawAccept { offer_seq } => {
+                self.require_playing()?;
+                let expected = self.open_offer.ok_or_else(SessionError::not_ready)?;
+                if offer_seq != expected {
+                    return Err(SessionError::log_mismatch(
+                        "draw accept seq mismatch".to_string(),
+                    ));
+                }
+                let offer = self
+                    .log
+                    .get(offer_seq as usize)
+                    .ok_or_else(SessionError::unknown_entry)?;
+                if offer.mover == entry.mover {
+                    return Err(SessionError::not_agreeable());
+                }
+                self.open_offer = None;
+                self.state = SessionState::Finished(FinishReason::AgreedDraw);
+            }
+            LogPayload::Resign => {
+                self.require_playing()?;
+                self.state = SessionState::Finished(FinishReason::Resignation { by: entry.mover });
+            }
+            LogPayload::Abort => {
+                if matches!(self.state, SessionState::Finished(_)) {
+                    return Err(SessionError::game_over());
+                }
+                self.state = SessionState::Finished(FinishReason::Abort { by: entry.mover });
+            }
+        }
         self.log.push(*entry);
         Ok(())
     }
@@ -901,12 +939,21 @@ impl Session {
     /// Returns [`SessionError`] when replay hits a chess-illegal move.
     pub fn replay_game(&mut self) -> Result<(), SessionError> {
         let mut game = Game::from_startpos();
+        let mut last_outcome = Outcome::Ongoing;
         for entry in &self.log {
             if let LogPayload::Move { mv } = entry.payload {
-                game.play(&mv).map_err(|_| {
+                last_outcome = game.play(&mv).map_err(|_| {
                     SessionError::log_mismatch("replay hit illegal move".to_string())
                 })?;
             }
+        }
+        if let Outcome::Draw(DrawReason::FiftyMove)
+        | Outcome::Draw(DrawReason::Threefold)
+        | Outcome::Draw(DrawReason::InsufficientMaterial)
+        | Outcome::Checkmate { .. }
+        | Outcome::Stalemate = last_outcome
+        {
+            self.state = SessionState::Finished(FinishReason::Rules(last_outcome));
         }
         self.game = Some(game);
         Ok(())

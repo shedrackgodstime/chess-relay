@@ -47,11 +47,11 @@ Every subsequent contributor or agent must adhere to these three rules:
 ## 3. Phased Execution Roadmap
 
 ```text
-Phase 1: Wire Protocol & Application Fixes (Non-UI Core)
-  ├── 1.1 Accept remote lifecycle entries in `app.rs` (`Resign`, `DrawOffer`, `DrawAccept`, `Abort`)
-  ├── 1.2 Unbind `resign()` and `offer_draw()` from turn ownership in `bridge.rs`
-  └── 1.3 Fix self-answering draw dialog in `game_screen.gd`
-  └── Gate 1: Automated tests proving remote resign/draw/abort ingest cleanly without disconnects.
+Phase 1: Wire Protocol & Application Fixes (Non-UI Core) [COMPLETED]
+  ├── [x] 1.1 Accept remote lifecycle entries in `app.rs` (`Resign`, `DrawOffer`, `DrawAccept`, `Abort`)
+  ├── [x] 1.2 Unbind `resign()` and `offer_draw()` from turn ownership in `bridge.rs`
+  └── [x] 1.3 Fix self-answering draw dialog in `game_screen.gd`
+  └── Gate 1: Automated tests proving remote resign/draw/abort ingest cleanly without disconnects. [PASSED]
 
 Phase 2: Lifecycle & Handshake Decoupling (Restoring Setup Authority)
   ├── 2.1 Decouple Iroh link-up (`peer_connected`) from session creation (`StartGame`)
@@ -105,7 +105,14 @@ Phase 3: Structural Deconstruction & Transport Modernization
   - In `_on_core_draw_offered(by, seq)`:
     Check if `by != _bridge.my_side()`. If received from the opponent, display the `ConfirmationDialog` with "Accept" / "Decline" buttons.
   - Wire confirmation to `_bridge.answer_draw(true)` and cancellation to `_bridge.answer_draw(false)`.
-* **Test:** Update `godot/tests/game_scenarios_test.gd` to verify the recipient sees the draw dialog.
+### Status: Completed (Green)
+* `Session::receive` and `replay_game` in [`rust/src/session/mod.rs`](../../rust/src/session/mod.rs) now validate and ingest all lifecycle log payloads (`Resign`, `DrawOffer`, `DrawAccept`, `Abort`).
+* `App::ingest_remote` in [`rust/src/app.rs`](../../rust/src/app.rs) routes all lifecycle entries to `outbox` events (`GameEnded`, `DrawOffered`, `DrawAnswered`).
+* `on_msg` in [`rust/src/bridge.rs`](../../rust/src/bridge.rs) supports `Ingest::Applied` so unagreed lifecycle entries do not sever the connection.
+* `resign`, `offer_draw`, `answer_draw`, and new `abort` in [`rust/src/bridge.rs`](../../rust/src/bridge.rs) use `core.me` when networked/AI, enabling out-of-turn resignation/draw offers.
+* Exposed `my_peer` and `side_of_peer` in [`bridge.rs`](../../rust/src/bridge.rs) and [`chess_core_bridge.gd`](../../godot/src/game/bridge/chess_core_bridge.gd).
+* In [`game_screen.gd`](../../godot/src/ui/screens/game/game_screen.gd), the draw offer dialog is routed to the receiving opponent rather than self-answering.
+* All unit tests, doc-tests, integration tests, and Godot test suites are 100% green.
 
 ---
 

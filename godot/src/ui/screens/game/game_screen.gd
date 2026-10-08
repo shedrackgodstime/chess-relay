@@ -484,8 +484,34 @@ func _end_text(reason: String) -> String:
 	return "Game over"
 
 
-func _on_core_draw_offered(by: String, seq: int) -> void:
-	_header.set_center_text("Draw offered · awaiting answer")
+func _on_core_draw_offered(by: String, _seq: int) -> void:
+	var offering_side := _bridge.side_of_peer(by)
+	var is_mine := (_is_multiplayer or _is_ai) and (by == _bridge.my_peer() or offering_side == _bridge.my_side())
+	if is_mine:
+		_header.set_center_text("Draw offer sent · waiting for opponent")
+		return
+
+	var text := "Opponent offers a draw. Accept?"
+	if not _is_multiplayer and not _is_ai and not offering_side.is_empty():
+		text = "%s offers a draw. Accept?" % offering_side.capitalize()
+
+	var answer := ConfirmationDialog.new()
+	answer.theme_type_variation = &"ModalDialog"
+	answer.title = "Draw offered"
+	answer.dialog_text = text
+	answer.dialog_autowrap = true
+	answer.ok_button_text = "Accept"
+	answer.cancel_button_text = "Decline"
+	answer.confirmed.connect(func() -> void:
+		_bridge.answer_draw(true)
+		answer.queue_free()
+	)
+	answer.canceled.connect(func() -> void:
+		_bridge.answer_draw(false)
+		answer.queue_free()
+	)
+	add_child(answer)
+	answer.popup_centered(Vector2i(460, 220))
 
 
 func _on_core_draw_answered(by: String, accept: bool) -> void:
@@ -538,28 +564,10 @@ func _open_game_menu() -> void:
 
 
 func _offer_draw() -> void:
-	if (_is_multiplayer or _is_ai) and _bridge.turn() != _bridge.my_side():
-		_header.set_center_text("Waiting for opponent")
-		return
 	if not _bridge.offer_draw():
 		return
-	var answer := ConfirmationDialog.new()
-	answer.theme_type_variation = &"ModalDialog"
-	answer.title = "Draw offered"
-	answer.dialog_text = "The side to move offers a draw. Accept?"
-	answer.dialog_autowrap = true
-	answer.ok_button_text = "Accept"
-	answer.cancel_button_text = "Decline"
-	answer.confirmed.connect(func() -> void:
-		_bridge.answer_draw(true)
-		answer.queue_free()
-	)
-	answer.canceled.connect(func() -> void:
-		_bridge.answer_draw(false)
-		answer.queue_free()
-	)
-	add_child(answer)
-	answer.popup_centered(Vector2i(460, 220))
+	if _is_multiplayer or _is_ai:
+		_header.set_center_text("Draw offer sent · waiting for opponent")
 
 
 func _confirm_leave() -> void:
@@ -577,11 +585,9 @@ func _confirm_leave() -> void:
 	confirmation.confirmed.connect(func() -> void:
 		if _is_ai:
 			_bridge.stop_ai()
-		# Leaving mid-game resigns the side to move; the result is logged
-		# like any other session action. Networked, only our own side
-		# may resign: leaving on the opponent's turn just leaves.
-		if not _is_multiplayer or _bridge.turn() == _bridge.my_side():
-			_bridge.resign()
+		# Leaving mid-game resigns the side; the result is logged
+		# like any other session action.
+		_bridge.resign()
 		leave_requested.emit()
 		confirmation.queue_free()
 	)

@@ -180,3 +180,62 @@ fn contract_rejects_misuse() {
             .is_bad_command()
     );
 }
+
+#[test]
+fn remote_resign_ingests_and_ends_game() {
+    let (mut host, mut guest, _white, black) = playing_pair();
+    let events = guest.handle(&Command::Resign { peer: black }).unwrap();
+    assert!(matches!(events[0], Event::GameEnded { .. }));
+    let resign_entry = last_entry(&guest);
+    assert!(matches!(
+        resign_entry.payload,
+        chess_relay_core::session::LogPayload::Resign
+    ));
+
+    host.ingest_remote(&resign_entry).unwrap();
+    let queued = host.drain();
+    assert_eq!(queued.len(), 1);
+    assert!(matches!(queued[0], Event::GameEnded { .. }));
+    assert!(matches!(host_state(&host), SessionState::Finished(_)));
+}
+
+#[test]
+fn remote_draw_offer_and_accept_ingests() {
+    let (mut host, mut guest, white, black) = playing_pair();
+    let events = guest.handle(&Command::OfferDraw { peer: black }).unwrap();
+    assert!(matches!(events[0], Event::DrawOffered { .. }));
+    let offer_entry = last_entry(&guest);
+
+    host.ingest_remote(&offer_entry).unwrap();
+    let queued = host.drain();
+    assert_eq!(queued.len(), 1);
+    assert!(matches!(queued[0], Event::DrawOffered { .. }));
+
+    let events = host
+        .handle(&Command::AnswerDraw {
+            peer: white,
+            accept: true,
+        })
+        .unwrap();
+    assert!(events.iter().any(|e| matches!(e, Event::GameEnded { .. })));
+    let accept_entry = last_entry(&host);
+
+    guest.ingest_remote(&accept_entry).unwrap();
+    let queued = guest.drain();
+    assert!(queued.iter().any(|e| matches!(e, Event::GameEnded { .. })));
+    assert!(matches!(host_state(&guest), SessionState::Finished(_)));
+}
+
+#[test]
+fn remote_abort_ingests() {
+    let (mut host, mut guest, _white, black) = playing_pair();
+    let events = guest.handle(&Command::Abort { peer: black }).unwrap();
+    assert!(matches!(events[0], Event::GameEnded { .. }));
+    let abort_entry = last_entry(&guest);
+
+    host.ingest_remote(&abort_entry).unwrap();
+    let queued = host.drain();
+    assert_eq!(queued.len(), 1);
+    assert!(matches!(queued[0], Event::GameEnded { .. }));
+    assert!(matches!(host_state(&host), SessionState::Finished(_)));
+}

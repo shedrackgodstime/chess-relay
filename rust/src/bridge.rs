@@ -570,27 +570,36 @@ impl ChessRelayBridge {
         }
     }
 
-    /// Resigns the side to move (hotseat: the human giving up).
+    /// Resigns unilaterally (hotseat: side to move; networked/ai: local player).
     #[func]
     fn resign(&mut self) -> bool {
         let command = {
             let core = self.lock();
-            match turn_peer(&core) {
-                Some(peer) => Command::Resign { peer },
-                None => return false,
-            }
+            let peer = if core.net.is_some() || core.ai.is_some() {
+                core.me
+            } else {
+                match turn_peer(&core) {
+                    Some(peer) => peer,
+                    None => return false,
+                }
+            };
+            Command::Resign { peer }
         };
         self.run_command(command)
     }
 
-    /// Offers a draw for the side to move; records the offerer.
+    /// Offers a draw (hotseat: side to move; networked/ai: local player).
     #[func]
     fn offer_draw(&mut self) -> bool {
         let peer = {
             let core = self.lock();
-            match turn_peer(&core) {
-                Some(peer) => peer,
-                None => return false,
+            if core.net.is_some() || core.ai.is_some() {
+                core.me
+            } else {
+                match turn_peer(&core) {
+                    Some(peer) => peer,
+                    None => return false,
+                }
             }
         };
         if !self.run_command(Command::OfferDraw { peer }) {
@@ -605,15 +614,19 @@ impl ChessRelayBridge {
     fn answer_draw(&mut self, accept: bool) -> bool {
         let command = {
             let core = self.lock();
-            let offerer = match core.offer_by {
-                Some(offerer) => offerer,
-                None => return false,
+            let peer = if core.net.is_some() || core.ai.is_some() {
+                core.me
+            } else {
+                let offerer = match core.offer_by {
+                    Some(offerer) => offerer,
+                    None => return false,
+                };
+                let sides = match sides(&core) {
+                    Some(sides) => sides,
+                    None => return false,
+                };
+                if offerer == sides.0 { sides.1 } else { sides.0 }
             };
-            let sides = match sides(&core) {
-                Some(sides) => sides,
-                None => return false,
-            };
-            let peer = if offerer == sides.0 { sides.1 } else { sides.0 };
             Command::AnswerDraw { peer, accept }
         };
         if !self.run_command(command) {
@@ -621,6 +634,42 @@ impl ChessRelayBridge {
         }
         self.lock().offer_by = None;
         true
+    }
+
+    /// Aborts unilaterally (any unfinished state).
+    #[func]
+    fn abort(&mut self) -> bool {
+        let command = {
+            let core = self.lock();
+            let peer = if core.net.is_some() || core.ai.is_some() {
+                core.me
+            } else {
+                match turn_peer(&core) {
+                    Some(peer) => peer,
+                    None => return false,
+                }
+            };
+            Command::Abort { peer }
+        };
+        self.run_command(command)
+    }
+
+    /// Side of the given peer ("white", "black", or "" if unknown).
+    #[func]
+    fn side_of_peer(&self, peer: GString) -> GString {
+        let core = self.lock();
+        let peer_str = peer.to_string();
+        match sides(&core) {
+            Some((white, _)) if white.to_string() == peer_str => GString::from("white"),
+            Some((_, black)) if black.to_string() == peer_str => GString::from("black"),
+            _ => GString::from(""),
+        }
+    }
+
+    /// Local peer ID string.
+    #[func]
+    fn my_peer(&self) -> GString {
+        GString::from(&self.lock().me.to_string())
     }
 
     /// Target squares for legal moves departing `square` (e.g. `"e2"`).
@@ -758,14 +807,23 @@ impl ChessRelayBridge {
             }
             Event::MoveRejected { reason } => self.emit_error(reason),
             Event::DrawOffered { by, seq } => {
+                {
+                    self.lock().offer_by = Some(*by);
+                }
                 let by = GString::from(&by.to_string());
                 self.signals().draw_offered().emit(&by, *seq as i64);
             }
             Event::DrawAnswered { by, accept } => {
+                {
+                    self.lock().offer_by = None;
+                }
                 let by = GString::from(&by.to_string());
                 self.signals().draw_answered().emit(&by, *accept);
             }
             Event::GameEnded { reason } => {
+                {
+                    self.lock().offer_by = None;
+                }
                 let reason = GString::from(&format!("{reason:?}"));
                 self.signals().game_ended().emit(&reason);
             }
@@ -1564,6 +1622,7 @@ async fn on_msg<C: Connection>(
         Msg::Entry(entry) => {
             enum Ingest {
                 Agree(u64, [u8; 64]),
+                Applied,
                 Reject(String),
                 Stale,
             }
@@ -1586,7 +1645,7 @@ async fn on_msg<C: Connection>(
                                 guard.outbox.extend(events.drain(..));
                                 match agreed {
                                     Some((seq, sig)) => Ingest::Agree(seq, sig),
-                                    None => Ingest::Reject("agreement missing".to_string()),
+                                    None => Ingest::Applied,
                                 }
                             }
                             Err(err) => {
@@ -1604,6 +1663,7 @@ async fn on_msg<C: Connection>(
                     note(core, generation, NetNote::Error(reason));
                     Err(())
                 }
+                Ingest::Applied => Ok(()),
                 Ingest::Agree(seq, sig) => {
                     if conn.send(&Msg::Agreed { seq, sig }).await.is_err() {
                         note(core, generation, NetNote::Disconnected);
@@ -1827,6 +1887,87 @@ mod tests {
         poll_until(|| has_move_agreed(&host_core, 1)).await;
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
         assert!(fen_of(&guest_core).contains("4P3/8"));
+
+        drop(host_tx);
+        drop(guest_tx);
+        tokio::time::timeout(Duration::from_secs(5), host_task)
+            .await
+            .expect("host driver exits")
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), guest_task)
+            .await
+            .expect("guest driver exits")
+            .unwrap();
+    }
+
+    /// Resignation over memory link: guest resigns, host ingests the
+    /// entry, and host outbox reflects GameEnded.
+    #[tokio::test]
+    async fn session_drives_resignation_over_memory() {
+        let hub = MemoryTransport::new();
+        let mut host_ep = hub.endpoint();
+        let mut guest_ep = hub.endpoint();
+        let ticket = host_ep.ticket();
+        let guest_conn = guest_ep.connect(&ticket).await.unwrap();
+        let host_conn = host_ep.accept().await.unwrap();
+
+        let host_core = Arc::new(Mutex::new(CoreState::default()));
+        let guest_core = Arc::new(Mutex::new(CoreState::default()));
+        host_core.lock().unwrap().net_generation = 1;
+        guest_core.lock().unwrap().net_generation = 1;
+        let (host_tx, host_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (guest_tx, guest_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let host_seed = [11u8; 32];
+        let guest_seed = [12u8; 32];
+        let guest_peer = peer_of(guest_seed);
+
+        let host_task = tokio::spawn({
+            let core = Arc::clone(&host_core);
+            async move {
+                let mut conn = host_conn;
+                if handshake(&core, &mut conn, Role::Host, host_seed, Some(guest_peer), 1)
+                    .await
+                    .is_ok()
+                {
+                    drive_session(core, conn, host_rx, 1).await;
+                }
+            }
+        });
+        let guest_task = tokio::spawn({
+            let core = Arc::clone(&guest_core);
+            async move {
+                let mut conn = guest_conn;
+                if handshake(&core, &mut conn, Role::Guest, guest_seed, None, 1)
+                    .await
+                    .is_ok()
+                {
+                    drive_session(core, conn, guest_rx, 1).await;
+                }
+            }
+        });
+
+        poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
+
+        {
+            let mut guard = guest_core.lock().unwrap();
+            let app = guard.app.as_mut().expect("guest session live");
+            let events = app
+                .handle(&Command::Resign { peer: guest_peer })
+                .expect("guest resignation accepted");
+            guard.outbox.extend(events);
+        }
+        guest_tx.send(NetCmd::Flush).unwrap();
+
+        poll_until(|| {
+            host_core
+                .lock()
+                .unwrap()
+                .outbox
+                .iter()
+                .any(|e| matches!(e, Event::GameEnded { .. }))
+        })
+        .await;
 
         drop(host_tx);
         drop(guest_tx);

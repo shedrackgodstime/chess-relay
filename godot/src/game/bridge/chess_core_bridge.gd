@@ -213,6 +213,20 @@ func my_side() -> String:
 	return str(_core.call(&"my_side"))
 
 
+## This device's peer ID string, or "" before initialized.
+func my_peer() -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"my_peer"))
+
+
+## Side of the given peer ("white", "black", or "" if unknown).
+func side_of_peer(peer: String) -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"side_of_peer", peer))
+
+
 ## Hosts a networked game. Returns the ticket the guest dials, or ""
 ## when hosting failed (see `bridge_error`). Linking runs in the
 ## background; `peer_connected` reports the guest.
