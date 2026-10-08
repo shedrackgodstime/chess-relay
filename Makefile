@@ -22,19 +22,40 @@ DEBUG_APK := /tmp/opencode/chess-relay-debug.apk
 RELEASE_APK := /tmp/opencode/chess-relay-release.apk
 RUST_SRCS := $(shell find rust/src rust/Cargo.toml rust/Cargo.lock -type f 2>/dev/null)
 
-.PHONY: help run android android-release android-prod check _launch _require-keystore
+.PHONY: help run run-reset android android-reset android-release android-release-reset \
+	android-prod check reset-desktop _launch _require-keystore
 .DEFAULT_GOAL := help
+
+RESET ?= 0
 
 help:
 	@echo "Targets:"
 	@echo "  make run              rebuild desktop lib, run the game"
+	@echo "  make run RESET=1      clear desktop identity/saves, then run"
+	@echo "  make run-reset        same as make run RESET=1"
 	@echo "  make android          rebuild + debuggable APK to the attached device"
+	@echo "  make android RESET=1  clear Android app data, then install + launch"
+	@echo "  make android-reset    same as make android RESET=1"
 	@echo "  make android-release  rebuild + release APK to the attached device"
+	@echo "  make android-release-reset  clear data, then install release APK"
 	@echo "  make android-prod     alias of android-release"
 	@echo "  make check            fmt + clippy + test + doc + Godot checks"
 
 run: godot/bin/libchess_relay_core.so
+	@if [ "$(RESET)" = "1" ]; then $(MAKE) reset-desktop; fi
 	$(GODOT) --path godot
+
+run-reset: RESET=1
+run-reset: run
+
+reset-desktop:
+	@set -eu; \
+	data_dir="$(HOME)/.local/share/godot/app_userdata/Chess Relay"; \
+	rm -f "$$data_dir/chess_relay_identity.key" \
+		"$$data_dir/chess_relay_save.bin" \
+		"$$data_dir/chess_relay_ai_save.bin" \
+		"$$data_dir/chess_relay_recent_peers.bin"; \
+	echo "CLEARED: $$data_dir"
 
 godot/bin/libchess_relay_core.so: $(RUST_SRCS)
 	cargo build --manifest-path rust/Cargo.toml --lib
@@ -52,12 +73,12 @@ check:
 android: .build/android-debug.stamp
 	rm -f $(DEBUG_APK)
 	$(GODOT) --headless --path godot --export-debug "Android-Spike" "$(DEBUG_APK)"
-	$(MAKE) _launch APK=$(DEBUG_APK)
+	$(MAKE) _launch APK=$(DEBUG_APK) RESET=$(RESET)
 
 android-release: .build/android-release.stamp
 	rm -f $(RELEASE_APK)
 	$(GODOT) --headless --path godot --export-release "Android-Release" "$(RELEASE_APK)"
-	$(MAKE) _launch APK=$(RELEASE_APK)
+	$(MAKE) _launch APK=$(RELEASE_APK) RESET=$(RESET)
 
 android-prod: android-release
 
@@ -81,6 +102,10 @@ _launch:
 	if [ -z "$$APKSIGNER" ]; then echo "apksigner missing: set ANDROID_HOME"; exit 1; fi; \
 	"$$APKSIGNER" verify "$(APK)" || { echo "EXPORT FAIL: signature invalid"; exit 1; }
 	"$(ADB)" shell am force-stop "$(PKG)"
+	@if [ "$(RESET)" = "1" ]; then \
+		"$(ADB)" shell pm clear "$(PKG)" >/dev/null || { echo "ANDROID RESET FAIL: could not clear $(PKG)"; exit 1; }; \
+		echo "CLEARED: Android app data for $(PKG)"; \
+	fi
 	"$(ADB)" install -r "$(APK)"
 	"$(ADB)" logcat -c
 	"$(ADB)" shell monkey -p "$(PKG)" -c android.intent.category.LAUNCHER 1 > /dev/null
@@ -100,3 +125,9 @@ _launch:
 	mkdir -p .build
 	touch $@
 	rm -f .build/android-debug.stamp
+
+android-reset: RESET=1
+android-reset: android
+
+android-release-reset: RESET=1
+android-release-reset: android-release
