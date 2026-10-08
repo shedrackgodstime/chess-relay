@@ -39,6 +39,8 @@ struct CoreState {
     app: Option<App>,
     /// This device's peer. Set at start/join; the spike flow defaults it.
     me: PeerId,
+    /// Connected remote peer, if any.
+    remote_peer: Option<PeerId>,
     offer_by: Option<PeerId>,
     save_path: Option<String>,
     outbox: VecDeque<Event>,
@@ -81,18 +83,12 @@ struct NetState {
     cmd_tx: tokio::sync::mpsc::UnboundedSender<NetCmd>,
 }
 
-/// Driver input: local log progress worth sending to the peer.
+/// Driver input: local progress or lifecycle events worth sending to the peer.
 #[derive(Debug)]
 enum NetCmd {
+    HostStarted { genesis: Box<LogEntry> },
+    SendReady,
     Flush,
-}
-
-/// Session side for the handshake: the host starts the game and sends
-/// the first message, the guest joins from it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Role {
-    Host,
-    Guest,
 }
 
 /// A live network handoff: everything a link task needs after setup.
@@ -100,7 +96,6 @@ struct NetLaunch {
     endpoint: crate::IrohEndpoint,
     generation: u64,
     cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
-    seed: [u8; 32],
 }
 
 /// Facts from network tasks for the scene thread to announce.
@@ -344,7 +339,6 @@ impl ChessRelayBridge {
                 net.runtime.spawn(accept_task(
                     Arc::clone(&self.core),
                     launch.endpoint,
-                    launch.seed,
                     launch.generation,
                     launch.cmd_rx,
                 ));
@@ -356,7 +350,7 @@ impl ChessRelayBridge {
     /// Joins a networked game: dials `ticket` (or a short rendezvous
     /// code) in the background. Returns false only when setup fails
     /// outright; dial success or failure surfaces as `peer_connected`
-    /// or `network_error`. The handshake is slice C.
+    /// or `network_error`.
     #[func]
     fn join_game(&mut self, ticket: GString) -> bool {
         let ticket = ticket.to_string();
@@ -387,7 +381,6 @@ impl ChessRelayBridge {
                     Arc::clone(&self.core),
                     launch.endpoint,
                     ticket,
-                    launch.seed,
                     launch.generation,
                     launch.cmd_rx,
                 ));
@@ -405,6 +398,71 @@ impl ChessRelayBridge {
             begin_retire(&mut core)
         };
         finish_retire(old);
+    }
+
+    /// Starts the networked game as host with the chosen side ("white", "black", "random").
+    /// Creates the genesis session and notifies the session driver.
+    #[func]
+    fn start_network_game(&mut self, side: GString) -> bool {
+        let (events, genesis) = {
+            let mut core = self.lock();
+            if core.net.is_none() {
+                drop(core);
+                self.emit_error("no network active");
+                return false;
+            }
+            let me = core.me;
+            let Some(guest) = core.remote_peer else {
+                drop(core);
+                self.emit_error("no guest connected");
+                return false;
+            };
+            let side_str = side.to_string().to_lowercase();
+            let (white, black) = match side_str.as_str() {
+                "black" => (guest, me),
+                "random" => {
+                    let mut buf = [0u8; 1];
+                    let _ = getrandom::getrandom(&mut buf);
+                    if buf[0] % 2 == 0 {
+                        (me, guest)
+                    } else {
+                        (guest, me)
+                    }
+                }
+                _ => (me, guest),
+            };
+            let Some(app) = core.app.as_mut() else {
+                drop(core);
+                self.emit_error("no app state");
+                return false;
+            };
+            let events = match app.handle(&Command::StartGame { white, black }) {
+                Ok(ev) => ev,
+                Err(err) => {
+                    let msg = err.to_string();
+                    drop(core);
+                    self.emit_error(&msg);
+                    return false;
+                }
+            };
+            let genesis = match app.query(&Query::MoveLog) {
+                Ok(QueryResult::MoveLog(entries)) => entries.first().copied(),
+                _ => None,
+            };
+            let Some(genesis) = genesis else {
+                drop(core);
+                self.emit_error("failed to create genesis");
+                return false;
+            };
+            (events, genesis)
+        };
+        self.emit_all(&events);
+        if let Some(tx) = self.lock().net.as_ref().map(|n| n.cmd_tx.clone()) {
+            let _ = tx.send(NetCmd::HostStarted {
+                genesis: Box::new(genesis),
+            });
+        }
+        true
     }
 
     /// Persists the current move log to the configured save path.
@@ -438,10 +496,14 @@ impl ChessRelayBridge {
     fn set_ready(&mut self, side: GString) {
         let peer = {
             let core = self.lock();
-            sides(&core).map(|(white, black)| match side.to_string().as_str() {
-                "white" => white,
-                _ => black,
-            })
+            if core.net.is_some() {
+                Some(core.me)
+            } else {
+                sides(&core).map(|(white, black)| match side.to_string().as_str() {
+                    "white" => white,
+                    _ => black,
+                })
+            }
         };
         let Some(peer) = peer else {
             self.emit_error("bridge not started");
@@ -457,7 +519,12 @@ impl ChessRelayBridge {
             }
         };
         match events {
-            Ok(events) => self.emit_all(&events),
+            Ok(events) => {
+                self.emit_all(&events);
+                if let Some(tx) = self.lock().net.as_ref().map(|net| net.cmd_tx.clone()) {
+                    let _ = tx.send(NetCmd::SendReady);
+                }
+            }
             Err(message) => self.emit_error(&message),
         }
     }
@@ -1103,7 +1170,8 @@ fn start_network(core: &mut CoreState) -> Result<NetLaunch, String> {
     core.net_generation += 1;
     let generation = core.net_generation;
     core.me = me;
-    core.app = None;
+    core.remote_peer = None;
+    core.app = Some(App::with_local(secret));
     core.outbox.clear();
     core.offer_by = None;
     let (cmd_tx, cmd_rx) = tokio::sync::mpsc::unbounded_channel();
@@ -1116,7 +1184,6 @@ fn start_network(core: &mut CoreState) -> Result<NetLaunch, String> {
         endpoint,
         generation,
         cmd_rx,
-        seed,
     })
 }
 
@@ -1144,42 +1211,40 @@ fn finish_retire(net: Option<NetState>) {
     }
 }
 
-/// Background accept for the host: links the guest, runs the host
-/// handshake, then drives the session. Silent when a newer network
-/// retired this one mid-flight.
+/// Background accept for the host: links the guest and immediately
+/// drives the session. Silent when a newer network retired this one mid-flight.
 async fn accept_task(
     core: Arc<Mutex<CoreState>>,
     mut endpoint: crate::IrohEndpoint,
-    seed: [u8; 32],
     generation: u64,
     cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
 ) {
-    let mut conn = match endpoint.accept().await {
+    let conn = match endpoint.accept().await {
         Ok(conn) => conn,
         Err(err) => {
-            eprintln!("NET-TRACE host: accept failed"); // TEMP-DIAG
             note(&core, generation, NetNote::Error(short_error(&err)));
             return;
         }
     };
     let guest = PeerId::from_bytes(conn.peer_id_bytes());
-    eprintln!("NET-TRACE host: accepted guest={guest}"); // TEMP-DIAG
-    if handshake(&core, &mut conn, Role::Host, seed, Some(guest), generation)
-        .await
-        .is_ok()
     {
-        drive_session(core, conn, cmd_rx, generation).await;
+        let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if guard.net_generation != generation {
+            return;
+        }
+        guard.remote_peer = Some(guest);
     }
+    note(&core, generation, NetNote::Connected(guest.to_string()));
+    drive_session(core, conn, cmd_rx, generation).await;
 }
 
 /// Background dial for the guest: resolves short codes through
-/// rendezvous, dials tickets directly, then runs the guest handshake
-/// and drives the session. Silent when retired mid-flight.
+/// rendezvous, dials tickets directly, and immediately drives the session.
+/// Silent when retired mid-flight.
 async fn join_task(
     core: Arc<Mutex<CoreState>>,
     endpoint: crate::IrohEndpoint,
     ticket: String,
-    seed: [u8; 32],
     generation: u64,
     cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
 ) {
@@ -1198,22 +1263,23 @@ async fn join_task(
         },
     };
     let mut endpoint = endpoint;
-    let mut conn = match endpoint.connect(&dial).await {
-        Ok(conn) => {
-            eprintln!("NET-TRACE guest: dial ok"); // TEMP-DIAG
-            conn
-        }
+    let conn = match endpoint.connect(&dial).await {
+        Ok(conn) => conn,
         Err(err) => {
             note(&core, generation, NetNote::Error(short_error(&err)));
             return;
         }
     };
-    if handshake(&core, &mut conn, Role::Guest, seed, None, generation)
-        .await
-        .is_ok()
+    let host = PeerId::from_bytes(conn.peer_id_bytes());
     {
-        drive_session(core, conn, cmd_rx, generation).await;
+        let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if guard.net_generation != generation {
+            return;
+        }
+        guard.remote_peer = Some(host);
     }
+    note(&core, generation, NetNote::Connected(host.to_string()));
+    drive_session(core, conn, cmd_rx, generation).await;
 }
 
 /// True while `generation` is still the live network.
@@ -1233,37 +1299,6 @@ fn note(core: &Arc<Mutex<CoreState>>, generation: u64, note: NetNote) {
     }
 }
 
-/// How long one handshake step waits for the peer. Past this the
-/// session is dead: a hang here used to freeze the UI on "starting
-/// game" with nothing logged, on both sides.
-const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(30);
-
-/// Receives one handshake message, noting transport death as a
-/// disconnect and silence as a named timeout, and stopping the session
-/// either way. Returns the message when it arrives in time.
-async fn recv_handshake<C: Connection>(
-    core: &Arc<Mutex<CoreState>>,
-    conn: &mut C,
-    waiting_for: &str,
-    generation: u64,
-) -> Result<Msg, ()> {
-    match tokio::time::timeout(HANDSHAKE_TIMEOUT, conn.recv()).await {
-        Ok(Ok(msg)) => Ok(msg),
-        Ok(Err(_)) => {
-            note(core, generation, NetNote::Disconnected);
-            Err(())
-        }
-        Err(_) => {
-            note(
-                core,
-                generation,
-                NetNote::Error(format!("Timed out {waiting_for}.")),
-            );
-            Err(())
-        }
-    }
-}
-
 /// Runs a command and queues its events plus pending drains for
 /// `process()` to emit off-frame.
 fn apply(core: &Arc<Mutex<CoreState>>, command: Command) -> Result<(), String> {
@@ -1277,279 +1312,39 @@ fn apply(core: &Arc<Mutex<CoreState>>, command: Command) -> Result<(), String> {
     Ok(())
 }
 
-/// Last move-log entry, cloned out from under the lock.
-fn tip_entry(core: &Arc<Mutex<CoreState>>) -> Option<LogEntry> {
-    let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    match guard.app.as_ref().map(|app| app.query(&Query::MoveLog)) {
-        Some(Ok(QueryResult::MoveLog(entries))) => entries.last().copied(),
-        _ => None,
-    }
-}
-
-/// Wire handshake, mirroring the CLI flow: the host starts the game and
-/// sends hello, the guest joins from it, and both agree on genesis
-/// before play. Transport failures note a disconnect, protocol
-/// violations note an error; both stop the session.
-async fn handshake<C: Connection>(
-    core: &Arc<Mutex<CoreState>>,
-    conn: &mut C,
-    role: Role,
-    seed: [u8; 32],
-    remote: Option<PeerId>,
-    generation: u64,
-) -> Result<(), ()> {
-    let secret = SigningKey::from_bytes(&seed);
-    let me = PeerId::of(&secret);
-    match role {
-        Role::Host => {
-            let Some(guest) = remote else {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("host link lost its guest".to_string()),
-                );
-                return Err(());
-            };
-            {
-                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                if guard.net_generation != generation {
-                    return Err(());
-                }
-                guard.app = Some(App::with_local(secret));
-            }
-            if apply(
-                core,
-                Command::StartGame {
-                    white: me,
-                    black: guest,
-                },
-            )
-            .is_err()
-            {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("session start rejected".to_string()),
-                );
-                return Err(());
-            }
-            note(core, generation, NetNote::Connected(guest.to_string()));
-            let Some(genesis) = tip_entry(core).filter(|entry| entry.seq == 0) else {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("genesis missing".to_string()),
-                );
-                return Err(());
-            };
-            if conn
-                .send(&Msg::Hello {
-                    version: PROTOCOL_VERSION,
-                    genesis,
-                })
-                .await
-                .is_err()
-            {
-                eprintln!("NET-TRACE host: hello send failed"); // TEMP-DIAG
-                note(core, generation, NetNote::Disconnected);
-                return Err(());
-            }
-            eprintln!("NET-TRACE host: hello sent"); // TEMP-DIAG
-            match recv_handshake(core, conn, "waiting for the guest to get ready", generation)
-                .await?
-            {
-                Msg::Ready { peer } if peer == guest => {
-                    eprintln!("NET-TRACE host: guest ready"); // TEMP-DIAG
-                }
-                _ => {
-                    note(
-                        core,
-                        generation,
-                        NetNote::Error("guest readiness malformed".to_string()),
-                    );
-                    return Err(());
-                }
-            }
-            let co_sig =
-                match recv_handshake(core, conn, "waiting for the guest's agreement", generation)
-                    .await?
-                {
-                    Msg::Agreed { seq: 0, sig } => {
-                        eprintln!("NET-TRACE host: guest agreed"); // TEMP-DIAG
-                        sig
-                    }
-                    _ => {
-                        note(
-                            core,
-                            generation,
-                            NetNote::Error("genesis agreement malformed".to_string()),
-                        );
-                        return Err(());
-                    }
-                };
-            if !is_current(core, generation) {
-                return Err(());
-            }
-            for command in [
-                Command::NotePeerJoined {
-                    peer: guest,
-                    co_sig,
-                },
-                Command::NotePeerReady { peer: guest },
-                Command::SetReady { peer: me },
-            ] {
-                if apply(core, command).is_err() {
-                    note(
-                        core,
-                        generation,
-                        NetNote::Error("guest arrival rejected".to_string()),
-                    );
-                    return Err(());
-                }
-            }
-            if conn.send(&Msg::Ready { peer: me }).await.is_err() {
-                eprintln!("NET-TRACE host: ready send failed"); // TEMP-DIAG
-                note(core, generation, NetNote::Disconnected);
-                return Err(());
-            }
-            eprintln!("NET-TRACE host: ready sent, handshake done"); // TEMP-DIAG
-            Ok(())
-        }
-        Role::Guest => {
-            let genesis =
-                match recv_handshake(core, conn, "waiting for the host hello", generation).await? {
-                    Msg::Hello { version, genesis } if version == PROTOCOL_VERSION => {
-                        eprintln!("NET-TRACE guest: hello received"); // TEMP-DIAG
-                        genesis
-                    }
-                    _ => {
-                        note(
-                            core,
-                            generation,
-                            NetNote::Error("hello rejected".to_string()),
-                        );
-                        return Err(());
-                    }
-                };
-            if !is_current(core, generation) {
-                return Err(());
-            }
-            {
-                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                guard.app = Some(App::with_local(secret));
-            }
-            if apply(
-                core,
-                Command::JoinGame {
-                    peer: me,
-                    genesis: Box::new(genesis),
-                },
-            )
-            .is_err()
-            {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("join rejected".to_string()),
-                );
-                return Err(());
-            }
-            note(core, generation, NetNote::Connected(me.to_string()));
-            if apply(core, Command::SetReady { peer: me }).is_err() {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("readiness rejected".to_string()),
-                );
-                return Err(());
-            }
-            if conn.send(&Msg::Ready { peer: me }).await.is_err() {
-                eprintln!("NET-TRACE guest: ready send failed"); // TEMP-DIAG
-                note(core, generation, NetNote::Disconnected);
-                return Err(());
-            }
-            eprintln!("NET-TRACE guest: ready sent"); // TEMP-DIAG
-            let Some(agreed) = tip_entry(core).filter(|entry| entry.seq == 0) else {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("genesis missing".to_string()),
-                );
-                return Err(());
-            };
-            let Some(co_sig) = agreed.co_sig else {
-                note(
-                    core,
-                    generation,
-                    NetNote::Error("genesis agreement missing".to_string()),
-                );
-                return Err(());
-            };
-            if conn
-                .send(&Msg::Agreed {
-                    seq: 0,
-                    sig: co_sig,
-                })
-                .await
-                .is_err()
-            {
-                eprintln!("NET-TRACE guest: agreed send failed"); // TEMP-DIAG
-                note(core, generation, NetNote::Disconnected);
-                return Err(());
-            }
-            eprintln!("NET-TRACE guest: agreed sent"); // TEMP-DIAG
-            match recv_handshake(
-                core,
-                conn,
-                "waiting for the host to start the game",
-                generation,
-            )
-            .await?
-            {
-                Msg::Ready { peer } => {
-                    eprintln!("NET-TRACE guest: host ready, handshake done"); // TEMP-DIAG
-                    if !is_current(core, generation) {
-                        return Err(());
-                    }
-                    if apply(core, Command::NotePeerReady { peer }).is_err() {
-                        note(
-                            core,
-                            generation,
-                            NetNote::Error("host readiness rejected".to_string()),
-                        );
-                        return Err(());
-                    }
-                }
-                _ => {
-                    note(
-                        core,
-                        generation,
-                        NetNote::Error("host readiness malformed".to_string()),
-                    );
-                    return Err(());
-                }
-            }
-            Ok(())
-        }
-    }
-}
-
-/// Session loop after the handshake: local progress flushes unsent log
-/// entries to the peer, remote entries ingest and agree back, and
-/// agreements complete our moves. A closed command channel (retired
-/// network) or a dead connection ends the loop.
+/// Session loop driving local commands and wire events: local progress
+/// flushes unsent log entries, remote entries ingest and agree back, and
+/// readiness/genesis exchange runs asynchronously.
 async fn drive_session<C: Connection>(
     core: Arc<Mutex<CoreState>>,
     mut conn: C,
     mut cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
     generation: u64,
 ) {
-    // Genesis travels in hello/join, never as an entry.
     let mut sent_seq = 1u64;
     loop {
         tokio::select! {
             cmd = cmd_rx.recv() => {
                 match cmd {
+                    Some(NetCmd::HostStarted { genesis }) => {
+                        if conn.send(&Msg::Hello {
+                            version: PROTOCOL_VERSION,
+                            genesis: *genesis,
+                        }).await.is_err() {
+                            note(&core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
+                    Some(NetCmd::SendReady) => {
+                        let me = {
+                            let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                            guard.me
+                        };
+                        if conn.send(&Msg::Ready { peer: me }).await.is_err() {
+                            note(&core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
                     Some(NetCmd::Flush) => {
                         if flush_unsent(&core, &mut conn, &mut sent_seq, generation)
                             .await
@@ -1609,9 +1404,7 @@ async fn flush_unsent<C: Connection>(
 }
 
 /// One incoming message: entries ingest and agree back, agreements
-/// complete our moves, readiness is advisory after the handshake, and
-/// a clean end reads as a disconnect. Hello, tips, and final positions
-/// belong to future slices and wait out this one ignored.
+/// complete our moves, readiness is updated, and genesis exchange completes setup.
 async fn on_msg<C: Connection>(
     core: &Arc<Mutex<CoreState>>,
     conn: &mut C,
@@ -1619,6 +1412,94 @@ async fn on_msg<C: Connection>(
     generation: u64,
 ) -> Result<(), ()> {
     match msg {
+        Msg::Hello { version, genesis } => {
+            if version != PROTOCOL_VERSION {
+                note(core, generation, NetNote::Error("version mismatch".to_string()));
+                return Err(());
+            }
+            if !is_current(core, generation) {
+                return Err(());
+            }
+            let me = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.me
+            };
+            if apply(
+                core,
+                Command::JoinGame {
+                    peer: me,
+                    genesis: Box::new(genesis),
+                },
+            )
+            .is_err()
+            {
+                note(core, generation, NetNote::Error("join rejected".to_string()));
+                return Err(());
+            }
+            let co_sig = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                match guard.app.as_ref().and_then(|app| app.query(&Query::MoveLog).ok()) {
+                    Some(QueryResult::MoveLog(entries)) => entries.first().and_then(|e| e.co_sig),
+                    _ => None,
+                }
+            };
+            let Some(co_sig) = co_sig else {
+                note(core, generation, NetNote::Error("genesis agreement missing".to_string()));
+                return Err(());
+            };
+            if conn.send(&Msg::Agreed { seq: 0, sig: co_sig }).await.is_err() {
+                note(core, generation, NetNote::Disconnected);
+                return Err(());
+            }
+            Ok(())
+        }
+        Msg::Agreed { seq, sig } => {
+            if !is_current(core, generation) {
+                return Err(());
+            }
+            if seq == 0 {
+                let guest = {
+                    let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    guard.remote_peer
+                };
+                let Some(guest) = guest else {
+                    note(core, generation, NetNote::Error("no remote peer".to_string()));
+                    return Err(());
+                };
+                if apply(core, Command::NotePeerJoined { peer: guest, co_sig: sig }).is_err() {
+                    note(core, generation, NetNote::Error("genesis agreement rejected".to_string()));
+                    return Err(());
+                }
+                let me = {
+                    let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    guard.me
+                };
+                if apply(core, Command::SetReady { peer: me }).is_err() {
+                    note(core, generation, NetNote::Error("host readiness rejected".to_string()));
+                    return Err(());
+                }
+                if conn.send(&Msg::Ready { peer: me }).await.is_err() {
+                    note(core, generation, NetNote::Disconnected);
+                    return Err(());
+                }
+                Ok(())
+            } else {
+                match apply(core, Command::NoteMoveAgreed { seq, co_sig: sig }) {
+                    Ok(()) => Ok(()),
+                    Err(reason) => {
+                        note(core, generation, NetNote::Error(reason));
+                        Err(())
+                    }
+                }
+            }
+        }
+        Msg::Ready { peer } => {
+            if !is_current(core, generation) {
+                return Err(());
+            }
+            let _ = apply(core, Command::NotePeerReady { peer });
+            Ok(())
+        }
         Msg::Entry(entry) => {
             enum Ingest {
                 Agree(u64, [u8; 64]),
@@ -1673,30 +1554,11 @@ async fn on_msg<C: Connection>(
                 }
             }
         }
-        Msg::Agreed { seq, sig } => {
-            if !is_current(core, generation) {
-                return Err(());
-            }
-            match apply(core, Command::NoteMoveAgreed { seq, co_sig: sig }) {
-                Ok(()) => Ok(()),
-                Err(reason) => {
-                    note(core, generation, NetNote::Error(reason));
-                    Err(())
-                }
-            }
-        }
-        Msg::Ready { peer } => {
-            if !is_current(core, generation) {
-                return Err(());
-            }
-            let _ = apply(core, Command::NotePeerReady { peer });
-            Ok(())
-        }
         Msg::Done => {
             note(core, generation, NetNote::Disconnected);
             Err(())
         }
-        Msg::Hello { .. } | Msg::Tip { .. } | Msg::Fen { .. } => Ok(()),
+        Msg::Tip { .. } | Msg::Fen { .. } => Ok(()),
     }
 }
 
@@ -1759,6 +1621,7 @@ mod tests {
     use super::*;
     use crate::transport::MemoryTransport;
 
+    #[allow(dead_code)]
     fn peer_of(seed: [u8; 32]) -> PeerId {
         PeerId::of(&SigningKey::from_bytes(&seed))
     }
@@ -1817,7 +1680,9 @@ mod tests {
 
     /// Handshake plus one move across memory links: both sides start
     /// play, the host's pawn push reaches the guest, and the guest's
-    /// agreement completes the host's move with identical positions.
+    /// Decoupled setup plus one move across memory links: host starts
+    /// match as White, guest receives genesis and marks ready, both start,
+    /// and host's pawn push reaches guest and is agreed with identical positions.
     #[tokio::test]
     async fn session_drives_handshake_and_move_over_memory() {
         let hub = MemoryTransport::new();
@@ -1829,39 +1694,86 @@ mod tests {
 
         let host_core = Arc::new(Mutex::new(CoreState::default()));
         let guest_core = Arc::new(Mutex::new(CoreState::default()));
-        host_core.lock().unwrap().net_generation = 1;
-        guest_core.lock().unwrap().net_generation = 1;
         let (host_tx, host_rx) = tokio::sync::mpsc::unbounded_channel();
         let (guest_tx, guest_rx) = tokio::sync::mpsc::unbounded_channel();
 
         let host_seed = [7u8; 32];
         let guest_seed = [9u8; 32];
-        let guest_peer = peer_of(guest_seed);
+        let host_key = SigningKey::from_bytes(&host_seed);
+        let guest_key = SigningKey::from_bytes(&guest_seed);
+        let host_peer = PeerId::of(&host_key);
+        let guest_peer = PeerId::of(&guest_key);
+
+        {
+            let mut guard = host_core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.me = host_peer;
+            guard.remote_peer = Some(guest_peer);
+            guard.app = Some(App::with_local(host_key));
+        }
+        {
+            let mut guard = guest_core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.me = guest_peer;
+            guard.remote_peer = Some(host_peer);
+            guard.app = Some(App::with_local(guest_key));
+        }
 
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                let mut conn = host_conn;
-                if handshake(&core, &mut conn, Role::Host, host_seed, Some(guest_peer), 1)
-                    .await
-                    .is_ok()
-                {
-                    drive_session(core, conn, host_rx, 1).await;
-                }
+                drive_session(core, host_conn, host_rx, 1).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                let mut conn = guest_conn;
-                if handshake(&core, &mut conn, Role::Guest, guest_seed, None, 1)
-                    .await
-                    .is_ok()
-                {
-                    drive_session(core, conn, guest_rx, 1).await;
-                }
+                drive_session(core, guest_conn, guest_rx, 1).await;
             }
         });
+
+        // Host starts the game
+        let (events, genesis) = {
+            let mut guard = host_core.lock().unwrap();
+            let app = guard.app.as_mut().unwrap();
+            let events = app
+                .handle(&Command::StartGame {
+                    white: host_peer,
+                    black: guest_peer,
+                })
+                .unwrap();
+            let genesis = match app.query(&Query::MoveLog).unwrap() {
+                QueryResult::MoveLog(entries) => entries[0],
+                _ => panic!("missing genesis"),
+            };
+            (events, genesis)
+        };
+        host_core.lock().unwrap().outbox.extend(events);
+        host_tx
+            .send(NetCmd::HostStarted {
+                genesis: Box::new(genesis),
+            })
+            .unwrap();
+
+        // Wait until guest receives hello and sets up session
+        poll_until(|| {
+            let guard = guest_core.lock().unwrap();
+            guard
+                .app
+                .as_ref()
+                .and_then(|a| a.query(&Query::SessionState).ok())
+                .is_some()
+        })
+        .await;
+
+        // Guest marks ready
+        {
+            let mut guard = guest_core.lock().unwrap();
+            let app = guard.app.as_mut().unwrap();
+            let events = app.handle(&Command::SetReady { peer: guest_peer }).unwrap();
+            guard.outbox.extend(events);
+        }
+        guest_tx.send(NetCmd::SendReady).unwrap();
 
         poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
@@ -1874,7 +1786,7 @@ mod tests {
             let app = guard.app.as_mut().expect("host session live");
             let events = app
                 .handle(&Command::SubmitMove {
-                    peer: peer_of(host_seed),
+                    peer: host_peer,
                     mv: "e2e4".parse().unwrap(),
                 })
                 .expect("host pawn push legal");
@@ -1887,6 +1799,135 @@ mod tests {
         poll_until(|| has_move_agreed(&host_core, 1)).await;
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
         assert!(fen_of(&guest_core).contains("4P3/8"));
+
+        drop(host_tx);
+        drop(guest_tx);
+        tokio::time::timeout(Duration::from_secs(5), host_task)
+            .await
+            .expect("host driver exits")
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), guest_task)
+            .await
+            .expect("guest driver exits")
+            .unwrap();
+    }
+
+    /// Host chooses Black: guest is assigned White, receives genesis,
+    /// guest makes the opening move, and host ingests it.
+    #[tokio::test]
+    async fn session_drives_host_as_black_over_memory() {
+        let hub = MemoryTransport::new();
+        let mut host_ep = hub.endpoint();
+        let mut guest_ep = hub.endpoint();
+        let ticket = host_ep.ticket();
+        let guest_conn = guest_ep.connect(&ticket).await.unwrap();
+        let host_conn = host_ep.accept().await.unwrap();
+
+        let host_core = Arc::new(Mutex::new(CoreState::default()));
+        let guest_core = Arc::new(Mutex::new(CoreState::default()));
+        let (host_tx, host_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (guest_tx, guest_rx) = tokio::sync::mpsc::unbounded_channel();
+
+        let host_seed = [21u8; 32];
+        let guest_seed = [22u8; 32];
+        let host_key = SigningKey::from_bytes(&host_seed);
+        let guest_key = SigningKey::from_bytes(&guest_seed);
+        let host_peer = PeerId::of(&host_key);
+        let guest_peer = PeerId::of(&guest_key);
+
+        {
+            let mut guard = host_core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.me = host_peer;
+            guard.remote_peer = Some(guest_peer);
+            guard.app = Some(App::with_local(host_key));
+        }
+        {
+            let mut guard = guest_core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.me = guest_peer;
+            guard.remote_peer = Some(host_peer);
+            guard.app = Some(App::with_local(guest_key));
+        }
+
+        let host_task = tokio::spawn({
+            let core = Arc::clone(&host_core);
+            async move {
+                drive_session(core, host_conn, host_rx, 1).await;
+            }
+        });
+        let guest_task = tokio::spawn({
+            let core = Arc::clone(&guest_core);
+            async move {
+                drive_session(core, guest_conn, guest_rx, 1).await;
+            }
+        });
+
+        // Host starts game choosing Black (guest is White, host is Black)
+        let (events, genesis) = {
+            let mut guard = host_core.lock().unwrap();
+            let app = guard.app.as_mut().unwrap();
+            let events = app
+                .handle(&Command::StartGame {
+                    white: guest_peer,
+                    black: host_peer,
+                })
+                .unwrap();
+            let genesis = match app.query(&Query::MoveLog).unwrap() {
+                QueryResult::MoveLog(entries) => entries[0],
+                _ => panic!("missing genesis"),
+            };
+            (events, genesis)
+        };
+        host_core.lock().unwrap().outbox.extend(events);
+        host_tx
+            .send(NetCmd::HostStarted {
+                genesis: Box::new(genesis),
+            })
+            .unwrap();
+
+        poll_until(|| {
+            let guard = guest_core.lock().unwrap();
+            guard
+                .app
+                .as_ref()
+                .and_then(|a| a.query(&Query::SessionState).ok())
+                .is_some()
+        })
+        .await;
+
+        // Guest marks ready
+        {
+            let mut guard = guest_core.lock().unwrap();
+            let app = guard.app.as_mut().unwrap();
+            let events = app.handle(&Command::SetReady { peer: guest_peer }).unwrap();
+            guard.outbox.extend(events);
+        }
+        guest_tx.send(NetCmd::SendReady).unwrap();
+
+        poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
+
+        // Guest is White: plays e2e4
+        {
+            let mut guard = guest_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let app = guard.app.as_mut().expect("guest session live");
+            let events = app
+                .handle(&Command::SubmitMove {
+                    peer: guest_peer,
+                    mv: "e2e4".parse().unwrap(),
+                })
+                .expect("guest opening move legal");
+            let mut all = events;
+            all.extend(app.drain());
+            guard.outbox.extend(all);
+        }
+        guest_tx.send(NetCmd::Flush).unwrap();
+
+        poll_until(|| move_log_len(&host_core) == 2 && move_log_len(&guest_core) == 2).await;
+        poll_until(|| has_move_agreed(&guest_core, 1)).await;
+        assert_eq!(fen_of(&host_core), fen_of(&guest_core));
 
         drop(host_tx);
         drop(guest_tx);
@@ -1913,39 +1954,85 @@ mod tests {
 
         let host_core = Arc::new(Mutex::new(CoreState::default()));
         let guest_core = Arc::new(Mutex::new(CoreState::default()));
-        host_core.lock().unwrap().net_generation = 1;
-        guest_core.lock().unwrap().net_generation = 1;
         let (host_tx, host_rx) = tokio::sync::mpsc::unbounded_channel();
         let (guest_tx, guest_rx) = tokio::sync::mpsc::unbounded_channel();
 
         let host_seed = [11u8; 32];
         let guest_seed = [12u8; 32];
-        let guest_peer = peer_of(guest_seed);
+        let host_key = SigningKey::from_bytes(&host_seed);
+        let guest_key = SigningKey::from_bytes(&guest_seed);
+        let host_peer = PeerId::of(&host_key);
+        let guest_peer = PeerId::of(&guest_key);
+
+        {
+            let mut guard = host_core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.me = host_peer;
+            guard.remote_peer = Some(guest_peer);
+            guard.app = Some(App::with_local(host_key));
+        }
+        {
+            let mut guard = guest_core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.me = guest_peer;
+            guard.remote_peer = Some(host_peer);
+            guard.app = Some(App::with_local(guest_key));
+        }
 
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                let mut conn = host_conn;
-                if handshake(&core, &mut conn, Role::Host, host_seed, Some(guest_peer), 1)
-                    .await
-                    .is_ok()
-                {
-                    drive_session(core, conn, host_rx, 1).await;
-                }
+                drive_session(core, host_conn, host_rx, 1).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                let mut conn = guest_conn;
-                if handshake(&core, &mut conn, Role::Guest, guest_seed, None, 1)
-                    .await
-                    .is_ok()
-                {
-                    drive_session(core, conn, guest_rx, 1).await;
-                }
+                drive_session(core, guest_conn, guest_rx, 1).await;
             }
         });
+
+        // Host starts game
+        let (events, genesis) = {
+            let mut guard = host_core.lock().unwrap();
+            let app = guard.app.as_mut().unwrap();
+            let events = app
+                .handle(&Command::StartGame {
+                    white: host_peer,
+                    black: guest_peer,
+                })
+                .unwrap();
+            let genesis = match app.query(&Query::MoveLog).unwrap() {
+                QueryResult::MoveLog(entries) => entries[0],
+                _ => panic!("missing genesis"),
+            };
+            (events, genesis)
+        };
+        host_core.lock().unwrap().outbox.extend(events);
+        host_tx
+            .send(NetCmd::HostStarted {
+                genesis: Box::new(genesis),
+            })
+            .unwrap();
+
+        poll_until(|| {
+            let guard = guest_core.lock().unwrap();
+            guard
+                .app
+                .as_ref()
+                .and_then(|a| a.query(&Query::SessionState).ok())
+                .is_some()
+        })
+        .await;
+
+        // Guest marks ready
+        {
+            let mut guard = guest_core.lock().unwrap();
+            let app = guard.app.as_mut().unwrap();
+            let events = app.handle(&Command::SetReady { peer: guest_peer }).unwrap();
+            guard.outbox.extend(events);
+        }
+        guest_tx.send(NetCmd::SendReady).unwrap();
 
         poll_until(|| has_game_started(&host_core) && has_game_started(&guest_core)).await;
 
@@ -2008,7 +2095,7 @@ mod tests {
                 cmd_tx,
             });
         }
-        spawner.spawn(accept_task(core.clone(), endpoint, [11u8; 32], 1, cmd_rx));
+        spawner.spawn(accept_task(core.clone(), endpoint, 1, cmd_rx));
         std::thread::sleep(Duration::from_millis(200));
         let old = {
             let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());

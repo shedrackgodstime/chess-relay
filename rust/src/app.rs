@@ -439,7 +439,10 @@ impl App {
                 session.receive(genesis)?;
                 session.agree(&secret, 0)?;
                 self.session = Some(session);
-                Ok(vec![Event::PeerJoined { peer: *peer }])
+                Ok(vec![
+                    Event::SessionCreated { white, black, host },
+                    Event::PeerJoined { peer: *peer },
+                ])
             }
             Command::NotePeerJoined { peer, co_sig } => {
                 let session = self.session_mut()?;
