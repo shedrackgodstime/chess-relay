@@ -43,7 +43,8 @@ disconnects, reconnects, persistence, and stale asynchronous work.
 
 ### Phase 0 — Baseline and inventory
 
-Status: `Implemented`; baseline verification has failures.
+Status: `Verified` for the available local gates; live rendezvous remains a
+separate integration check.
 
 - Checkpoint current work before refactoring. Done in commit `3f8e8f2`, pushed
   to `origin/main`.
@@ -59,7 +60,7 @@ source path and a stated owner.
 Baseline evidence from 2026-10-08:
 
 - Rust: complete suite passed outside the restricted socket sandbox: 83 unit
-  tests, 23 integration tests, 21 doctests; 2 intentionally ignored tests.
+  tests, 26 integration tests, 21 doctests; 2 intentionally ignored tests.
 - Godot: complete suite passed with a writable `user://`: 26 scripts parsed,
   warning drift passed, resume persistence passed, and the UI suite reported
   exactly `156 of 156` checks.
@@ -84,11 +85,13 @@ contract, and one testable failure policy.
 
 ### Phase 2 — Persistent identity and endpoint authority
 
-Status: `Implemented`; integration verification remains open — `IDENTITY-001`.
+Status: `Implemented`; end-to-end restart verification remains open —
+`IDENTITY-001`.
 
-Current evidence: `start_network()` generates a new random seed every time and
-calls `bind_with_seed(seed)`. The persisted identity used by
-`start_resumable()` is not used by network host/join.
+Current evidence: `host_game()` and `join_game()` load the same persisted
+installation seed and `start_network()` binds the endpoint from it. The Rust
+unit test proves seed reuse and endpoint/session identity equality; a full
+application restart test is still required.
 
 - Load or create one installation identity through one Rust-owned persistence
   path.
@@ -105,11 +108,12 @@ does not silently create a new identity; deliberate reset is the only rotation.
 
 ### Phase 3 — Real join-code contract
 
-Status: `Confirmed` — `JOIN-001`.
+Status: `Implemented`; live rendezvous verification remains open — `JOIN-001`.
 
-Current evidence: `transport_rendezvous.rs` implements code resolution, but
-`bridge.rs::host_game()` returns a raw ticket and the Godot UI labels/copies it
-as a ticket. The UI does not receive a generated short code.
+Current evidence: `host_game()` generates and publishes a six-character code;
+the Godot host card displays/copies that code; join input sends the code to the
+Rust resolver. Offline shape and bridge tests pass. A live relay round trip is
+still intentionally separate and is not claimed here.
 
 - Make host creation return a typed invitation containing the short code and
   any private/internal dial information required by the owner.
@@ -150,7 +154,8 @@ freshness, and an explicit unavailable/empty behavior.
 
 ### Phase 5 — Lifecycle and connection determinism
 
-Status: `Observed`; informed by `docs/audits/connection-and-source-of-truth-audit.md`.
+Status: `Implemented` in the bridge/UI path; end-to-end two-process coverage
+remains open — `LIFECYCLE-001`.
 
 - Separate transport, handshake, session, and presentation states.
 - Subscribe before starting producers, or provide snapshot/replay semantics.
@@ -158,6 +163,10 @@ Status: `Observed`; informed by `docs/audits/connection-and-source-of-truth-audi
 - Retire workers/endpoints atomically; stale generations cannot publish facts.
 - Make startup, shutdown, screen re-entry, and repeated start/stop idempotent.
 - Verify the session cannot remain live-looking after its driver dies.
+- Keep the transport-connected, session-created, ready, and game-started
+  transitions distinct in the Godot screen flow; transport connection opens
+  setup, host starts the session, guest marks its assigned side ready, and only
+  `game_started` opens the board.
 
 Exit condition: event order, revision, generation, and terminal-state behavior
 are covered by integration tests rather than inferred from timing.
@@ -195,10 +204,10 @@ report distinguishes verified behavior from unavailable evidence.
 
 | ID | Finding | Status | First closure proof |
 | --- | --- | --- | --- |
-| `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality |
-| `JOIN-001` | Short-code implementation is not the displayed/used host contract | Confirmed | Host-code → resolve-code → join integration test |
+| `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality; app restart still open |
+| `JOIN-001` | Short-code implementation is not the displayed/used host contract | Implemented | Host-code → resolver contract and UI wiring; live rendezvous still open |
 | `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Confirmed | Real query/persistence source + empty/error tests |
-| `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Observed | State transition table + stale-generation integration tests |
+| `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring + stale-generation tests; two-process UI integration still open |
 | `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |
 
 ## Session handoff rule

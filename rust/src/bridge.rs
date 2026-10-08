@@ -131,7 +131,7 @@ impl ChessRelayBridge {
 #[godot_api]
 impl ChessRelayBridge {
     #[signal]
-    fn session_created(white: GString, black: GString);
+    fn session_created(white: GString, black: GString, host: GString);
     #[signal]
     fn ready_changed(peer: GString);
     #[signal]
@@ -894,12 +894,13 @@ impl ChessRelayBridge {
 
     fn emit_one(&mut self, event: &Event) {
         match event {
-            Event::SessionCreated { white, black, .. } => {
+            Event::SessionCreated { white, black, host } => {
                 let (white, black) = (
                     GString::from(&white.to_string()),
                     GString::from(&black.to_string()),
                 );
-                self.signals().session_created().emit(&white, &black);
+                let host = GString::from(&host.to_string());
+                self.signals().session_created().emit(&white, &black, &host);
             }
             Event::PeerJoined { peer } => {
                 let peer = GString::from(&peer.to_string());

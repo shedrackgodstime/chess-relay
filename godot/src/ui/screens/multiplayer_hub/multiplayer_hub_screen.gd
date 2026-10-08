@@ -243,19 +243,19 @@ func notify_network_error(reason: String = "") -> void:
 ## just the transport. (Advancing on link-up sent the host to setup
 ## while the guest was still handshaking — and the guest's failure
 ## then looked like a mystery instead of a failed handshake.)
-func peer_linked() -> void:
+func peer_linked(opponent_name: String = "Opponent") -> void:
 	if _active_invite_flow == "create" and _create_waiting and _create_status != null:
-		_create_status.text = "Opponent connected · starting game..."
+		_create_status.text = "Opponent connected · configure the game..."
+		game_setup_requested.emit(opponent_name, "create")
 	elif _active_invite_flow == "join-connecting" and _join_status != null:
-		_join_status.text = "Connected · starting game..."
+		_join_status.text = "Connected · waiting for host..."
+		game_setup_requested.emit(opponent_name, "join")
 
 
 ## Backend calls this when the session is ready (game started), not
 ## when the transport merely linked. Only this advances out of the hub.
-## Both flows advance here: the host from its create card, the guest
-## from its join card. (Gating this on the create flow alone stranded
-## every guest on "starting game" with a live session underneath —
-## found via the NET-TRACE handshake log, not guessed.)
+## Both flows remain supported for the compatibility path: the host from its
+## create card and the guest from its join card.
 func opponent_connected(opponent_name: String = "Opponent") -> void:
 	if _active_invite_flow == "create" and _create_waiting:
 		_create_status.text = "Opponent connected."

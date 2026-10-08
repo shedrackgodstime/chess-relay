@@ -194,35 +194,21 @@ func _on_game_leave_requested() -> void:
 ## `game_started`: the handshake (ready + genesis agreement both ways)
 ## must complete first, otherwise one side sits in setup while the
 ## other is still failing to join.
-## TEMP-DIAG screen tag for the trace lines below. Removed with them.
-func _trace_screen() -> String:
-	if _current_screen is MultiplayerHubScreen:
-		return "hub"
-	if _current_screen is GameSetupScreen:
-		return "setup"
-	if _current_screen is GameScreen:
-		return "game"
-	if _current_screen is HomeScreen:
-		return "home"
-	return "none"
-
-
 func _on_net_peer_connected(peer: String) -> void:
-	print("NET-TRACE app: peer_connected peer=%s screen=%s" % [peer.left(8), _trace_screen()]) # TEMP-DIAG
 	_net_peer = peer
 	if _current_screen is MultiplayerHubScreen:
-		(_current_screen as MultiplayerHubScreen).peer_linked()
+		(_current_screen as MultiplayerHubScreen).peer_linked(peer)
 
 
 func _on_net_game_started() -> void:
-	print("NET-TRACE app: game_started screen=%s" % _trace_screen()) # TEMP-DIAG
 	if _current_screen is MultiplayerHubScreen:
 		var opponent := _net_peer if not _net_peer.is_empty() else "Opponent"
 		(_current_screen as MultiplayerHubScreen).opponent_connected(opponent)
+	elif _current_screen is GameSetupScreen:
+		_show_game_screen(true)
 
 
 func _on_net_network_error(message: String) -> void:
-	print("NET-TRACE app: network_error %s" % message) # TEMP-DIAG
 	if _current_screen is MultiplayerHubScreen:
 		(_current_screen as MultiplayerHubScreen).notify_network_error(message)
 	elif _current_screen is GameSetupScreen:
@@ -230,7 +216,6 @@ func _on_net_network_error(message: String) -> void:
 
 
 func _on_net_peer_disconnected() -> void:
-	print("NET-TRACE app: peer_disconnected") # TEMP-DIAG
 	if _current_screen is MultiplayerHubScreen:
 		(_current_screen as MultiplayerHubScreen).notify_network_error("Opponent disconnected.")
 	elif _current_screen is GameSetupScreen:

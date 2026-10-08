@@ -23,6 +23,8 @@ extends Node
 
 ## Emitted when the core accepted and applied a move.
 signal move_applied(sequence: int, uci: String, by: String, agreed: bool)
+## Emitted when the core has assigned both sides for a session.
+signal session_created(white: String, black: String, host: String)
 ## Emitted when play begins.
 signal game_started
 ## Emitted when either side changed readiness.
@@ -62,6 +64,9 @@ func _ready() -> void:
 	_core.connect(&"move_applied",
 		func(sequence: int, uci: String, by: String, agreed: bool) -> void:
 			move_applied.emit(sequence, uci, by, agreed))
+	_core.connect(&"session_created",
+		func(white: String, black: String, host: String) -> void:
+			session_created.emit(white, black, host))
 	_core.connect(&"game_started", func() -> void: game_started.emit())
 	_core.connect(&"ready_changed", func(peer: String) -> void: ready_changed.emit(peer))
 	_core.connect(&"game_ended", func(reason: String) -> void: game_ended.emit(reason))
@@ -205,6 +210,14 @@ func set_ready(side: String) -> void:
 		_core.call(&"set_ready", side)
 
 
+## Starts a host session after the transport peer is connected.
+func start_network_game(side: String) -> bool:
+	if _core == null:
+		return false
+	var accepted: bool = _core.call(&"start_network_game", side)
+	return accepted
+
+
 ## This device's side ("white"/"black"), or "" before the session has sides.
 ## Networked input gates on this; hotseat play ignores it.
 func my_side() -> String:
@@ -228,7 +241,7 @@ func side_of_peer(peer: String) -> String:
 
 
 ## Hosts a networked game using the persistent installation identity. Returns
-## the ticket the guest dials, or ""
+## the short invite code the guest enters, or ""
 ## when hosting failed (see `bridge_error`). Linking runs in the
 ## background; `peer_connected` reports the guest.
 func host_game(identity_path: String) -> String:

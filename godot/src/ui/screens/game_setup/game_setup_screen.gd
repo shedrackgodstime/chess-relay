@@ -28,7 +28,7 @@ var _local_ready := false
 var _opponent_is_ready := false
 var _header_menu_layer: Control
 ## The live networked session, when this setup fronts one. Set for
-## ticket/host flows only; mock invite flows have no session and keep
+## code/host flows only; mock invite flows have no session and keep
 ## the old local behavior.
 var _net_bridge: ChessCoreBridge = null
 
@@ -81,12 +81,12 @@ func selected_ai_difficulty() -> String:
 	return _difficulty_choice.get_selected_choice()
 
 
-## Attaches the live networked session. The lobby then shows the
-## session instead of offering choices: sides were fixed when the
-## handshake completed, and color/time/variant/difficulty pickers
-## change nothing on the wire, so they hide instead of lying.
+## Attaches the live network bridge. Only choices supported by the current
+## application contract remain interactive; unsupported settings are hidden.
 func configure_net_bridge(bridge: ChessCoreBridge) -> void:
 	_net_bridge = bridge
+	if not _net_bridge.session_created.is_connected(_on_net_session_created):
+		_net_bridge.session_created.connect(_on_net_session_created)
 	if is_node_ready() and _peer_setup:
 		_apply_peer_setup()
 
@@ -98,33 +98,50 @@ func _apply_peer_setup() -> void:
 	_ready_label.text = "Choose your settings, then mark yourself ready"
 	var detail := "Connected player"
 	if _peer_kind == "create" or _peer_kind == "join":
-		# Tickets today; short codes arrive with rendezvous publishing.
-		detail = "Connected via ticket"
+		detail = "Connected via invite code"
 	_opponent_card.configure(_peer_name, "PLAYER", detail)
 	if _net_bridge != null:
-		_apply_net_lobby()
+		_apply_net_setup()
 	_update_summary()
 
 
-## Read-only lobby for a live session: real sides on the cards,
-## theater controls hidden, one honest button. Entering only opens
-## the board of the game that started underneath; it never starts
-## anything, so an early host sees the live game, not a second one.
-func _apply_net_lobby() -> void:
-	_side_choice.hide()
+## Network setup owns the user-visible transition into the session. The host
+## chooses a side and starts; the guest waits for the host and then marks ready.
+func _apply_net_setup() -> void:
 	_time_choice.hide()
 	_variant_choice.hide()
 	_custom_time_controls.hide()
+	_difficulty_choice.hide()
 	var mine := _net_bridge.my_side()
 	var mine_shown := mine.capitalize() if not mine.is_empty() else "…"
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine_shown)
 	_opponent_card.set_side(theirs)
-	_play_button.text = "Enter game"
-	_play_button.tooltip_text = "Open the live game"
+	if _peer_kind == "create":
+		_play_button.text = "Start game"
+		_play_button.tooltip_text = "Choose your side and start the session"
+		_ready_label.text = "Choose your side, then start the game"
+		_settings_summary.text = "You choose the sides · Standard"
+	else:
+		_side_choice.hide()
+		_play_button.text = "Ready"
+		_play_button.tooltip_text = "Tell the host you are ready"
+		_ready_label.text = "Waiting for the host to start the session"
+		_settings_summary.text = "Waiting for the host"
 	_play_button.disabled = false
-	_ready_label.text = "Connected · game is live · enter when ready"
-	_settings_summary.text = "You play %s · Standard · game is live" % mine_shown
+
+
+func _on_net_session_created(_white: String, _black: String, _host: String) -> void:
+	if _net_bridge == null:
+		return
+	var mine := _net_bridge.my_side()
+	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
+	_player_card.set_side(mine.capitalize() if not mine.is_empty() else "…")
+	_opponent_card.set_side(theirs)
+	if _peer_kind == "create":
+		_ready_label.text = "Game created · waiting for opponent to be ready"
+	else:
+		_ready_label.text = "Game created · mark yourself ready"
 
 
 func _update_header_visibility() -> void:
@@ -167,8 +184,14 @@ func _on_custom_time_changed(_value: float) -> void:
 
 func _on_play_pressed() -> void:
 	if _net_bridge != null:
-		# Live session underneath; entering only opens its board.
-		play_requested.emit()
+		if _peer_kind == "create":
+			if _net_bridge.start_network_game(selected_ai_side()):
+				_play_button.disabled = true
+				_ready_label.text = "Game started · waiting for opponent to be ready"
+		else:
+			_net_bridge.set_ready(_net_bridge.my_side())
+			_play_button.disabled = true
+			_ready_label.text = "Ready · waiting for the host"
 		return
 	if _peer_setup:
 		_local_ready = true
