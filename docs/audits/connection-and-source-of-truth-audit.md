@@ -221,6 +221,17 @@ This is the v1 multiplayer contract:
 No client may invent a setup value, declare itself ready independently, or
 advance to the game screen from transport connection alone.
 
+### C-SOT-08 — Local game start was not a shared board-open barrier
+
+**Status:** fixed for the v1 loading flow.
+
+Each peer can finish its Rust session at a different wall-clock time. The
+bridge still reports the local `game_started` fact, but the network GameScreen
+now hides the board and reports `Loaded` before revealing it. The peer-loaded
+fact is persisted in Rust, so a fast signal cannot be lost before the screen
+subscribes. The board becomes visible only after both devices have loaded their
+network game screen.
+
 ## What is already documented elsewhere
 
 - F-01 covers the network lifecycle inversion and the hollow setup screen.

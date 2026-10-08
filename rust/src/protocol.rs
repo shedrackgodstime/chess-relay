@@ -79,6 +79,8 @@ pub enum Msg {
     /// guest waits for this before applying its own readiness locally, so
     /// both screens enter play from the same host commit.
     Started,
+    /// The local game screen is loaded and ready to reveal the board.
+    Loaded,
     /// A signed log entry of any kind: moves today, and offers, answers,
     /// resignations and aborts as sessions use them. The payload already
     /// distinguishes kinds; the protocol never interprets them, it only
@@ -257,6 +259,7 @@ mod tests {
             },
             Msg::Ready { peer },
             Msg::Started,
+            Msg::Loaded,
             Msg::Entry(genesis),
             Msg::Agreed {
                 seq: 3,

@@ -44,6 +44,8 @@ signal bridge_error(message: String)
 signal peer_connected(peer: String)
 ## Emitted when the peer link drops.
 signal peer_disconnected
+## Emitted when the remote game screen has loaded and is ready for the board.
+signal peer_loaded
 ## Emitted when the link fails without dropping (bad ticket, lost code).
 signal network_error(message: String)
 
@@ -80,6 +82,7 @@ func _ready() -> void:
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
 	_core.connect(&"peer_connected", func(peer: String) -> void: peer_connected.emit(peer))
 	_core.connect(&"peer_disconnected", func() -> void: peer_disconnected.emit())
+	_core.connect(&"peer_loaded", func() -> void: peer_loaded.emit())
 	_core.connect(&"network_error", func(message: String) -> void: network_error.emit(message))
 
 
@@ -251,6 +254,21 @@ func start_network_game(side: String, time: String, variant: String) -> bool:
 		return false
 	var accepted: bool = _core.call(&"start_network_game", side, time, variant)
 	return accepted
+
+
+## Announces that the network game screen is loaded. The board remains hidden
+## until the peer reports the same state.
+func mark_network_loaded() -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"mark_network_loaded")
+
+
+## Snapshot for a screen that attaches after the peer_loaded signal.
+func network_peer_loaded() -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"network_peer_loaded")
 
 
 ## Publishes the host-owned setup preview to the connected guest.

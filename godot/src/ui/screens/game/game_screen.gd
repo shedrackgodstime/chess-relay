@@ -80,6 +80,12 @@ func _ready() -> void:
 	_sync_bridge_snapshot()
 	if _is_multiplayer and _bridge.fen().is_empty():
 		_header.set_center_text("Waiting for opponent...")
+	if _is_multiplayer:
+		_board.visible = false
+		_header.set_center_text("Waiting for opponent to load...")
+		_bridge.mark_network_loaded()
+		if _bridge.network_peer_loaded():
+			_reveal_network_board()
 
 
 func _update_header_visibility() -> void:
@@ -177,11 +183,22 @@ func _connect_bridge_signals() -> void:
 	_bridge.bridge_error.connect(_on_bridge_error)
 	_bridge.network_error.connect(_on_net_error)
 	_bridge.peer_disconnected.connect(_on_peer_disconnected)
+	_bridge.peer_loaded.connect(_on_peer_loaded)
 
 
 func _on_core_game_started() -> void:
 	_sync_board_perspective()
 	_rebuild_position()
+	_header.set_center_text("Game started · %s to move" % _bridge.turn().capitalize())
+
+
+func _on_peer_loaded() -> void:
+	if _is_multiplayer:
+		_reveal_network_board()
+
+
+func _reveal_network_board() -> void:
+	_board.visible = true
 	_header.set_center_text("Game started · %s to move" % _bridge.turn().capitalize())
 
 

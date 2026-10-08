@@ -15,9 +15,9 @@ controls or require the hub to know how a connection is established.
 ```text
 Multiplayer hub
 ├── Create invite -> show code and wait -> transport connected -> Game Setup
-│   └── host live setup -> host starts -> guest auto-acknowledges -> game -> board
+│   └── host live setup -> host starts -> guest auto-acknowledges -> both load -> board
 ├── Join by code -> resolving/connecting -> failed/retry or connected -> Setup
-│   └── host setup snapshot -> wait for host start -> game -> board
+│   └── host setup snapshot -> wait for host start -> both load -> board
 ├── Invite listed player -> wait -> declined/retry or accepted -> Game Setup
 └── Receive invite -> accept -> Game Setup or decline -> return to hub
 

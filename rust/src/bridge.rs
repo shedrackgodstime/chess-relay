@@ -49,6 +49,7 @@ struct CoreState {
     net: Option<NetState>,
     net_notes: VecDeque<NetNote>,
     network_setup: Option<NetworkSetup>,
+    network_peer_loaded: bool,
     ai: Option<AiState>,
     /// Bumped on every host/join/leave so late tasks from a retired
     /// network go silent instead of emitting stale signals.
@@ -103,6 +104,7 @@ enum NetCmd {
         time: String,
         variant: String,
     },
+    Loaded,
     HostStarted {
         genesis: Box<LogEntry>,
         side: String,
@@ -129,6 +131,7 @@ enum NetNote {
         time: String,
         variant: String,
     },
+    PeerLoaded,
     /// Slice C pushes this when its driver sees the peer go away.
     #[allow(dead_code)]
     Disconnected,
@@ -179,6 +182,8 @@ impl ChessRelayBridge {
     fn peer_connected(peer: GString);
     #[signal]
     fn peer_disconnected();
+    #[signal]
+    fn peer_loaded();
     #[signal]
     fn network_error(message: GString);
 
@@ -573,6 +578,27 @@ impl ChessRelayBridge {
             });
         }
         true
+    }
+
+    /// Announces that this device's network game screen is loaded. The board
+    /// remains hidden until the peer sends the same fact.
+    #[func]
+    fn mark_network_loaded(&mut self) -> bool {
+        let Some(tx) = self.lock().net.as_ref().map(|net| net.cmd_tx.clone()) else {
+            self.emit_error("no network active");
+            return false;
+        };
+        if tx.send(NetCmd::Loaded).is_err() {
+            self.emit_error("network connection closed");
+            return false;
+        }
+        true
+    }
+
+    /// Snapshot for screens that subscribe after the peer-loaded signal.
+    #[func]
+    fn network_peer_loaded(&self) -> bool {
+        self.lock().network_peer_loaded
     }
 
     /// Publishes the host's current lobby choices. This is metadata only:
@@ -1039,6 +1065,9 @@ impl INode for ChessRelayBridge {
                 NetNote::Disconnected => {
                     self.signals().peer_disconnected().emit();
                 }
+                NetNote::PeerLoaded => {
+                    self.signals().peer_loaded().emit();
+                }
                 NetNote::Error(message) => {
                     let message = GString::from(message);
                     self.signals().network_error().emit(&message);
@@ -1432,6 +1461,7 @@ fn start_network(
     core.me = me;
     core.remote_peer = None;
     core.network_setup = None;
+    core.network_peer_loaded = false;
     core.recent_peers_path = Some(recent_path);
     core.app = Some(App::with_local(secret));
     core.outbox.clear();
@@ -1609,6 +1639,12 @@ async fn drive_session<C: Connection>(
                 match cmd {
                     Some(NetCmd::UpdateSetup { side, time, variant }) => {
                         if !host_role || conn.send(&Msg::Setup { side, time, variant }).await.is_err() {
+                            note(&core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
+                    Some(NetCmd::Loaded) => {
+                        if conn.send(&Msg::Loaded).await.is_err() {
                             note(&core, generation, NetNote::Disconnected);
                             return;
                         }
@@ -1921,6 +1957,17 @@ async fn on_msg<C: Connection>(
                 );
                 return Err(());
             }
+            Ok(())
+        }
+        Msg::Loaded => {
+            if !is_current(core, generation) {
+                return Err(());
+            }
+            {
+                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.network_peer_loaded = true;
+            }
+            note(core, generation, NetNote::PeerLoaded);
             Ok(())
         }
         Msg::Setup {
