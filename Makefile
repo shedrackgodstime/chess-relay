@@ -64,10 +64,10 @@ godot/bin/libchess_relay_core.so: $(RUST_SRCS)
 	touch godot/bin/libchess_relay_core.so
 
 check:
-	cargo fmt --manifest-path rust/Cargo.toml -- --check
-	cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
-	cargo test --manifest-path rust/Cargo.toml
-	RUSTDOCFLAGS="-D warnings" cargo doc --manifest-path rust/Cargo.toml --no-deps
+	cargo fmt --manifest-path rust/Cargo.toml --check
+	cargo clippy --manifest-path rust/Cargo.toml --locked --all-targets -- -D warnings
+	cargo test --manifest-path rust/Cargo.toml --locked
+	RUSTDOCFLAGS="-D warnings" cargo doc --manifest-path rust/Cargo.toml --locked --no-deps
 	GODOT_BIN=$(GODOT) bash godot/tests/run_all_checks.sh
 
 android: .build/android-debug.stamp

@@ -96,6 +96,23 @@ section "warning drift"
 python3 "$root/tools/check_warning_drift.py" "$GODOT_BIN" || failed=1
 
 # ---------------------------------------------------------------------------
+# Gate 2b: no committed diagnostic scaffolding.
+#
+# Session prints (TEMP-DIAG, NET-TRACE, DBG markers) run on the render
+# thread in shipped builds. A debug print with no gate is a print that
+# stays; this grep is the gate. Plain print()/println! in CLI bins and
+# test PASS lines are outside this pattern on purpose.
+# ---------------------------------------------------------------------------
+section "diagnostic markers"
+if grep -rE 'TEMP-DIAG|NET-TRACE|DBG ' "$root/src" "$root/../rust/src" 2>/dev/null; then
+  printf 'FAIL diagnostic markers committed (see lines above)\n' >>"$findings" || true
+  printf 'FAIL diagnostic markers committed\n'
+  failed=1
+else
+  echo "no committed diagnostic markers"
+fi
+
+# ---------------------------------------------------------------------------
 # Gate 3: every suite, each alone, stderr gated.
 #
 # Discovered, not listed: nobody edits a list to add a test, so a new suite

@@ -131,10 +131,10 @@ async fn main() -> anyhow::Result<()> {
         chess_relay_core::publish_loop(code_clone, ticket_clone).await;
     });
 
-    println!("waiting for guest (300s)...");
-    let mut conn = tokio::time::timeout(Duration::from_secs(300), endpoint.accept())
-        .await
-        .map_err(|_| anyhow::anyhow!("no guest arrived in 300s"))??;
+    // No timeout: a human needs as long as a human needs. The lobby
+    // stays open until a guest arrives or the host is killed.
+    println!("waiting for guest (no timeout)...");
+    let mut conn = endpoint.accept().await?;
     let guest_peer = PeerId::from_bytes(conn.peer_id_bytes());
     println!("guest arrived: {guest_peer}");
 
@@ -144,8 +144,7 @@ async fn main() -> anyhow::Result<()> {
         ticket: ticket.clone(),
     })
     .await?;
-    let Msg::LobbyHello { version, .. } = recv(&mut conn, Duration::from_secs(120)).await?
-    else {
+    let Msg::LobbyHello { version, .. } = recv(&mut conn, Duration::from_secs(120)).await? else {
         anyhow::bail!("expected LobbyHello from guest");
     };
     if version != PROTOCOL_VERSION {
@@ -167,7 +166,11 @@ async fn main() -> anyhow::Result<()> {
     .await?;
     conn.send(&Msg::Setup {
         revision: 1,
-        side: if play_black { "Black".into() } else { "White".into() },
+        side: if play_black {
+            "Black".into()
+        } else {
+            "White".into()
+        },
         time: "-".into(),
         variant: "Standard".into(),
     })
@@ -218,6 +221,11 @@ async fn main() -> anyhow::Result<()> {
         conn.send(&Msg::Ready { peer: host_peer }).await?;
     }
     conn.send(&Msg::Started).await?;
+    // The Godot game screen keeps the board hidden until BOTH sides have
+    // sent Loaded (see game_screen.gd _reveal_network_board). The old
+    // scripted CLI never sent it, so the guest board stayed invisible.
+    conn.send(&Msg::Loaded).await?;
+    let mut loaded_sent = true;
     println!("both ready — game started. Type UCI moves (e2e4) or /quit.");
 
     // Stdin reader thread -> channel (avoids needing tokio io-std feature).
@@ -244,7 +252,9 @@ async fn main() -> anyhow::Result<()> {
     loop {
         // Check terminal outcome.
         let outcome_done = match app.query(&Query::GameState).unwrap() {
-            QueryResult::GameState(v) => !matches!(v.outcome, chess_relay_core::chess_core::Outcome::Ongoing),
+            QueryResult::GameState(v) => {
+                !matches!(v.outcome, chess_relay_core::chess_core::Outcome::Ongoing)
+            }
             _ => false,
         };
         if outcome_done {
@@ -266,10 +276,7 @@ async fn main() -> anyhow::Result<()> {
                     chess_relay_core::chess_core::Color::Black
                 };
                 v.side_to_move == my_color
-                    && matches!(
-                        v.outcome,
-                        chess_relay_core::chess_core::Outcome::Ongoing
-                    )
+                    && matches!(v.outcome, chess_relay_core::chess_core::Outcome::Ongoing)
             }
             _ => false,
         };
@@ -355,7 +362,13 @@ async fn main() -> anyhow::Result<()> {
                         let _ = app.handle(&Command::NotePeerReady { peer });
                         println!("(guest ready ping: {peer})");
                     }
-                    Msg::Loaded => println!("(guest board loaded)"),
+                    Msg::Loaded => {
+                        println!("(guest board loaded)");
+                        if !loaded_sent {
+                            conn.send(&Msg::Loaded).await?;
+                            loaded_sent = true;
+                        }
+                    }
                     Msg::Leave => { println!("guest left the game"); break; }
                     Msg::Done => { println!("guest sent Done"); break; }
                     Msg::Setup { side, time, variant, .. } => {

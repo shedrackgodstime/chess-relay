@@ -30,7 +30,10 @@ were fixed, which is itself a data point for strict setup validation.
 
 ## Known divergence (intentional, documented in `game.rs`)
 
-Two knights vs bare king: we declare a draw (casual simplification,
+~~Two knights vs bare king: we declare a draw (casual simplification,
 matches the GDScript prototype); FIDE and shakmaty play on (a helpmate
-exists). Everything else — including same-colour bishop endings,
-fifty-move timing, and threefold detection timing — agrees exactly.
+exists).~~ **Closed 2026-10-09:** the two-knight simplification was removed
+as a FIDE error (mate achievable with help means the position is not dead).
+The engine now plays on, agreeing with shakmaty; `dead_positions_draw`
+pins KNNK as `Ongoing`. Everything else — including same-colour bishop
+endings, fifty-move timing, and threefold detection timing — agrees exactly.

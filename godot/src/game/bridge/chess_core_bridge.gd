@@ -33,6 +33,8 @@ signal game_started
 signal ready_changed(peer: String)
 ## Emitted when the session ended. `reason` is a human-readable string.
 signal game_ended(reason: String)
+## Structured terminal fact. Names and winner ownership come from Rust.
+signal game_result(result: Dictionary)
 ## Emitted when a draw is offered. `seq` is the offer entry sequence.
 signal draw_offered(by: String, seq: int)
 ## Emitted when the open offer is answered.
@@ -94,6 +96,7 @@ func _ready() -> void:
 	_core.connect(&"game_started", func() -> void: game_started.emit())
 	_core.connect(&"ready_changed", func(peer: String) -> void: ready_changed.emit(peer))
 	_core.connect(&"game_ended", func(reason: String) -> void: game_ended.emit(reason))
+	_core.connect(&"game_result", func(result: Dictionary) -> void: game_result.emit(result))
 	_core.connect(&"draw_offered", func(by: String, seq: int) -> void: draw_offered.emit(by, seq))
 	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
@@ -260,6 +263,14 @@ func turn() -> String:
 	return str(_core.call(&"turn"))
 
 
+## En-passant target square from Rust, or "" when none. Capture markers
+## read this, never FEN field 4.
+func en_passant_square() -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"en_passant_square"))
+
+
 ## Target squares for legal moves leaving `square` (for example "e2").
 ##
 ## Empty when the square is unparseable, vacant, or play has not started.
@@ -398,11 +409,35 @@ func my_peer() -> String:
 	return str(_core.call(&"my_peer"))
 
 
+func my_player_name() -> String:
+	if _core == null:
+		return "Player"
+	return str(_core.call(&"my_player_name"))
+
+
+func player_name(peer: String) -> String:
+	if _core == null:
+		return "Player"
+	return str(_core.call(&"player_name", peer))
+
+
+func set_player_name(name: String, identity_path: String) -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"set_player_name", name, identity_path)
+
+
 ## Side of the given peer ("white", "black", or "" if unknown).
 func side_of_peer(peer: String) -> String:
 	if _core == null:
 		return ""
 	return str(_core.call(&"side_of_peer", peer))
+
+
+func peer_for_side(side: String) -> String:
+	if _core == null:
+		return ""
+	return str(_core.call(&"peer_for_side", side))
 
 
 ## Hosts a networked game using the persistent installation identity. Returns

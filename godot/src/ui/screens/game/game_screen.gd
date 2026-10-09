@@ -96,7 +96,12 @@ func _update_clock_strip() -> void:
 	var local_side := _bridge.my_side() if _bridge != null else _ai_side.to_lower()
 	var local_is_black := local_side == "black"
 	var local_active := "black" if local_is_black else "white"
-	_opponent_clock.text = "%s  %s" % [_opponent_name.to_upper(), MOCK_CLOCK_TEXT]
+	var opponent_label := _opponent_name
+	if _is_multiplayer and _bridge != null:
+		var opponent_peer := _opponent_peer()
+		if not opponent_peer.is_empty():
+			opponent_label = _bridge.player_name(opponent_peer)
+	_opponent_clock.text = "%s  %s" % [opponent_label.to_upper(), MOCK_CLOCK_TEXT]
 	_player_clock.text = "%s  YOU" % MOCK_CLOCK_TEXT
 	var active_color := Color(1.0, 0.94, 0.82, 1.0)
 	var idle_color := Color(0.72, 0.66, 0.58, 1.0)
@@ -108,10 +113,10 @@ func _update_clock_strip() -> void:
 		"font_color", player_color)
 
 
-## SPIKE-ONLY: the core behind this bridge plays both sides from committed
-## spike keys (see rust/src/bridge.rs). Every local game is a forged
-## opponent until the transport path replaces it in Phase 7. Do not build
-## networked features on local play.
+## Local games share one installation identity: the core admits a derived
+## peer role for the second seat (see rust/src/bridge.rs). Every local game
+## is therefore hotseat on one identity until the transport path replaces
+## the second seat. Do not build networked features on local play.
 func _start_bridge() -> void:
 	if _bridge == null:
 		_bridge = ChessCoreBridge.new()
@@ -128,6 +133,15 @@ func _start_bridge() -> void:
 				_abs(IDENTITY_FILE), _abs(SAVE_FILE), _fresh_start)
 		if restored:
 			_header.set_center_text("Game restored")
+
+
+func _opponent_peer() -> String:
+	var local_side := _bridge.my_side()
+	if local_side == "white":
+		return _bridge.peer_for_side("black")
+	if local_side == "black":
+		return _bridge.peer_for_side("white")
+	return ""
 
 
 ## Reconstructs presentation from the current core snapshot after wiring.
@@ -151,7 +165,7 @@ func _sync_bridge_snapshot() -> void:
 func _connect_bridge_signals() -> void:
 	_bridge.move_applied.connect(_on_core_move_applied)
 	_bridge.game_started.connect(_on_core_game_started)
-	_bridge.game_ended.connect(_on_core_game_ended)
+	_bridge.game_result.connect(_on_core_game_result)
 	_bridge.draw_offered.connect(_on_core_draw_offered)
 	_bridge.draw_answered.connect(_on_core_draw_answered)
 	_bridge.bridge_error.connect(_on_bridge_error)
@@ -194,7 +208,7 @@ func _sync_board_perspective() -> void:
 func _on_peer_disconnected() -> void:
 	_stop_game_interaction()
 	_header.set_center_text("Opponent disconnected")
-	_show_game_over_card("Connection lost", false)
+	_show_game_over_card({"reason": "connection_lost"}, false)
 
 
 func _on_peer_left() -> void:
@@ -202,7 +216,7 @@ func _on_peer_left() -> void:
 		return
 	_stop_game_interaction()
 	_header.set_center_text("Opponent left the game")
-	_show_game_over_card("Opponent left", false)
+	_show_game_over_card({"reason": "opponent_left"}, false)
 
 
 func _on_net_reconnecting() -> void:
@@ -411,13 +425,11 @@ func _capture_squares(from_square: String, targets: Array[String]) -> Array[Stri
 	var captures: Array[String] = []
 	if _bridge == null:
 		return captures
-	var fields := _bridge.fen().split(" ")
-	if fields.size() < 4:
-		return captures
+	var en_passant := _bridge.en_passant_square()
 	var occupants := _observed_position_sides()
 	var mover_side := str(occupants.get(from_square, ""))
 	for target in targets:
-		if target == fields[3] or str(occupants.get(target, "")) != "" and str(occupants.get(target, "")) != mover_side:
+		if (not en_passant.is_empty() and target == en_passant) or str(occupants.get(target, "")) != "" and str(occupants.get(target, "")) != mover_side:
 			if not target in captures:
 				captures.append(target)
 	return captures
@@ -476,11 +488,11 @@ func _save_if_local() -> void:
 		_bridge.save_game()
 
 
-func _on_core_game_ended(reason: String) -> void:
+func _on_core_game_result(result: Dictionary) -> void:
 	_stop_game_interaction()
 	_save_if_local()
-	_header.set_center_text(_end_text(reason))
-	_show_game_over_card(reason)
+	_header.set_center_text(_result_title(result))
+	_show_game_over_card(result)
 
 
 ## Terminal network/game states share one interaction barrier. Keeping the
@@ -503,7 +515,7 @@ func _stop_game_interaction() -> void:
 	_castle_targets.clear()
 
 
-func _show_game_over_card(reason: String, allow_rematch: bool = true) -> void:
+func _show_game_over_card(result: Dictionary, allow_rematch: bool = true) -> void:
 	_close_game_over_card()
 	_game_over_backdrop = Panel.new()
 	_game_over_backdrop.name = "GameOverBackdrop"
@@ -528,12 +540,12 @@ func _show_game_over_card(reason: String, allow_rematch: bool = true) -> void:
 	content.add_theme_constant_override("separation", 12)
 	_game_over_card.add_child(content)
 	var title := Label.new()
-	title.text = _result_title(reason)
+	title.text = _result_title(result)
 	title.theme_type_variation = &"SetupHeadingText"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 	var subtitle := Label.new()
-	subtitle.text = _result_reason(reason)
+	subtitle.text = _result_reason(result)
 	subtitle.theme_type_variation = &"SetupStatusText"
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(subtitle)
@@ -614,59 +626,55 @@ func rematch_result_received(accepted: bool) -> void:
 	_header.set_center_text("Rematch accepted · setting up…")
 
 
-func _result_title(reason: String) -> String:
-	if reason == "Opponent left":
+func _result_title(result: Dictionary) -> String:
+	var reason := str(result.get("reason", "game_over"))
+	if reason == "opponent_left":
 		return "Opponent left"
-	if reason == "Connection lost":
+	if reason == "connection_lost":
 		return "Connection lost"
-	if "Checkmate" in reason:
-		return "Victory" if _player_won(reason) else "Defeat"
-	if "Draw" in reason:
+	if reason == "checkmate":
+		return "Checkmate · %s wins" % str(result.get("winner_side", "")).capitalize()
+	if reason == "resignation":
+		# AI games name the local outcome; shared-board games name the
+		# winning side, since both seats are local to someone.
+		if _is_ai:
+			return "Resignation · Victory" if result.get("local_won", false) == true else "Resignation · Defeat"
+		var side := str(result.get("winner_side", ""))
+		if side.is_empty():
+			return "Resignation · Victory" if result.get("local_won", false) == true else "Resignation · Defeat"
+		return "Resignation · %s wins" % side.capitalize()
+	if reason == "agreed_draw":
+		return "Draw agreed"
+	if reason == "abort":
+		return "Game aborted"
+	if reason == "draw" or reason == "stalemate":
 		return "Draw"
-	if "Resignation" in reason:
-		return "Victory" if _player_won(reason) else "Defeat"
 	return "Game over"
 
 
-func _result_reason(reason: String) -> String:
-	if reason == "Opponent left":
+func _result_reason(result: Dictionary) -> String:
+	var reason := str(result.get("reason", "game_over"))
+	var winner := str(result.get("winner_name", ""))
+	var loser := str(result.get("loser_name", ""))
+	var actor := str(result.get("actor_name", ""))
+	if reason == "opponent_left":
 		return "The game ended because your opponent left."
-	if reason == "Connection lost":
+	if reason == "connection_lost":
 		return "The connection could not be restored."
-	if "Checkmate" in reason:
-		return "by Checkmate · %s" % _end_text(reason)
-	if "Resignation" in reason:
-		return "by Resignation"
-	if "Draw agreed" in reason:
-		return "by Agreement"
-	return "by %s" % _end_text(reason).to_lower()
-
-
-func _player_won(reason: String) -> bool:
-	var side := _bridge.my_side().capitalize()
-	return side in reason
-
-
-## Presentation wording for a finished session; the fact itself is Rust's.
-func _end_text(reason: String) -> String:
-	if "Checkmate" in reason:
-		if "White" in reason:
-			return "Checkmate · White wins"
-		return "Checkmate · Black wins"
-	if "Stalemate" in reason:
-		return "Draw · stalemate"
-	if "FiftyMove" in reason:
-		return "Draw · fifty moves"
-	if "Threefold" in reason:
-		return "Draw · threefold repetition"
-	if "InsufficientMaterial" in reason:
-		return "Draw · insufficient material"
-	if "AgreedDraw" in reason:
-		return "Draw agreed"
-	if "Resignation" in reason:
-		return "Resignation · game over"
-	if "Abort" in reason:
-		return "Game aborted"
+	if reason == "resignation":
+		return "%s resigned · %s wins" % [actor, winner]
+	if reason == "checkmate":
+		return "%s wins by checkmate" % winner
+	if reason == "agreed_draw":
+		return "Draw by agreement"
+	if reason == "abort":
+		return "%s aborted the game" % actor if not actor.is_empty() else "Game aborted"
+	if reason == "stalemate":
+		return "Draw by stalemate"
+	if reason == "draw":
+		return "Draw by chess rules"
+	if not loser.is_empty():
+		return "%s" % loser
 	return "Game over"
 
 

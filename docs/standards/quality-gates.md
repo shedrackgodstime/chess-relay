@@ -523,9 +523,11 @@ on it.
 - **Audit finding 4** — closed locally. The local spike still supports two roles,
   but no committed shared seeds remain; fresh and persisted role identities are
   derived per installation. This does not substitute for live transport proof.
-- **Audit finding 5** — `protocol.rs` is an empty placeholder, the tests README
-  has been corrected but the handover and `foundation_tightening.md` still
-  describe `treat_warnings_as_errors` as a live setting.
+- **Audit finding 5** — `protocol.rs` is now the live wire protocol
+  (version-first handshake, postcard codec, `ProtocolError`), not a
+  placeholder; the tests README has been corrected but the handover and
+  `foundation_tightening.md` still describe `treat_warnings_as_errors` as a
+  live setting.
 
 **What I am not claiming.** That 1383 findings meant 1383 bugs. Tier 1 was ~317
 and they were the class that produces real defects; three were. Tier 2 is

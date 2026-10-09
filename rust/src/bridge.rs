@@ -17,7 +17,7 @@ use crate::ai::{Adaptation, Difficulty, LocalAiEngine, Personality, SearchContro
 use crate::app::{App, Command, Event, Query, QueryResult};
 use crate::chess_core::{Board, Color as ChessColor, Move, Square};
 use crate::protocol::{Msg, PROTOCOL_VERSION};
-use crate::session::{LogEntry, LogStore, PeerId, RecentPeerStore};
+use crate::session::{FinishReason, LogEntry, LogStore, PeerId, RecentPeerStore, SessionState};
 use crate::transport::{Connection, Endpoint as _, TransportError, TransportQuality};
 use crate::transport_iroh::ticket_peer_id;
 use ed25519_dalek::{Signer, SigningKey};
@@ -43,8 +43,16 @@ struct CoreState {
     me: PeerId,
     /// Connected remote peer, if any.
     remote_peer: Option<PeerId>,
+    /// Peer whose invitation was accepted into a game session on this
+    /// network. A redial from this peer skips the invite handshake and
+    /// resumes the game session directly (AUDIT-INVITE-RECONNECT-001).
+    /// Cleared on every network start; the generation gate retires
+    /// in-flight users.
+    game_peer: Option<PeerId>,
     offer_by: Option<PeerId>,
     save_path: Option<String>,
+    profile_path: Option<std::path::PathBuf>,
+    display_name: Option<String>,
     recent_peers_path: Option<std::path::PathBuf>,
     outbox: VecDeque<Event>,
     net: Option<NetState>,
@@ -273,6 +281,15 @@ impl ChessRelayBridge {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+
+    fn load_profile(&self, identity_path: &str) -> Result<(), String> {
+        let path = profile_path(identity_path);
+        let name = load_profile_name(&path)?;
+        let mut core = self.lock();
+        core.profile_path = Some(path);
+        core.display_name = name;
+        Ok(())
+    }
 }
 
 #[godot_api]
@@ -295,6 +312,16 @@ impl ChessRelayBridge {
     fn draw_answered(by: GString, accept: bool);
     #[signal]
     fn game_ended(reason: GString);
+    /// Structured terminal fact, emitted alongside `game_ended`. Keys:
+    /// `reason` (resignation/checkmate/agreed_draw/draw/stalemate/abort/
+    /// ongoing), `actor/winner/loser_peer` + `actor/winner/loser_name`,
+    /// `winner_side`/`loser_side` (white/black/""), `local_peer`,
+    /// `local_won` (bool), `white_name`, `black_name`. Names resolve
+    /// through the profile authority; identity through peer IDs. Terminal
+    /// and replayable as a snapshot: a late subscriber reads the same
+    /// values from the finished session.
+    #[signal]
+    fn game_result(result: Dictionary<GString, Variant>);
     #[signal]
     fn bridge_error(message: GString);
     #[signal]
@@ -373,6 +400,10 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if let Err(err) = self.load_profile(&identity_path) {
+            self.emit_error(&err);
+            return false;
+        }
         if fresh && let Err(err) = clear_saved_game(&save_path) {
             self.emit_error(&err.to_string());
             return false;
@@ -451,6 +482,10 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if let Err(err) = self.load_profile(&identity_path) {
+            self.emit_error(&err);
+            return false;
+        }
         if fresh && let Err(err) = clear_saved_game(&save_path) {
             self.emit_error(&err.to_string());
             return false;
@@ -536,6 +571,10 @@ impl ChessRelayBridge {
                 return GString::new();
             }
         };
+        if let Err(err) = self.load_profile(&identity_path) {
+            self.emit_error(&err);
+            return GString::new();
+        }
         let old = {
             let mut core = self.lock();
             begin_retire(&mut core)
@@ -620,6 +659,10 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if let Err(err) = self.load_profile(&identity_path) {
+            self.emit_error(&err);
+            return false;
+        }
         let old = {
             let mut core = self.lock();
             begin_retire(&mut core)
@@ -662,6 +705,10 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if let Err(err) = self.load_profile(&identity_path) {
+            self.emit_error(&err);
+            return false;
+        }
         let old = {
             let mut core = self.lock();
             begin_retire(&mut core)
@@ -708,6 +755,10 @@ impl ChessRelayBridge {
                 return false;
             }
         };
+        if let Err(err) = self.load_profile(&identity_path) {
+            self.emit_error(&err);
+            return false;
+        }
         let old = {
             let mut core = self.lock();
             begin_retire(&mut core)
@@ -776,10 +827,13 @@ impl ChessRelayBridge {
     fn request_rematch(&mut self) -> bool {
         let (tx, rematch_id) = {
             let mut core = self.lock();
-            let Some(tx) = core.net.as_ref().map(|net| net.cmd_tx.clone()) else {
-                drop(core);
-                self.emit_error("no network active");
-                return false;
+            let tx = match can_request_rematch(&core) {
+                Ok(tx) => tx,
+                Err(message) => {
+                    drop(core);
+                    self.emit_error(message);
+                    return false;
+                }
             };
             core.next_rematch_id = core.next_rematch_id.wrapping_add(1).max(1);
             let rematch_id = core.next_rematch_id;
@@ -803,21 +857,21 @@ impl ChessRelayBridge {
         };
         let response = {
             let mut core = self.lock();
-            match core.pending_rematch.as_ref().copied() {
-                None => Err("rematch is no longer pending"),
-                Some((pending_id, _)) if pending_id != rematch_id => {
-                    Err("rematch identifier mismatch")
+            if let Some(message) = rematch_response_error(&core, rematch_id, accepted) {
+                Err(message)
+            } else if let (Some((_, peer)), Some(tx)) = (
+                core.pending_rematch,
+                core.net.as_ref().map(|net| net.cmd_tx.clone()),
+            ) {
+                core.pending_rematch = None;
+                if accepted {
+                    reset_for_rematch(&mut core, false);
                 }
-                Some((_, peer)) => match core.net.as_ref().map(|net| net.cmd_tx.clone()) {
-                    None => Err("no network active"),
-                    Some(tx) => {
-                        core.pending_rematch = None;
-                        if accepted {
-                            reset_for_rematch(&mut core, false);
-                        }
-                        Ok((tx, peer))
-                    }
-                },
+                Ok((tx, peer))
+            } else {
+                // Unreachable: the predicate above already required a
+                // matching pending request and a live network.
+                Err("rematch is no longer pending")
             }
         };
         let (tx, peer) = match response {
@@ -1278,6 +1332,22 @@ impl ChessRelayBridge {
         result
     }
 
+    /// En-passant target square (e.g. `"e3"`) for capture decoration, or
+    /// `""` when none exists. Same precedent as `position_pieces`: parsed
+    /// from our own canonical FEN inside Rust, never in GDScript
+    /// (AUDIT-FEN-001).
+    #[func]
+    fn en_passant_square(&self) -> GString {
+        let fen = self.fen().to_string();
+        let Ok(board) = Board::from_fen(&fen) else {
+            return GString::new();
+        };
+        match board.en_passant() {
+            Some(square) => GString::from(square.to_string().as_str()),
+            None => GString::new(),
+        }
+    }
+
     /// Side to move as `"white"`, `"black"`, or `""` before play starts.
     #[func]
     fn turn(&self) -> GString {
@@ -1449,10 +1519,76 @@ impl ChessRelayBridge {
         }
     }
 
+    /// Peer identity assigned to a side, or empty before a session exists.
+    #[func]
+    fn peer_for_side(&self, side: GString) -> GString {
+        let core = self.lock();
+        let Some((white, black)) = sides(&core) else {
+            return GString::new();
+        };
+        match side.to_string().to_ascii_lowercase().as_str() {
+            "white" => GString::from(&white.to_string()),
+            "black" => GString::from(&black.to_string()),
+            _ => GString::new(),
+        }
+    }
+
     /// Local peer ID string.
     #[func]
     fn my_peer(&self) -> GString {
         GString::from(&self.lock().me.to_string())
+    }
+
+    /// The local profile name, or its deterministic identity-derived fallback.
+    #[func]
+    fn my_player_name(&self) -> GString {
+        let core = self.lock();
+        GString::from(&player_name(&core, core.me))
+    }
+
+    /// The authoritative display name for a participant identity.
+    #[func]
+    fn player_name(&self, peer: GString) -> GString {
+        let core = self.lock();
+        let wanted = peer.to_string();
+        let known = [core.me, core.remote_peer.unwrap_or_default()];
+        for candidate in known {
+            if candidate.to_string() == wanted {
+                return GString::from(&player_name(&core, candidate));
+            }
+        }
+        if core
+            .ai
+            .as_ref()
+            .is_some_and(|ai| ai.peer.to_string() == wanted)
+        {
+            return GString::from("Chess AI");
+        }
+        GString::from(&format!("Player {wanted}"))
+    }
+
+    /// Updates and persists the local display name. Empty text restores the
+    /// deterministic fallback without changing the cryptographic identity.
+    /// Takes the identity path so a name set before any session still
+    /// persists; the file sits next to the identity key.
+    #[func]
+    fn set_player_name(&mut self, name: GString, identity_path: GString) -> bool {
+        let name = match clean_player_name(&name.to_string()) {
+            Ok(name) => name,
+            Err(err) => {
+                self.emit_error(&err);
+                return false;
+            }
+        };
+        let path = profile_path(&identity_path.to_string());
+        if let Err(err) = save_profile_name(&path, name.as_deref()) {
+            self.emit_error(&err);
+            return false;
+        }
+        let mut core = self.lock();
+        core.profile_path = Some(path);
+        core.display_name = name;
+        true
     }
 
     /// Target squares for legal moves departing `square` (e.g. `"e2"`).
@@ -1738,6 +1874,8 @@ impl ChessRelayBridge {
                 }
                 let reason = GString::from(&format!("{reason:?}"));
                 self.signals().game_ended().emit(&reason);
+                let result = result_snapshot(&self.lock());
+                self.signals().game_result().emit(&result);
             }
         }
     }
@@ -2037,6 +2175,7 @@ fn start_network(
     let generation = core.net_generation;
     core.me = me;
     core.remote_peer = None;
+    core.game_peer = None;
     core.presence.clear();
     core.pending_invite = None;
     core.remote_left = false;
@@ -2155,7 +2294,30 @@ async fn accept_task(
                 .await;
             }
             AcceptMode::Invite => {
-                drive_incoming_invite(&core, conn, local_ticket, &mut cmd_rx, generation).await;
+                // A redial from the peer whose invitation already became a
+                // game resumes that session: routing it back through the
+                // invite handshake would reject game messages as invalid
+                // (AUDIT-INVITE-RECONNECT-001).
+                if redial_resumes_game(&core, generation, guest) {
+                    note(&core, generation, NetNote::Connected(guest));
+                    drive_session(
+                        &core,
+                        conn,
+                        local_ticket,
+                        &mut cmd_rx,
+                        generation,
+                        false,
+                        false,
+                    )
+                    .await;
+                } else if drive_incoming_invite(&core, conn, local_ticket, &mut cmd_rx, generation)
+                    .await
+                {
+                    let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    if guard.net_generation == generation {
+                        guard.game_peer = Some(guest);
+                    }
+                }
             }
         }
         if remote_left(&core, generation) {
@@ -2170,13 +2332,15 @@ async fn accept_task(
 
 /// Handles one incoming invitation on the hub's presence endpoint. The
 /// connection remains open while Godot displays the Morgan invite card.
+/// Returns true when the invitation became a game session, so the accept
+/// loop can route that peer's redials straight back into it.
 async fn drive_incoming_invite(
     core: &Arc<Mutex<CoreState>>,
     mut conn: crate::IrohConnection,
     local_ticket: String,
     cmd_rx: &mut tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
     generation: u64,
-) {
+) -> bool {
     let peer = {
         let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
         guard.remote_peer
@@ -2187,7 +2351,7 @@ async fn drive_incoming_invite(
             generation,
             NetNote::Error("peer identity missing".to_string()),
         );
-        return;
+        return false;
     };
     if conn
         .send(&Msg::LobbyHello {
@@ -2197,7 +2361,7 @@ async fn drive_incoming_invite(
         .await
         .is_err()
     {
-        return;
+        return false;
     }
     let Ok(remote_hello) = conn.recv().await else {
         note(
@@ -2205,13 +2369,13 @@ async fn drive_incoming_invite(
             generation,
             NetNote::Error("invite handshake failed".to_string()),
         );
-        return;
+        return false;
     };
     if on_msg(core, &mut conn, remote_hello, generation, false)
         .await
         .is_err()
     {
-        return;
+        return false;
     }
     let invite = match conn.recv().await {
         Ok(Msg::InviteRequest { invite_id, sender }) if sender == peer => (invite_id, sender),
@@ -2221,9 +2385,9 @@ async fn drive_incoming_invite(
                 generation,
                 NetNote::Error("invalid invitation request".to_string()),
             );
-            return;
+            return false;
         }
-        Err(_) => return,
+        Err(_) => return false,
     };
     let (response_tx, response_rx) = tokio::sync::oneshot::channel();
     note(
@@ -2242,13 +2406,13 @@ async fn drive_incoming_invite(
                 let _ = conn.send(&Msg::Leave).await;
                 let _ = acknowledged.send(());
             }
-            return;
+            return false;
         }
         result = conn.recv() => {
             if result.is_err() {
-                return;
+                return false;
             }
-            return;
+            return false;
         }
     };
     if conn
@@ -2259,7 +2423,7 @@ async fn drive_incoming_invite(
         .await
         .is_err()
     {
-        return;
+        return false;
     }
     if !accepted {
         note(
@@ -2270,10 +2434,11 @@ async fn drive_incoming_invite(
                 peer,
             },
         );
-        return;
+        return false;
     }
     note(core, generation, NetNote::Connected(peer));
     drive_session(core, conn, local_ticket, cmd_rx, generation, false, false).await;
+    true
 }
 
 /// Dials a saved ticket and waits for the recipient's explicit response
@@ -2475,6 +2640,14 @@ async fn join_task(
     }
 }
 
+/// Routing for a presence-endpoint redial: true when this peer already
+/// turned an invitation into a game session on the live generation, so
+/// the accept loop resumes the session instead of re-handshaking.
+fn redial_resumes_game(core: &Arc<Mutex<CoreState>>, generation: u64, guest: PeerId) -> bool {
+    let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    guard.net_generation == generation && guard.game_peer == Some(guest)
+}
+
 /// True while `generation` is still the live network.
 fn is_current(core: &Arc<Mutex<CoreState>>, generation: u64) -> bool {
     core.lock()
@@ -2553,6 +2726,20 @@ fn note(core: &Arc<Mutex<CoreState>>, generation: u64, note: NetNote) {
             | NetNote::PeerOffline(_)
             | NetNote::IncomingRematch { .. }
             | NetNote::RematchResult { .. } => {}
+        }
+        // An unannounced transport loss ends reachability, not just the
+        // link: without this the recent-peer row keeps a stale online
+        // indicator until the next dial (AUDIT-PRESENCE-001). Reconnect
+        // success re-marks the peer online through PeerAddress.
+        // An unannounced transport loss ends reachability, not just the
+        // link: without this the recent-peer row keeps a stale online
+        // indicator until the next dial (AUDIT-PRESENCE-001). Reconnect
+        // success re-marks the peer online through PeerAddress.
+        if matches!(note, NetNote::Disconnected)
+            && let Some(peer) = guard.remote_peer
+        {
+            guard.presence.insert(peer, PeerPresence::Offline);
+            guard.net_notes.push_back(NetNote::PeerOffline(peer));
         }
         guard.net_notes.push_back(note);
     }
@@ -2889,19 +3076,37 @@ async fn on_msg<C: Connection>(
             Err(())
         }
         Msg::RematchRequest { rematch_id } => {
-            let peer = {
-                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-                let Some(peer) = guard.remote_peer else {
-                    note(
-                        core,
-                        generation,
-                        NetNote::Error("rematch peer identity missing".to_string()),
-                    );
-                    return Err(());
-                };
-                guard.pending_rematch = Some((rematch_id, peer));
-                peer
+            // Locks are scoped and dropped before any note(): note()
+            // locks the core itself, so holding a guard across it
+            // deadlocks the driver.
+            let remote = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.remote_peer
             };
+            let Some(peer) = remote else {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("rematch peer identity missing".to_string()),
+                );
+                return Err(());
+            };
+            let finished = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                session_is_finished(&guard)
+            };
+            if !finished {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("rematch requires a finished game".to_string()),
+                );
+                return Ok(());
+            }
+            {
+                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.pending_rematch = Some((rematch_id, peer));
+            }
             note(
                 core,
                 generation,
@@ -2919,11 +3124,16 @@ async fn on_msg<C: Connection>(
                     Err("rematch identifier mismatch")
                 } else if let Some(peer) = guard.remote_peer {
                     if accepted {
-                        reset_for_rematch(&mut guard, true);
+                        if !session_is_finished(&guard) {
+                            Err("rematch requires a finished game")
+                        } else {
+                            reset_for_rematch(&mut guard, true);
+                            Ok(peer)
+                        }
                     } else {
                         guard.outgoing_rematch = None;
+                        Ok(peer)
                     }
-                    Ok(peer)
                 } else {
                     Err("rematch peer identity missing")
                 }
@@ -3075,6 +3285,22 @@ async fn on_msg<C: Connection>(
             if !is_current(core, generation) {
                 return Err(());
             }
+            // Readiness is bound to the authenticated transport peer: the
+            // session already rejects strangers, but only this check stops a
+            // peer from marking the *other* side ready early
+            // (AUDIT-AUTH-001).
+            let remote = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.remote_peer
+            };
+            if Some(peer) != remote {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("readiness identity mismatch".to_string()),
+                );
+                return Err(());
+            }
             if apply(core, Command::NotePeerReady { peer }).is_err() {
                 note(
                     core,
@@ -3156,6 +3382,18 @@ async fn on_msg<C: Connection>(
             variant,
         } => {
             if !is_current(core, generation) {
+                return Err(());
+            }
+            // Setup is host-owned: a guest-originated snapshot is a
+            // protocol violation, not a lobby update (AUDIT-AUTH-001).
+            // Setup is host-owned: a guest-originated snapshot is a
+            // protocol violation, not a lobby update (AUDIT-AUTH-001).
+            if host_role {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("guest setup rejected".to_string()),
+                );
                 return Err(());
             }
             if variant != "Standard" {
@@ -3376,6 +3614,209 @@ fn sides(core: &CoreState) -> Option<(PeerId, PeerId)> {
         QueryResult::SessionState(view) => Some((view.white, view.black)),
         _ => None,
     }
+}
+
+fn profile_path(identity_path: &str) -> std::path::PathBuf {
+    std::path::Path::new(identity_path).with_extension("profile")
+}
+
+fn load_profile_name(path: &std::path::Path) -> Result<Option<String>, String> {
+    match std::fs::read_to_string(path) {
+        Ok(value) => {
+            clean_player_name(&value).map_err(|_| "saved player name is invalid".to_string())
+        }
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(format!("could not read player profile: {err}")),
+    }
+}
+
+fn save_profile_name(path: &std::path::Path, name: Option<&str>) -> Result<(), String> {
+    std::fs::write(path, name.unwrap_or_default())
+        .map_err(|err| format!("could not save player profile: {err}"))
+}
+
+fn fallback_player_name(peer: PeerId) -> String {
+    format!("Player {}", peer)
+}
+
+fn player_name(core: &CoreState, peer: PeerId) -> String {
+    if peer == core.me
+        && let Some(name) = core.display_name.as_deref()
+    {
+        return name.to_string();
+    }
+    if core.ai.as_ref().is_some_and(|ai| ai.peer == peer) {
+        return "Chess AI".to_string();
+    }
+    fallback_player_name(peer)
+}
+
+/// Pure terminal mapping: session facts to (reason, actor, winner, loser).
+/// Identity only, no names or Dictionary shaping: the live-game modal bug
+/// (a resignation showing Defeat to the winner) came from inferring the
+/// winner out of a display string instead of this mapping.
+fn terminal_outcome(
+    session: &crate::app::SessionStateView,
+) -> (&'static str, Option<PeerId>, Option<PeerId>, Option<PeerId>) {
+    match session.state {
+        SessionState::Finished(FinishReason::Resignation { by }) => (
+            "resignation",
+            Some(by),
+            Some(if by == session.white {
+                session.black
+            } else {
+                session.white
+            }),
+            Some(by),
+        ),
+        SessionState::Finished(FinishReason::Abort { by }) => ("abort", Some(by), None, None),
+        SessionState::Finished(FinishReason::AgreedDraw) => ("agreed_draw", None, None, None),
+        SessionState::Finished(FinishReason::Rules(outcome)) => match outcome {
+            crate::chess_core::Outcome::Checkmate { winner: side } => {
+                let winner = if side == ChessColor::White {
+                    session.white
+                } else {
+                    session.black
+                };
+                let loser = if winner == session.white {
+                    session.black
+                } else {
+                    session.white
+                };
+                ("checkmate", None, Some(winner), Some(loser))
+            }
+            crate::chess_core::Outcome::Stalemate => ("stalemate", None, None, None),
+            crate::chess_core::Outcome::Draw(_) => ("draw", None, None, None),
+            crate::chess_core::Outcome::Ongoing => ("ongoing", None, None, None),
+        },
+        _ => ("ongoing", None, None, None),
+    }
+}
+
+/// Shared display-name rule: trim, reject long or control-bearing text,
+/// fold empty to the deterministic fallback. One rule for saves and loads
+/// so a name the UI accepts can never fail to reload.
+fn clean_player_name(raw: &str) -> Result<Option<String>, String> {
+    let name = raw.trim().to_string();
+    if name.chars().count() > 24 || name.chars().any(char::is_control) {
+        return Err("player name must be 24 characters or fewer".to_string());
+    }
+    Ok((!name.is_empty()).then_some(name))
+}
+
+/// Whether the local application session reached a terminal state.
+/// Rematch may only be requested, accepted, or applied from there:
+/// resetting earlier would discard a live match (AUDIT-REMATCH-001).
+fn session_is_finished(core: &CoreState) -> bool {
+    core.app
+        .as_ref()
+        .and_then(|app| app.query(&Query::SessionState).ok())
+        .is_some_and(|result| {
+            matches!(
+                result,
+                QueryResult::SessionState(view)
+                    if matches!(view.state, SessionState::Finished(_))
+            )
+        })
+}
+
+/// Send-gate for a rematch request, extracted so the rule is unit
+/// testable without a Godot runtime: network must exist and the session
+/// must already be finished. Returns the command channel on success.
+fn can_request_rematch(
+    core: &CoreState,
+) -> Result<tokio::sync::mpsc::UnboundedSender<NetCmd>, &'static str> {
+    let Some(tx) = core.net.as_ref().map(|net| net.cmd_tx.clone()) else {
+        return Err("no network active");
+    };
+    if !session_is_finished(core) {
+        return Err("rematch is only available after the game ends");
+    }
+    Ok(tx)
+}
+
+/// Accept-gate for answering a rematch request, extracted for the same
+/// reason: the pending ID must match, the network must exist, and an
+/// acceptance requires a finished session.
+fn rematch_response_error(
+    core: &CoreState,
+    rematch_id: u64,
+    accepted: bool,
+) -> Option<&'static str> {
+    match core.pending_rematch {
+        None => Some("rematch is no longer pending"),
+        Some((pending_id, _)) if pending_id != rematch_id => Some("rematch identifier mismatch"),
+        Some(_) if core.net.is_none() => Some("no network active"),
+        Some(_) if accepted && !session_is_finished(core) => {
+            Some("rematch is only available after the game ends")
+        }
+        Some(_) => None,
+    }
+}
+
+fn result_snapshot(core: &CoreState) -> Dictionary<GString, Variant> {
+    let mut result = Dictionary::new();
+    let Some(app) = core.app.as_ref() else {
+        return result;
+    };
+    let Some(QueryResult::SessionState(session)) = app.query(&Query::SessionState).ok() else {
+        return result;
+    };
+    let (reason, actor, winner, loser) = terminal_outcome(&session);
+    result.set("reason", reason);
+    result.set(
+        "actor_peer",
+        actor.map_or_else(String::new, |peer| peer.to_string()),
+    );
+    result.set(
+        "actor_name",
+        actor.map_or_else(String::new, |peer| player_name(core, peer)),
+    );
+    result.set(
+        "winner_peer",
+        winner.map_or_else(String::new, |peer| peer.to_string()),
+    );
+    result.set(
+        "winner_name",
+        winner.map_or_else(String::new, |peer| player_name(core, peer)),
+    );
+    result.set(
+        "loser_peer",
+        loser.map_or_else(String::new, |peer| peer.to_string()),
+    );
+    result.set(
+        "loser_name",
+        loser.map_or_else(String::new, |peer| player_name(core, peer)),
+    );
+    result.set(
+        "winner_side",
+        winner
+            .map(|peer| {
+                if peer == session.white {
+                    "white"
+                } else {
+                    "black"
+                }
+            })
+            .unwrap_or_default(),
+    );
+    result.set(
+        "loser_side",
+        loser
+            .map(|peer| {
+                if peer == session.white {
+                    "white"
+                } else {
+                    "black"
+                }
+            })
+            .unwrap_or_default(),
+    );
+    result.set("local_peer", core.me.to_string());
+    result.set("local_won", winner == Some(core.me));
+    result.set("white_name", player_name(core, session.white));
+    result.set("black_name", player_name(core, session.black));
+    result
 }
 
 fn game_side(app: Option<&App>) -> Option<ChessColor> {
@@ -3695,7 +4136,53 @@ mod tests {
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
 
         // A rematch is a protocol exchange, not a local scene reset. The
-        // guest receives the request, accepts it, and both authenticated
+        // game must finish first: rematch from a live position is
+        // rejected, so the host resigns, the entry crosses on the wire,
+        // and both sides observe the terminal state before resetting.
+        {
+            let mut guard = host_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let app = guard.app.as_mut().expect("host session live");
+            let events = app
+                .handle(&Command::Resign { peer: host_peer })
+                .expect("host resignation legal mid-game");
+            let mut all = events;
+            all.extend(app.drain());
+            guard.outbox.extend(all);
+        }
+        host_tx.send(NetCmd::Flush).unwrap();
+        poll_until_named("both peers observe the terminal state", || {
+            let host_done = host_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .app
+                .as_ref()
+                .and_then(|app| app.query(&Query::SessionState).ok())
+                .is_some_and(|result| {
+                    matches!(
+                        result,
+                        QueryResult::SessionState(view)
+                            if matches!(view.state, SessionState::Finished(_))
+                    )
+                });
+            let guest_done = guest_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .app
+                .as_ref()
+                .and_then(|app| app.query(&Query::SessionState).ok())
+                .is_some_and(|result| {
+                    matches!(
+                        result,
+                        QueryResult::SessionState(view)
+                            if matches!(view.state, SessionState::Finished(_))
+                    )
+                });
+            host_done && guest_done
+        })
+        .await;
+        // The guest receives the request, accepts it, and both authenticated
         // peers enter a fresh setup generation with an empty move log.
         host_core
             .lock()
@@ -3778,6 +4265,14 @@ mod tests {
             let mut guard = guest_core.lock().unwrap();
             guard.me = guest_peer;
             guard.remote_peer = Some(host_peer);
+            // A finished session: play the real handshake, then resign, so
+            // rematch requests below are decided against a terminal state.
+            let (_host_app, guest_app, _, _) = playing_pair([31u8; 32], [32u8; 32]);
+            let mut guest_app = guest_app;
+            guest_app
+                .handle(&Command::Resign { peer: guest_peer })
+                .expect("guest resignation finishes");
+            guard.app = Some(guest_app);
         }
 
         let stale = on_msg(
@@ -3838,6 +4333,359 @@ mod tests {
             guest_core.lock().unwrap().pending_rematch,
             Some((8, host_peer)),
             "duplicate request must not create a different pending ID"
+        );
+    }
+
+    /// Drives two apps through the real handshake to a playing session:
+    /// host starts, guest joins from genesis, genesis is co-signed both
+    /// ways, both sides ready. Returns host app, guest app, host peer,
+    /// guest peer.
+    fn playing_pair(host_seed: [u8; 32], guest_seed: [u8; 32]) -> (App, App, PeerId, PeerId) {
+        let host_peer = peer_of(host_seed);
+        let guest_peer = peer_of(guest_seed);
+        let mut host_app = App::with_local(SigningKey::from_bytes(&host_seed));
+        host_app
+            .handle(&Command::StartGame {
+                white: host_peer,
+                black: guest_peer,
+            })
+            .expect("host session starts");
+        let genesis = match host_app.query(&Query::MoveLog).expect("move log readable") {
+            QueryResult::MoveLog(entries) => entries[0],
+            _ => unreachable!("move log query answers with entries"),
+        };
+        let mut guest_app = App::with_local(SigningKey::from_bytes(&guest_seed));
+        guest_app
+            .handle(&Command::JoinGame {
+                peer: guest_peer,
+                genesis: Box::new(genesis),
+            })
+            .expect("guest session joins");
+        let co_sig = match guest_app.query(&Query::MoveLog).expect("move log readable") {
+            QueryResult::MoveLog(entries) => entries[0].co_sig.expect("guest co-signs genesis"),
+            _ => unreachable!("move log query answers with entries"),
+        };
+        host_app
+            .handle(&Command::NotePeerJoined {
+                peer: guest_peer,
+                co_sig,
+            })
+            .expect("host notes guest arrival");
+        host_app
+            .handle(&Command::NotePeerReady { peer: guest_peer })
+            .expect("host notes guest readiness");
+        host_app
+            .handle(&Command::SetReady { peer: host_peer })
+            .expect("host readies");
+        guest_app
+            .handle(&Command::NotePeerReady { peer: host_peer })
+            .expect("guest notes host readiness");
+        guest_app
+            .handle(&Command::SetReady { peer: guest_peer })
+            .expect("guest readies");
+        (host_app, guest_app, host_peer, guest_peer)
+    }
+
+    /// A rematch request against a live game is ignored without storing
+    /// anything: only a finished session may reset (AUDIT-REMATCH-001).
+    #[tokio::test]
+    async fn rematch_request_requires_a_finished_game() {
+        let hub = MemoryTransport::new();
+        let mut host_ep = hub.endpoint();
+        let mut guest_ep = hub.endpoint();
+        let ticket = host_ep.ticket();
+        let _guest_conn = guest_ep.connect(&ticket).await.unwrap();
+        let mut host_conn = host_ep.accept().await.unwrap();
+        let (host_app, _guest_app, host_peer, guest_peer) = playing_pair([33u8; 32], [34u8; 32]);
+        let core = Arc::new(Mutex::new(CoreState::default()));
+        {
+            let mut guard = core.lock().unwrap();
+            guard.me = host_peer;
+            guard.remote_peer = Some(guest_peer);
+            guard.app = Some(host_app);
+        }
+
+        on_msg(
+            &core,
+            &mut host_conn,
+            Msg::RematchRequest { rematch_id: 3 },
+            0,
+            true,
+        )
+        .await
+        .expect("live-game rematch stays connected");
+        assert_eq!(
+            core.lock().unwrap().pending_rematch,
+            None,
+            "a live game must not store a rematch request"
+        );
+
+        {
+            let mut guard = core.lock().unwrap();
+            guard
+                .app
+                .as_mut()
+                .expect("session live")
+                .handle(&Command::Resign { peer: host_peer })
+                .expect("resignation finishes");
+        }
+        on_msg(
+            &core,
+            &mut host_conn,
+            Msg::RematchRequest { rematch_id: 4 },
+            0,
+            true,
+        )
+        .await
+        .expect("finished-game rematch is accepted");
+        assert_eq!(
+            core.lock().unwrap().pending_rematch,
+            Some((4, guest_peer)),
+            "a finished game stores the rematch request"
+        );
+    }
+
+    /// Forged readiness is rejected: only the authenticated transport peer
+    /// may mark itself ready (AUDIT-AUTH-001).
+    #[tokio::test]
+    async fn forged_readiness_is_rejected() {
+        let hub = MemoryTransport::new();
+        let mut host_ep = hub.endpoint();
+        let mut guest_ep = hub.endpoint();
+        let ticket = host_ep.ticket();
+        let mut guest_conn = guest_ep.connect(&ticket).await.unwrap();
+        let _host_conn = host_ep.accept().await.unwrap();
+        let host_peer = peer_of([35u8; 32]);
+        let guest_peer = peer_of([36u8; 32]);
+        let core = Arc::new(Mutex::new(CoreState::default()));
+        {
+            let mut guard = core.lock().unwrap();
+            guard.me = guest_peer;
+            guard.remote_peer = Some(host_peer);
+            // Guest joins from the host genesis so the session sits in
+            // SettingUp, where readiness is actually decided.
+            let mut host_app = App::with_local(SigningKey::from_bytes(&[35u8; 32]));
+            host_app
+                .handle(&Command::StartGame {
+                    white: host_peer,
+                    black: guest_peer,
+                })
+                .expect("host session starts");
+            let genesis = match host_app.query(&Query::MoveLog).expect("move log readable") {
+                QueryResult::MoveLog(entries) => entries[0],
+                _ => unreachable!("move log query answers with entries"),
+            };
+            let mut app = App::with_local(SigningKey::from_bytes(&[36u8; 32]));
+            app.handle(&Command::JoinGame {
+                peer: guest_peer,
+                genesis: Box::new(genesis),
+            })
+            .expect("guest session joins");
+            guard.app = Some(app);
+        }
+
+        // This core is the guest: the wire peer is the host, so the only
+        // legitimate readiness on this side is the host's own. A message
+        // marking the guest ready from the wire short-circuits the local
+        // readiness path.
+        let forged = on_msg(
+            &core,
+            &mut guest_conn,
+            Msg::Ready { peer: guest_peer },
+            0,
+            false,
+        )
+        .await;
+        assert!(
+            forged.is_err(),
+            "readiness claimed for the other side must fail"
+        );
+        on_msg(
+            &core,
+            &mut guest_conn,
+            Msg::Ready { peer: host_peer },
+            0,
+            false,
+        )
+        .await
+        .expect("the transport peer may mark itself ready");
+    }
+
+    /// Guest-originated setup snapshots are rejected: setup is
+    /// host-owned (AUDIT-AUTH-001).
+    #[tokio::test]
+    async fn guest_setup_is_rejected() {
+        let hub = MemoryTransport::new();
+        let mut host_ep = hub.endpoint();
+        let mut guest_ep = hub.endpoint();
+        let ticket = host_ep.ticket();
+        let mut guest_conn = guest_ep.connect(&ticket).await.unwrap();
+        let _host_conn = host_ep.accept().await.unwrap();
+        let core = Arc::new(Mutex::new(CoreState::default()));
+        let setup = Msg::Setup {
+            revision: 1,
+            side: "White".to_string(),
+            time: "5 | 3".to_string(),
+            variant: "Standard".to_string(),
+        };
+        let rejected = on_msg(&core, &mut guest_conn, setup.clone(), 0, true).await;
+        assert!(
+            rejected.is_err(),
+            "a host must never accept a guest setup snapshot"
+        );
+        on_msg(&core, &mut guest_conn, setup, 0, false)
+            .await
+            .expect("a guest accepts host setup");
+    }
+
+    /// Rematch send/accept gates without a Godot runtime: no network,
+    /// live game, stale ID, and the finished-game pass case
+    /// (AUDIT-REMATCH-001).
+    #[test]
+    fn rematch_predicates_require_network_and_finished_game() {
+        let bare = CoreState::default();
+        assert_eq!(can_request_rematch(&bare).unwrap_err(), "no network active");
+        assert_eq!(
+            rematch_response_error(&bare, 1, true),
+            Some("rematch is no longer pending")
+        );
+
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let endpoint = runtime
+            .block_on(crate::IrohEndpoint::bind_with_seed([71u8; 32]))
+            .unwrap();
+        let (cmd_tx, _cmd_rx) = tokio::sync::mpsc::unbounded_channel();
+        let (host_app, _guest_app, host_peer, guest_peer) = playing_pair([71u8; 32], [72u8; 32]);
+        let mut live = CoreState {
+            me: host_peer,
+            remote_peer: Some(guest_peer),
+            net: Some(NetState {
+                runtime,
+                endpoint,
+                cmd_tx,
+                invite_code: None,
+            }),
+            app: Some(host_app),
+            ..Default::default()
+        };
+        assert_eq!(
+            can_request_rematch(&live).unwrap_err(),
+            "rematch is only available after the game ends"
+        );
+        live.pending_rematch = Some((9, guest_peer));
+        assert_eq!(
+            rematch_response_error(&live, 9, true),
+            Some("rematch is only available after the game ends")
+        );
+        assert_eq!(
+            rematch_response_error(&live, 8, true),
+            Some("rematch identifier mismatch")
+        );
+
+        live.app
+            .as_mut()
+            .expect("session live")
+            .handle(&Command::Resign { peer: host_peer })
+            .expect("resignation finishes");
+        live.pending_rematch = Some((9, guest_peer));
+        assert!(
+            can_request_rematch(&live).is_ok(),
+            "a finished game may request rematch"
+        );
+        assert_eq!(rematch_response_error(&live, 9, true), None);
+        assert_eq!(rematch_response_error(&live, 9, false), None);
+    }
+
+    /// A redial from the peer whose invitation already became a game
+    /// resumes that session instead of re-running the invite handshake
+    /// (AUDIT-INVITE-RECONNECT-001). The routing predicate below is the    /// unit under test; the reconnected `drive_session` resume itself is
+    /// covered by the sync/resume path tests. A loopback-Iroh accept-loop
+    /// test remains open (needs real endpoints, not memory transport).
+    /// The computer opponent resolves through the same naming authority
+    /// as humans: reserved AI identity renders a stable label, strangers
+    /// render deterministic fallbacks, never invented names.
+    #[test]
+    fn ai_peer_resolves_through_the_same_naming_authority() {
+        let me = peer_of([81u8; 32]);
+        let ai_peer = peer_of([82u8; 32]);
+        let stranger = peer_of([83u8; 32]);
+        let (request_tx, _request_rx) = std::sync::mpsc::channel();
+        let (_result_tx, result_rx) = std::sync::mpsc::channel();
+        let core = CoreState {
+            me,
+            ai: Some(AiState {
+                peer: ai_peer,
+                tx: request_tx,
+                rx: result_rx,
+                control: None,
+                generation: 0,
+                thread: None,
+            }),
+            ..Default::default()
+        };
+        assert_eq!(player_name(&core, ai_peer), "Chess AI");
+        assert_eq!(player_name(&core, me), format!("Player {me}"));
+        assert_eq!(player_name(&core, stranger), format!("Player {stranger}"));
+    }
+
+    #[test]
+    fn invite_redial_routes_to_game_session() {
+        let peer = peer_of([61u8; 32]);
+        let other = peer_of([62u8; 32]);
+        let wrap = |game_peer| {
+            Arc::new(Mutex::new(CoreState {
+                net_generation: 1,
+                game_peer,
+                ..Default::default()
+            }))
+        };
+        assert!(
+            !redial_resumes_game(&wrap(None), 1, peer),
+            "no game yet: a first dial runs the invite handshake"
+        );
+        assert!(
+            redial_resumes_game(&wrap(Some(peer)), 1, peer),
+            "accepted game: the same peer's redial resumes the session"
+        );
+        assert!(
+            !redial_resumes_game(&wrap(Some(peer)), 1, other),
+            "a different peer still runs the invite handshake"
+        );
+        assert!(
+            !redial_resumes_game(&wrap(Some(peer)), 2, peer),
+            "a retired generation never resumes"
+        );
+    }
+
+    /// An unannounced transport loss marks the known peer offline so the
+    /// recent-peer row cannot keep a stale online indicator
+    /// (AUDIT-PRESENCE-001).
+    #[test]
+    fn disconnect_marks_known_peer_offline() {
+        let core = Arc::new(Mutex::new(CoreState::default()));
+        let peer = peer_of([41u8; 32]);
+        {
+            let mut guard = core.lock().unwrap();
+            guard.net_generation = 1;
+            guard.remote_peer = Some(peer);
+            guard.presence.insert(peer, PeerPresence::Online);
+        }
+        note(&core, 1, NetNote::Disconnected);
+        let guard = core.lock().unwrap();
+        assert_eq!(
+            guard.presence.get(&peer),
+            Some(&PeerPresence::Offline),
+            "disconnect must retire the online observation"
+        );
+        assert!(
+            guard
+                .net_notes
+                .iter()
+                .any(|note| matches!(note, NetNote::PeerOffline(p) if *p == peer)),
+            "disconnect must emit the offline transition for the scene thread"
         );
     }
 
@@ -4173,6 +5021,39 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(std::fs::metadata(&path).expect("identity exists").len(), 32);
         std::fs::remove_file(path).expect("test identity is removed");
+    }
+
+    /// The live-game modal bug: a resignation named the resigner by peer ID
+    /// in a display string, and Godot showed Defeat to the winner. The
+    /// winner must come out of this mapping by identity.
+    #[test]
+    fn resignation_names_winner_by_identity() {
+        let white = peer_of([11u8; 32]);
+        let black = peer_of([12u8; 32]);
+        let session = crate::app::SessionStateView {
+            state: SessionState::Finished(FinishReason::Resignation { by: black }),
+            white,
+            black,
+            host: white,
+            white_ready: true,
+            black_ready: true,
+        };
+        let (reason, actor, winner, loser) = terminal_outcome(&session);
+        assert_eq!(reason, "resignation");
+        assert_eq!(actor, Some(black));
+        assert_eq!(winner, Some(white));
+        assert_eq!(loser, Some(black));
+    }
+
+    #[test]
+    fn player_name_rule_trims_and_rejects() {
+        assert_eq!(
+            clean_player_name("  Alex  ").expect("padded name trims"),
+            Some("Alex".to_string())
+        );
+        assert_eq!(clean_player_name("").expect("empty clears"), None);
+        assert!(clean_player_name(&"x".repeat(25)).is_err());
+        assert!(clean_player_name("a\tb").is_err());
     }
 
     #[test]

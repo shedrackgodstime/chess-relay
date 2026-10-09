@@ -12,6 +12,7 @@ signal player_invite_requested(ticket: String)
 signal player_invite_cancelled
 signal incoming_invite_response(invite_id: int, accepted: bool)
 signal game_setup_requested(opponent_name: String, setup_kind: String)
+signal profile_name_changed(display_name: String)
 
 ## The list row, loaded here rather than referred to by path at runtime so that a
 ## scene which has gone missing is a load error at startup instead of a null in the
@@ -30,6 +31,7 @@ const CODE_LENGTH := 8
 @onready var _player_rows: VBoxContainer = %PlayerRows
 @onready var _empty_players_label: Label = %EmptyPlayersLabel
 @onready var _profile_status: Label = %ProfileStatus
+@onready var _profile_name: Label = %ProfileName
 @onready var _create_invite_button: Button = %CreateInviteButton
 @onready var _join_game_button: Button = %JoinGameButton
 @onready var _discovery_settings_button: Button = %DiscoverySettingsButton
@@ -46,6 +48,7 @@ var _join_cancel_button: Button
 var _current_join_code := ""
 var _create_waiting := false
 var _join_is_connecting := false
+var _profile_field: LineEdit = null
 ## Kept as rows rather than as the rows' Invite buttons, so turning the list off
 ## asks each row to do it and the row stays the thing that knows how.
 var _player_rows_added: Array[PlayerRow] = []
@@ -102,6 +105,39 @@ func configure_recent_players(bridge: ChessCoreBridge, identity_path: String) ->
 ## Re-reads the same Rust-owned index after a successful connection fact.
 func refresh_recent_players(bridge: ChessCoreBridge, identity_path: String) -> void:
 	configure_recent_players(bridge, identity_path)
+
+
+## Shows the authoritative local display name (Rust-owned profile or
+## deterministic fallback) and builds the editor once. Saves route out
+## through `profile_name_changed`; the backend echoes truth back here,
+## so this screen never invents a name.
+func configure_profile(display_name: String) -> void:
+	_profile_name.text = display_name
+	if _profile_field != null:
+		if not _profile_field.has_focus():
+			_profile_field.text = display_name
+		return
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_profile_field = LineEdit.new()
+	_profile_field.custom_minimum_size = Vector2(180, 40)
+	_profile_field.max_length = 24
+	_profile_field.placeholder_text = "Display name"
+	_profile_field.text = display_name
+	_profile_field.text_submitted.connect(_submit_profile_name)
+	row.add_child(_profile_field)
+	var save := Button.new()
+	save.text = "Save"
+	save.theme_type_variation = &"QuietButton"
+	save.pressed.connect(_submit_profile_name)
+	row.add_child(save)
+	_profile_name.get_parent().add_child(row)
+
+
+func _submit_profile_name(_typed: String = "") -> void:
+	if _profile_field == null:
+		return
+	profile_name_changed.emit(_profile_field.text.strip_edges())
 
 
 func _show_recent_players_unavailable() -> void:

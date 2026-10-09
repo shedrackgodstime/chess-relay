@@ -387,6 +387,16 @@ func _scenario_resign() -> void:
 	_check("Resignation" in game._header.center_text
 		or "resign" in game._header.center_text.to_lower(),
 		"resignation banners, got '%s'" % game._header.center_text)
+	# Winner attribution is the live-game modal bug: the resigner must not
+	# be shown as the winner, and the winner must be named by identity.
+	_check(game._game_over_card != null, "resignation opens the result card")
+	if game._game_over_card != null:
+		var title := game._game_over_card.get_child(0).get_child(0) as Label
+		var subtitle := game._game_over_card.get_child(0).get_child(1) as Label
+		_check(title != null and title.text == "Resignation · White wins",
+			"resignation names White as winner, got '%s'" % (title.text if title != null else "<missing>"))
+		_check(subtitle != null and "resigned" in subtitle.text.to_lower(),
+			"resignation subtitle names the actor, got '%s'" % (subtitle.text if subtitle != null else "<missing>"))
 	game.queue_free()
 	_phase_reached_end = true
 

@@ -7,8 +7,9 @@
 //!
 //! Draw simplifications (documented, prototype-compatible): threefold is
 //! automatic rather than claimed; fifty moves means 100 halfmoves without
-//! pawn move or capture; two knights versus bare king is drawn. These
-//! match `ref/chess-relay/chess/game.gd` and suit clock-less casual play.
+//! pawn move or capture. These match `ref/chess-relay/chess/game.gd` and
+//! suit clock-less casual play. Two knights versus bare king play on per
+//! FIDE (mate achievable with help), agreeing with shakmaty.
 //!
 //! Repetition keys include the en-passant square only when an en-passant
 //! capture is actually available, per FIDE sameness.
@@ -220,12 +221,9 @@ fn insufficient_material(board: &Board) -> bool {
             {
                 return true; // Bishops locked on one square colour.
             }
-            // Two knights on one side cannot force mate.
-            matches!(
-                (&white[..], &black[..]),
-                ([(Role::Knight, _), (Role::Knight, _)], [])
-                    | ([], [(Role::Knight, _), (Role::Knight, _)])
-            )
+            // Two knights versus bare king play on: mate is achievable
+            // with help, so under FIDE the position is not dead.
+            false
         }
     }
 }
@@ -306,7 +304,6 @@ mod tests {
             "4k3/8/8/8/8/8/8/4K3 w - - 0 1",    // Bare kings.
             "4k3/8/8/8/8/5N2/8/4K3 w - - 0 1",  // Single knight.
             "8/8/8/3b4/8/5B2/8/4K2k w - - 0 1", // Same-coloured bishops.
-            "7k/8/8/8/8/5N1N/8/4K3 w - - 0 1",  // Two knights vs bare king.
         ] {
             let game = Game::new(fen.parse().unwrap());
             assert_eq!(
@@ -315,6 +312,11 @@ mod tests {
                 "{fen}"
             );
         }
+        // Two knights vs bare king: mate is achievable with help, so under
+        // FIDE the position is live (see chess-differential §Known
+        // divergence). It must not be declared drawn.
+        let knights = Game::new("7k/8/8/8/8/5N1N/8/4K3 w - - 0 1".parse().unwrap());
+        assert_eq!(knights.outcome(), Outcome::Ongoing);
         let live = Game::new("4k3/8/8/8/8/5N2/3B4/4K3 w - - 0 1".parse().unwrap());
         assert_eq!(live.outcome(), Outcome::Ongoing);
     }

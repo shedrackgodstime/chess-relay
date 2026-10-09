@@ -293,9 +293,9 @@ network/session fact can be traced to a current core observation.
 
 ### Phase 7 — Enforcement and closure
 
-Status: `Blocked by confirmed local gate failure`; Rust gates pass, but the
-supported Godot UI runner exits `139`, and two-process/device verification is
-still open.
+Status: Godot UI runner exits zero (25 scripts, 151 UI assertions local
+baseline; scenarios suite now expects 53); two-process/device verification
+is still open.
 
 - Add regression tests for every confirmed finding and every boundary invariant.
 - Run Rust, Godot, bridge, and integration gates independently and together;
@@ -375,3 +375,60 @@ Still unavailable here: two independent running installations exercising the
 full Iroh invite/accept/rematch flow over the relay/direct-path matrix, and
 Android on-glass verification. Those are not inferred from local
 memory-transport or Godot assertions.
+
+## Latest session handoff — 2026-10-09 (identity, results, audit fixes)
+Changed: Rust profile authority (`set_player_name`, `clean_player_name`,
+`player_name`, `peer_for_side`, `my_player_name`), structured terminal facts
+(`terminal_outcome`, `result_snapshot`, `game_result` signal), Godot result
+rendering (game-over card, clock strip, hub name editor), host/guest setup
+kind helpers, Makefile `--locked` gates, plus audit fixes for readiness
+binding (AUDIT-AUTH-001, Ready + Setup), rematch terminal gating
+(AUDIT-REMATCH-001, send/receive/accept), and disconnect presence
+(AUDIT-PRESENCE-001). R9 red-proofs recorded per new gate (resignation
+mapping, Ready binding, guest Setup, rematch terminal, presence offline).
+
+Verification completed:
+
+- `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`,
+  full `cargo test --locked` (lib incl. new auth/rematch/presence/profile
+  tests + all integration suites), `cargo doc --locked --no-deps`: passed.
+- Godot `run_all_checks.sh`: scenarios suite expects 53 checks (50 + 3 new
+  result-card winner-attribution assertions), ui smoke 151/151, all green
+  with the rebuilt extension.
+- `git diff --check`: passed.
+
+Still open: two-process/live-device confirmation of the fixed resignation
+modal and rematch gating; F-05 monolith, F-08 framing, AUDIT-STARTUP-001,
+AUDIT-RESUME-001, AUDIT-INVITE-RECONNECT-001, AUDIT-TIME-001, AUDIT-FEN-001
+(en-passant parse), two-knights rules question, voice/clock (out of v1), AI
+participant contract, remote display-name exchange, orientation/collision
+verification. Uncommitted session artifacts (`chess_play_host` helper
+changes, `play-with-opencode.txt`) remain for review, not evidence.
+
+## Second audit-and-close pass — 2026-10-09 (same day)
+
+Closed: AUDIT-FEN-001 (`en_passant_square()` bridge query; GDScript FEN
+decode removed), AUDIT-TIME-001 (time controls labelled preview/untimed),
+two-knights FIDE error (rule removed, red test, differential updated),
+no-debug-prints gate (runner + CI shape), AUDIT-REMATCH-001 (terminal gates
+on send/receive/accept + pure predicates), AUDIT-AUTH-001 (Ready bound to
+transport peer, Setup host-only), AUDIT-PRESENCE-001 (offline on
+disconnect), N-2 (setup-kind helpers + unknown-mode status),
+AUDIT-DOC-001 leftovers (runner-139 and empty-protocol claims corrected),
+Makefile/CI `--locked`, AI naming through the profile authority (tested),
+INVITE-RECONNECT-001 redial routing with promotion flag (predicate tested;
+loopback-Iroh accept-loop test still open).
+
+Structurally assessed, not started (each needs its own design + device
+surface; half-measures would add second paths, not remove them):
+AUDIT-STARTUP-001 (async initiation + pending states + generation-safe
+publication), AUDIT-RESUME-001 (network save-path policy + restart test),
+F-05 (bridge decomposition), F-08 (persistent framing + ordering buffers).
+
+CLI rework (recorded, not started — the concept is changing): the helper
+must keep one persisted installation identity across runs (no fresh seed
+per run) so invites/presence accumulate; drive the real App contract
+interactively; follow library docs rules at the boundary; exchange display
+names only through the future authenticated metadata snapshot, never inside
+transport/presence state. Rebuild it as that client when the idea settles,
+rather than extending the current throwaway host.

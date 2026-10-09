@@ -81,12 +81,17 @@ func _on_p2p_requested() -> void:
 	hub.player_invite_cancelled.connect(_on_player_invite_cancelled)
 	hub.incoming_invite_response.connect(_on_incoming_invite_response)
 	hub.game_setup_requested.connect(_on_peer_setup_requested)
+	hub.profile_name_changed.connect(_on_profile_name_changed)
 	_show_screen(hub)
 	var net := _net()
 	if not net.start_presence(_identity_path()):
 		hub.configure_recent_players(net, _identity_path())
+		# No profile without a live bridge: the hub keeps its neutral
+		# "Guest player" label rather than a "Player 00000000" fallback
+		# derived from an unbound identity.
 		return
 	hub.configure_recent_players(net, _identity_path())
+	hub.configure_profile(net.my_player_name())
 
 
 ## Hands the live network bridge to whoever needs it, wiring its
@@ -141,6 +146,15 @@ func _on_join_requested(code: String) -> void:
 func _on_join_cancelled(code: String) -> void:
 	_leave_network()
 	join_cancelled.emit(code)
+
+
+## Persists the display name through the Rust profile authority, then
+## echoes truth back to the hub. The hub never keeps its own copy.
+func _on_profile_name_changed(display_name: String) -> void:
+	var net := _net()
+	net.set_player_name(display_name, _identity_path())
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).configure_profile(net.my_player_name())
 
 
 func _on_player_invite_requested(ticket: String) -> void:

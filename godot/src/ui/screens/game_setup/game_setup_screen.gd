@@ -27,6 +27,26 @@ var _peer_kind := "peer"
 var _local_ready := false
 var _opponent_is_ready := false
 var _remote_setup_received := false
+## Every peer setup role the hub can produce. Comparisons go through the
+## helpers below, never bare strings at each call site: a typo in a bare
+## string silently changes which branch runs and nothing fails.
+const SETUP_KINDS: Array[String] = [
+	"create", "join", "invite-host", "invite-guest", "rematch-host", "rematch-guest",
+]
+const HOST_SETUP_KINDS: Array[String] = ["create", "invite-host", "rematch-host"]
+const GUEST_SETUP_KINDS: Array[String] = ["join", "invite-guest", "rematch-guest"]
+
+
+static func is_network_setup(kind: String) -> bool:
+	return kind in SETUP_KINDS
+
+
+static func is_host_setup(kind: String) -> bool:
+	return kind in HOST_SETUP_KINDS
+
+
+static func is_guest_setup(kind: String) -> bool:
+	return kind in GUEST_SETUP_KINDS
 ## The live networked session, when this setup fronts one. Set for
 ## code/host flows only; mock invite flows have no session and keep
 ## the old local behavior.
@@ -57,7 +77,7 @@ func _ready() -> void:
 		_apply_peer_setup()
 		# The host snapshot may have arrived before this screen subscribed.
 		# Re-read the bridge-owned value after all @onready controls exist.
-		if _peer_kind == "join" or _peer_kind == "invite-guest" or _peer_kind == "rematch-guest":
+		if is_guest_setup(_peer_kind):
 			call_deferred("_apply_saved_net_setup")
 
 
@@ -66,7 +86,9 @@ func _ready() -> void:
 ## cannot drop them.
 func _configure_choices() -> void:
 	_side_choice.configure("Choose Color", ["White", "Black", "Random"], 3, 0)
-	_time_choice.configure("Time Control", ["1 | 0", "3 | 2", "5 | 3", "10 | 0", "15 | 10", "Custom"], 3, 2)
+	# Clock is out of v1: the core starts untimed games, so the label must
+	# not promise a rule. The choice still syncs as lobby preview metadata.
+	_time_choice.configure("Time Control (preview · untimed)", ["1 | 0", "3 | 2", "5 | 3", "10 | 0", "15 | 10", "Custom"], 3, 2)
 	# The Rust core currently has one authoritative starting position. Do not
 	# offer a Chess960 choice that would render as selected but start standard
 	# chess underneath.
@@ -111,12 +133,14 @@ func _apply_peer_setup() -> void:
 	_play_button.tooltip_text = "Mark yourself ready for this match"
 	_ready_label.text = "Choose your settings, then mark yourself ready"
 	var detail := "Connected player"
-	if _peer_kind == "create" or _peer_kind == "join" or _peer_kind == "invite-host" or _peer_kind == "invite-guest" or _peer_kind == "rematch-host" or _peer_kind == "rematch-guest":
+	if is_network_setup(_peer_kind):
 		detail = "Connected via invite code"
 	_opponent_card.configure(_peer_name, "PLAYER", detail)
 	if _net_bridge != null:
 		_apply_net_setup()
 	_update_summary()
+	if _peer_setup and not is_network_setup(_peer_kind):
+		_ready_label.text = "Unknown setup mode · waiting for host"
 
 
 ## Network setup owns the user-visible transition into the session. The host
@@ -132,7 +156,7 @@ func _apply_net_setup() -> void:
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine_shown)
 	_opponent_card.set_side(theirs)
-	if _peer_kind == "create" or _peer_kind == "invite-host" or _peer_kind == "rematch-host":
+	if is_host_setup(_peer_kind):
 		_side_choice.set_read_only(false)
 		_time_choice.set_read_only(false)
 		_variant_choice.set_read_only(false)
@@ -156,7 +180,7 @@ func _apply_net_setup() -> void:
 
 
 func _on_net_setup_changed(side: String, time: String, variant: String) -> void:
-	if _net_bridge == null or (_peer_kind != "join" and _peer_kind != "invite-guest" and _peer_kind != "rematch-guest"):
+	if _net_bridge == null or not is_guest_setup(_peer_kind):
 		return
 	_remote_setup_received = true
 	_apply_remote_side(side)
@@ -192,7 +216,7 @@ func _apply_remote_side(side: String) -> void:
 
 
 func _apply_saved_net_setup() -> void:
-	if _net_bridge == null or (_peer_kind != "join" and _peer_kind != "invite-guest" and _peer_kind != "rematch-guest"):
+	if _net_bridge == null or not is_guest_setup(_peer_kind):
 		return
 	var snapshot := _net_bridge.network_setup()
 	if snapshot.size() != 3:
@@ -201,7 +225,7 @@ func _apply_saved_net_setup() -> void:
 
 
 func _publish_net_setup() -> void:
-	if _net_bridge == null or (_peer_kind != "create" and _peer_kind != "invite-host" and _peer_kind != "rematch-host"):
+	if _net_bridge == null or not is_host_setup(_peer_kind):
 		return
 	_net_bridge.update_network_setup(
 		_side_choice.get_selected_choice(),
@@ -217,7 +241,7 @@ func _on_net_session_created(_white: String, _black: String, _host: String) -> v
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine.capitalize() if not mine.is_empty() else "…")
 	_opponent_card.set_side(theirs)
-	if _peer_kind == "create" or _peer_kind == "invite-host" or _peer_kind == "rematch-host":
+	if is_host_setup(_peer_kind):
 		_ready_label.text = "Game created · waiting for opponent to be ready"
 	else:
 		_ready_label.text = "Game created · waiting for host to start"
@@ -264,7 +288,7 @@ func _on_custom_time_changed(_value: float) -> void:
 
 func _on_play_pressed() -> void:
 	if _net_bridge != null:
-		if _peer_kind == "create" or _peer_kind == "invite-host" or _peer_kind == "rematch-host":
+		if is_host_setup(_peer_kind):
 			if _net_bridge.start_network_game(
 				selected_ai_side(),
 				_time_choice.get_selected_choice(),

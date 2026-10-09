@@ -170,7 +170,7 @@ Don't design the transport abstraction up front. Pull it out of the first workin
 
 ### Identity and joining
 
-Iroh's endpoint identity is the peer identity. v1 identity is a local keypair that signs log entries. Player-facing identity (names, accounts) waits until a feature needs it.
+Iroh's endpoint identity is the peer identity. v1 identity is a local keypair that signs log entries. Player-facing identity (names, accounts) waits until a feature needs it — and one now does: terminal results must name the winner for the player, so the bridge owns a persisted local display-name profile with a deterministic identity-derived fallback, and terminal facts carry actor/winner/loser by peer ID for Godot to render.
 
 Joining works without a server: the host creates a session and shares something that lets the guest reach the host's endpoint. The goal is a short human-readable code. Open question: Iroh tickets are long, so a short code needs some way to resolve to an endpoint without a central server. Until that's solved, the fallback is sharing the Iroh ticket directly.
 

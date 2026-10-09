@@ -84,6 +84,7 @@ layout_mode = 2
 size_flags_horizontal = 3
 
 [node name="ProfileName" type="Label" parent="Workspace/Margins/Content/ProfileCard/ProfileRow/ProfileIdentity"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_type_variation = &"SetupParticipantName"
 text = "Guest player"

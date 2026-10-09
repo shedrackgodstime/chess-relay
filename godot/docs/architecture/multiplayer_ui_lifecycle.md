@@ -55,6 +55,7 @@ remote peer explicitly accepts.
 | `player_invite_cancelled` | Cancel the outgoing player invitation. |
 | `incoming_invite_response(invite_id, accepted)` | Send the user's accept or decline response. |
 | `game_setup_requested(opponent_name, setup_kind)` | Open shared peer Game Setup after acceptance/connection. |
+| `profile_name_changed(display_name)` | Persist the local display name through the Rust profile authority; the hub echoes the authoritative name back. |
 
 The app routes results back to the hub through the live bridge for transport,
 presence, and invitation events. Game Setup exposes `configure_peer` and the
@@ -86,6 +87,10 @@ host start another game. Declining leaves the finished board available for
 review.
 
 ## Mock scenarios
+
+The `MockMultiplayerService` fixture has been removed from the production
+tree; the scenarios below describe historical UI-development fixtures, not
+current behavior. Live create/join/invite flows use the bridge paths above.
 
 `src/ui/multiplayer/mock_multiplayer_service.gd` is deliberately temporary
 and local to UI development:
