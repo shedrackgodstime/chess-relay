@@ -287,10 +287,10 @@ func _check_responsive_layouts() -> void:
 	var hub := HUB_SCENE.instantiate() as MultiplayerHubScreen
 	root.add_child(hub)
 	await process_frame
-	_check(hub._profile_status.text == "Discovery unavailable",
-		"hub does not claim an unimplemented discovery state")
+	_check(hub._profile_status.text == "Recent peers",
+		"hub labels the Rust-owned recent-peer source")
 	_check(hub._discovery_settings_button.disabled,
-		"discovery settings stay disabled until a backend exists")
+		"discovery settings stay disabled until their own backend exists")
 	hub._update_responsive_layout(800.0)
 	_check(hub._invite_grid.columns == 1, "hub stacks invite cards at narrow width")
 	hub._update_responsive_layout(1200.0)
@@ -317,15 +317,14 @@ func _check_game_screen() -> void:
 	await process_frame
 	var clock_strip := game.get_node("HUD/HUDRoot/ClockStrip") as PanelContainer
 	_check(clock_strip != null, "game screen has a compact clock strip")
-	_check(_label(clock_strip, "Content/OpponentClock").text == "OPPONENT  09:58",
-		"clock strip shows the opponent clock")
-	_check(_label(clock_strip, "Content/PlayerClock").text == "10:00  YOU",
-		"clock strip shows the local clock")
+	_check(_label(clock_strip, "Content/OpponentClock").text == "OPPONENT  MOCK",
+		"clock strip makes the out-of-scope opponent time explicit")
+	_check(_label(clock_strip, "Content/PlayerClock").text == "MOCK  YOU",
+		"clock strip makes the out-of-scope local time explicit")
 	_check(_label(clock_strip, "Content/MoveNumber").text == "M1",
 		"clock strip shows the current move number")
-	game._on_clock_tick()
-	_check(_label(clock_strip, "Content/PlayerClock").text == "09:59  YOU",
-		"active clock ticks in the game UI")
+	_check(not game.has_method("_on_clock_tick"),
+		"out-of-scope clock has no local ticking authority")
 	_check(not _control(game, "HUD/HUDRoot/GameHeader/NetworkIndicator").visible,
 		"computer game keeps network status hidden")
 	var peer_game := GAME_SCENE.instantiate() as GameScreen
@@ -392,10 +391,8 @@ func _check_game_screen() -> void:
 		game._board.square_to_world("d4"), Vector3.UP, 0)
 	_check(game._board.get_highlighted_square() == "d4",
 		"touch input selects a board square")
-	game._white_seconds = 45
-	game._update_clock_strip()
-	_check(game._player_clock.get_theme_color("font_color") == Color(1.0, 0.45, 0.28, 1.0),
-		"low clock state uses a warning colour")
+	_check(game._player_clock.text == "MOCK  YOU",
+		"clock remains a clearly labelled mock after moves")
 	# The screen root is a full-rect Control and Control.mouse_filter defaults to
 	# MOUSE_FILTER_STOP, which is why it is set to IGNORE. Without this, no mouse
 	# event reaches the camera at all.

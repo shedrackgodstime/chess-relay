@@ -8,6 +8,9 @@ signal create_requested
 signal create_cancelled
 signal join_requested(code: String)
 signal join_cancelled(code: String)
+signal player_invite_requested(ticket: String)
+signal player_invite_cancelled
+signal incoming_invite_response(invite_id: int, accepted: bool)
 signal game_setup_requested(opponent_name: String, setup_kind: String)
 
 ## The list row, loaded here rather than referred to by path at runtime so that a
@@ -53,8 +56,8 @@ func _ready() -> void:
 	_back_button.pressed.connect(func() -> void: back_requested.emit())
 	_create_invite_button.pressed.connect(_on_create_invite)
 	_join_game_button.pressed.connect(_begin_join_flow)
-	_profile_status.text = "Discovery unavailable"
-	_profile_status.tooltip_text = "Peer discovery is not implemented; use an invite code."
+	_profile_status.text = "Recent peers"
+	_profile_status.tooltip_text = "Recent peers are saved locally; presence is checked when an invite is sent."
 	_profile_status.add_theme_color_override("font_color", Color(0.65, 0.65, 0.65, 1.0))
 	_discovery_settings_button.disabled = true
 	_show_empty_players()
@@ -77,18 +80,22 @@ func configure_recent_players(bridge: ChessCoreBridge, identity_path: String) ->
 	if bridge.recent_players_status(identity_path) != "ready":
 		_show_recent_players_unavailable()
 		return
-	var peers := bridge.recent_players(identity_path)
+	var records := bridge.recent_peer_records(identity_path)
 	_clear_player_rows()
-	if peers.is_empty():
+	if records.is_empty():
 		_show_empty_players()
 		return
 	_empty_players_label.hide()
 	_player_rows.show()
-	for peer in peers:
+	for record: Dictionary in records:
+		var peer := str(record.get("peer", ""))
+		var ticket := str(record.get("ticket", ""))
+		var presence := str(record.get("presence", "unknown"))
 		var row := PLAYER_ROW_SCENE.instantiate() as PlayerRow
 		_player_rows.add_child(row)
-		row.configure("Peer %s" % str(peer), "Seen recently", true)
-		row.set_invite_enabled(false)
+		row.configure("Peer %s" % peer, presence, true, ticket)
+		row.invite_pressed.connect(_on_player_invite.bind(row))
+		row.set_invite_enabled(not ticket.is_empty())
 		_player_rows_added.append(row)
 
 
@@ -109,6 +116,58 @@ func _clear_player_rows() -> void:
 		if is_instance_valid(row):
 			row.queue_free()
 	_player_rows_added.clear()
+
+
+func _on_player_invite(row: PlayerRow) -> void:
+	if row.ticket.is_empty() or _active_invite_flow != "":
+		return
+	_active_invite_flow = "player-outgoing"
+	_invite_grid.hide()
+	_flow.show_flow("Invite player", "Sending an invitation to %s..." % row.display_name)
+	_flow.add_status("Waiting for response...")
+	_flow_cancel_button(_cancel_player_invite)
+	_set_player_invites_enabled(false)
+	player_invite_requested.emit(row.ticket)
+
+
+func player_invite_failed(reason: String = "") -> void:
+	if _active_invite_flow != "player-outgoing":
+		return
+	_flow.show_flow("Invite failed", reason if not reason.is_empty() else "The peer could not be reached.")
+	_flow_cancel_button(_reset_invite_flow)
+
+
+func show_incoming_invite(invite_id: int, peer: String) -> void:
+	_active_invite_flow = "player-incoming"
+	_invite_grid.hide()
+	_set_player_invites_enabled(false)
+	_flow.show_flow("Game invitation", "Peer %s wants to play." % peer)
+	var actions := _flow.add_centered_row()
+	var accept := Button.new()
+	accept.text = "Accept"
+	accept.custom_minimum_size = FLOW_ACTION_SIZE
+	actions.add_child(accept)
+	accept.pressed.connect(func() -> void:
+		_flow.show_flow("Game invitation", "Joining the game...")
+		incoming_invite_response.emit(invite_id, true))
+	var decline := Button.new()
+	decline.text = "Decline"
+	decline.custom_minimum_size = FLOW_ACTION_SIZE
+	decline.theme_type_variation = &"QuietButton"
+	actions.add_child(decline)
+	decline.pressed.connect(func() -> void:
+		incoming_invite_response.emit(invite_id, false)
+		_reset_invite_flow())
+
+
+func invite_result_received(accepted: bool, peer: String) -> void:
+	if _active_invite_flow != "player-outgoing":
+		return
+	if accepted:
+		_flow.show_flow("Invite accepted", "Peer %s is joining..." % peer)
+	else:
+		_flow.show_flow("Invite declined", "Peer %s declined the invitation." % peer)
+		_flow_cancel_button(_reset_invite_flow)
 
 
 func _on_create_invite() -> void:
@@ -156,6 +215,13 @@ func notify_network_error(reason: String = "") -> void:
 		join_failed(reason)
 	elif _create_waiting and _active_invite_flow == "create":
 		host_failed(reason)
+	elif _active_invite_flow == "player-outgoing":
+		player_invite_failed(reason)
+	elif _active_invite_flow == "player-incoming":
+		_flow.show_flow(
+			"Invitation ended",
+			reason if not reason.is_empty() else "The other player disconnected.")
+		_flow_cancel_button(_reset_invite_flow)
 
 
 ## Backend calls this when the link is up but the session handshake is
@@ -171,6 +237,11 @@ func peer_linked(opponent_name: String = "Opponent") -> void:
 	elif _active_invite_flow == "join-connecting" and _join_status != null:
 		_join_status.text = "Connected · waiting for host..."
 		game_setup_requested.emit(opponent_name, "join")
+	elif _active_invite_flow == "player-outgoing":
+		_flow.show_flow("Peer connected", "Configure the game with %s." % opponent_name)
+		game_setup_requested.emit(opponent_name, "invite-host")
+	elif _active_invite_flow == "player-incoming":
+		game_setup_requested.emit(opponent_name, "invite-guest")
 
 
 ## Backend calls this when the session is ready (game started), not
@@ -305,6 +376,11 @@ func _cancel_join() -> void:
 	_reset_invite_flow()
 	if cancel_pending_attempt:
 		join_cancelled.emit(attempted_code)
+
+
+func _cancel_player_invite() -> void:
+	_reset_invite_flow()
+	player_invite_cancelled.emit()
 
 
 func _reset_invite_flow() -> void:

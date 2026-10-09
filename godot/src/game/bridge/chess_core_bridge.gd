@@ -42,6 +42,16 @@ signal draw_answered(by: String, accept: bool)
 signal bridge_error(message: String)
 ## Emitted when the session driver links a peer. `peer` is its identity.
 signal peer_connected(peer: String)
+## Emitted when an authenticated peer sends a game invitation.
+signal incoming_invite(invite_id: int, peer: String)
+## Emitted after a recent-peer invitation is accepted or declined.
+signal invite_result(invite_id: int, accepted: bool, peer: String)
+## Live reachability observation for a recent peer: online or offline.
+signal peer_presence(peer: String, status: String)
+## Emitted when the peer explicitly leaves, distinct from a transport failure.
+signal peer_left
+signal incoming_rematch(rematch_id: int, peer: String)
+signal rematch_result(rematch_id: int, accepted: bool, peer: String, host: bool)
 ## Emitted after a live link drops while the Rust session remains resumable.
 signal network_reconnecting
 ## Measured transport quality from Rust/Iroh, shared by every screen.
@@ -88,6 +98,19 @@ func _ready() -> void:
 	_core.connect(&"draw_answered", func(by: String, accept: bool) -> void: draw_answered.emit(by, accept))
 	_core.connect(&"bridge_error", func(message: String) -> void: bridge_error.emit(message))
 	_core.connect(&"peer_connected", func(peer: String) -> void: peer_connected.emit(peer))
+	_core.connect(&"incoming_invite",
+		func(invite_id: int, peer: String) -> void: incoming_invite.emit(invite_id, peer))
+	_core.connect(&"invite_result",
+		func(invite_id: int, accepted: bool, peer: String) -> void:
+			invite_result.emit(invite_id, accepted, peer))
+	_core.connect(&"peer_presence",
+		func(peer: String, status: String) -> void: peer_presence.emit(peer, status))
+	_core.connect(&"peer_left", func() -> void: peer_left.emit())
+	_core.connect(&"incoming_rematch",
+		func(rematch_id: int, peer: String) -> void: incoming_rematch.emit(rematch_id, peer))
+	_core.connect(&"rematch_result",
+		func(rematch_id: int, accepted: bool, peer: String, host: bool) -> void:
+			rematch_result.emit(rematch_id, accepted, peer, host))
 	_core.connect(&"network_reconnecting", func() -> void: network_reconnecting.emit())
 	_core.connect(&"network_quality",
 		func(level: int, rtt_ms: int, loss_percent: int, direct: bool) -> void:
@@ -154,6 +177,48 @@ func recent_players(identity_path: String) -> PackedStringArray:
 	return _core.call(&"recent_players", identity_path)
 
 
+## Returns Rust-owned recent-peer records, newest contact first.
+## Keys: peer, ticket, last_seen_unix_secs, presence. Presence is a live
+## reachability observation and is never inferred from history alone.
+func recent_peer_records(identity_path: String) -> Array[Dictionary]:
+	if _core == null:
+		return []
+	return _core.call(&"recent_peer_records", identity_path)
+
+
+## Keeps the endpoint available for incoming recent-peer invitations.
+func start_presence(identity_path: String) -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"start_presence", identity_path)
+
+
+## Dials a Rust-owned recent-peer ticket and sends an invitation.
+func invite_peer(ticket: String, identity_path: String) -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"invite_peer", ticket, identity_path)
+
+
+## Accepts or declines the currently displayed incoming invitation.
+func respond_to_invite(invite_id: int, accepted: bool) -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"respond_to_invite", invite_id, accepted)
+
+
+func request_rematch() -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"request_rematch")
+
+
+func respond_to_rematch(rematch_id: int, accepted: bool) -> bool:
+	if _core == null:
+		return false
+	return _core.call(&"respond_to_rematch", rematch_id, accepted)
+
+
 ## Returns "ready" or "unavailable" for the recent-peer index.
 func recent_players_status(identity_path: String) -> String:
 	if _core == null:
@@ -174,6 +239,18 @@ func fen() -> String:
 	if _core == null:
 		return ""
 	return str(_core.call(&"fen"))
+
+
+## Typed occupied-square facts for rendering. The screen does not decode FEN.
+func position_pieces() -> Array[Dictionary]:
+	var pieces: Array[Dictionary] = []
+	if _core == null:
+		return pieces
+	var raw: Array = _core.call(&"position_pieces")
+	for item: Variant in raw:
+		if item is Dictionary:
+			pieces.append(item)
+	return pieces
 
 
 ## Side to move as "white", "black", or "" before play starts.

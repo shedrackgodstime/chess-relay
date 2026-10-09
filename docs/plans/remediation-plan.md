@@ -1,5 +1,10 @@
 # Remediation Plan: Game Setup, Network Lifecycle, and Preventing Divergence
 
+> Historical audit plan. The active execution order and current evidence live
+> in [`implementation-closure-plan.md`](implementation-closure-plan.md). Items
+> below are retained for provenance and must not be read as current status
+> without checking that ledger.
+
 **Date:** 2026-10-08  
 **Status:** Approved  
 **Authority:** [`docs/architecture/application_core.md`](../architecture/application_core.md), [`docs/audits/game_setup_and_network_audit.md`](../audits/game_setup_and_network_audit.md), [`godot/docs/HANDOVER.md`](../../godot/docs/HANDOVER.md).

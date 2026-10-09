@@ -1,5 +1,10 @@
 # Comprehensive Architectural Audit: Game Setup, Iroh, and Application Core
 
+> Historical audit record. Findings and roadmap items describe the state when
+> this audit was written. Current status and evidence are maintained in
+> [`implementation-closure-plan.md`](../plans/implementation-closure-plan.md)
+> and [`standards-reference-compliance-audit.md`](standards-reference-compliance-audit.md).
+
 **Date:** 2026-10-08  
 **Scope:** `godot/src/ui/screens/game_setup/`, `godot/src/ui/app/app_root.gd`, `godot/src/ui/screens/multiplayer_hub/`, `godot/src/ui/screens/game/`, `rust/src/bridge.rs`, `rust/src/transport_iroh.rs`, `rust/src/transport.rs`, `rust/src/transport_rendezvous.rs`, `rust/src/protocol.rs`, `rust/src/app.rs`, and `rust/src/session/`.  
 **Authority:** [`docs/architecture/application_core.md`](../architecture/application_core.md), [`godot/docs/HANDOVER.md`](../../godot/docs/HANDOVER.md), [`docs/standards/rust-standards.md`](../standards/rust-standards.md), and official Godot documentation in `ref/godot-docs/`.
@@ -8,7 +13,11 @@
 
 ## Executive Summary
 
-While all automated tests currently pass (`cargo test` and `godot/tests/run_all_checks.sh`), this audit confirms that **the current Game Setup UI and Iroh network integration fundamentally violate the architecture specified in [`application_core.md`](../architecture/application_core.md)**.
+At the time of this historical audit, the automated checks were reported as
+passing (`cargo test` and `godot/tests/run_all_checks.sh`). The audit then
+confirmed that **the Game Setup UI and Iroh network integration violated the
+architecture specified in [`application_core.md`](../architecture/application_core.md)**.
+Do not use that old result as current status; consult the active closure ledger.
 
 A quick-and-dirty CLI integration test script from Phase 4 was copied wholesale into the GDExtension bridge ([`rust/src/bridge.rs`](../../rust/src/bridge.rs)). Because that script automatically starts matches and forces player readiness without user interaction, the Godot frontend was forced to implement awkward workarounds:
 - The UI lifecycle was inverted: the multiplayer hub advances to the "Setup" screen *only after* the game has already started.

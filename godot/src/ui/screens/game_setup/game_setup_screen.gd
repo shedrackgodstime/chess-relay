@@ -57,7 +57,7 @@ func _ready() -> void:
 		_apply_peer_setup()
 		# The host snapshot may have arrived before this screen subscribed.
 		# Re-read the bridge-owned value after all @onready controls exist.
-		if _peer_kind == "join":
+		if _peer_kind == "join" or _peer_kind == "invite-guest" or _peer_kind == "rematch-guest":
 			call_deferred("_apply_saved_net_setup")
 
 
@@ -111,7 +111,7 @@ func _apply_peer_setup() -> void:
 	_play_button.tooltip_text = "Mark yourself ready for this match"
 	_ready_label.text = "Choose your settings, then mark yourself ready"
 	var detail := "Connected player"
-	if _peer_kind == "create" or _peer_kind == "join":
+	if _peer_kind == "create" or _peer_kind == "join" or _peer_kind == "invite-host" or _peer_kind == "invite-guest" or _peer_kind == "rematch-host" or _peer_kind == "rematch-guest":
 		detail = "Connected via invite code"
 	_opponent_card.configure(_peer_name, "PLAYER", detail)
 	if _net_bridge != null:
@@ -132,7 +132,7 @@ func _apply_net_setup() -> void:
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine_shown)
 	_opponent_card.set_side(theirs)
-	if _peer_kind == "create":
+	if _peer_kind == "create" or _peer_kind == "invite-host" or _peer_kind == "rematch-host":
 		_side_choice.set_read_only(false)
 		_time_choice.set_read_only(false)
 		_variant_choice.set_read_only(false)
@@ -156,7 +156,7 @@ func _apply_net_setup() -> void:
 
 
 func _on_net_setup_changed(side: String, time: String, variant: String) -> void:
-	if _net_bridge == null or _peer_kind != "join":
+	if _net_bridge == null or (_peer_kind != "join" and _peer_kind != "invite-guest" and _peer_kind != "rematch-guest"):
 		return
 	_remote_setup_received = true
 	_apply_remote_side(side)
@@ -192,7 +192,7 @@ func _apply_remote_side(side: String) -> void:
 
 
 func _apply_saved_net_setup() -> void:
-	if _net_bridge == null or _peer_kind != "join":
+	if _net_bridge == null or (_peer_kind != "join" and _peer_kind != "invite-guest" and _peer_kind != "rematch-guest"):
 		return
 	var snapshot := _net_bridge.network_setup()
 	if snapshot.size() != 3:
@@ -201,7 +201,7 @@ func _apply_saved_net_setup() -> void:
 
 
 func _publish_net_setup() -> void:
-	if _net_bridge == null or _peer_kind != "create":
+	if _net_bridge == null or (_peer_kind != "create" and _peer_kind != "invite-host" and _peer_kind != "rematch-host"):
 		return
 	_net_bridge.update_network_setup(
 		_side_choice.get_selected_choice(),
@@ -217,7 +217,7 @@ func _on_net_session_created(_white: String, _black: String, _host: String) -> v
 	var theirs := "Black" if mine == "white" else "White" if mine == "black" else "…"
 	_player_card.set_side(mine.capitalize() if not mine.is_empty() else "…")
 	_opponent_card.set_side(theirs)
-	if _peer_kind == "create":
+	if _peer_kind == "create" or _peer_kind == "invite-host" or _peer_kind == "rematch-host":
 		_ready_label.text = "Game created · waiting for opponent to be ready"
 	else:
 		_ready_label.text = "Game created · waiting for host to start"
@@ -264,7 +264,7 @@ func _on_custom_time_changed(_value: float) -> void:
 
 func _on_play_pressed() -> void:
 	if _net_bridge != null:
-		if _peer_kind == "create":
+		if _peer_kind == "create" or _peer_kind == "invite-host" or _peer_kind == "rematch-host":
 			if _net_bridge.start_network_game(
 				selected_ai_side(),
 				_time_choice.get_selected_choice(),

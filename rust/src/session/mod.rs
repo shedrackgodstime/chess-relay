@@ -38,7 +38,7 @@ pub(crate) mod store;
 #[doc(inline)]
 pub use log::{LogEntry, LogPayload, PeerId};
 #[doc(inline)]
-pub use store::{FileStore, LogStore, MemoryStore, RecentPeerStore, StoreError};
+pub use store::{FileStore, LogStore, MemoryStore, RecentPeerRecord, RecentPeerStore, StoreError};
 
 use crate::chess_core::{Color, DrawReason, Game, IllegalMove, Move, Outcome};
 use ed25519_dalek::{Signer, SigningKey};

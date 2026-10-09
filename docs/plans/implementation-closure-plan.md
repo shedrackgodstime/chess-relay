@@ -18,6 +18,100 @@ The target is not “a passing demo.” The target is one authoritative model wh
 observable behavior remains deterministic through startup, navigation, retries,
 disconnects, reconnects, persistence, and stale asynchronous work.
 
+## Current execution order
+
+This is the active order for the next sessions. It is deliberately narrower
+than the historical phase numbering: the next item must close or clearly split
+the scope currently being changed before broader cleanup begins.
+
+### 1. Close the postgame/rematch boundary
+
+Priority: highest; current scope.
+
+- Diagnose the `ui_smoke_test.gd` exit `139`; the supported Godot runner is not
+  green until its process exits successfully.
+- Add Rust memory-transport coverage for rematch request, accept, decline,
+  duplicate request, stale ID, send failure, and both peers' fresh setup
+  generation.
+- Add bridge/UI coverage for checkmate, draw, resignation, authenticated leave,
+  unrecovered disconnect, rematch offer, and rematch decline.
+- Verify the terminal barrier: no move, promotion, draw, or clock interaction
+  after terminal state; review remains available; rematch is offered only when
+  the authenticated peer session still permits it.
+
+Exit condition: the postgame/rematch ledger entries are protected by local
+regression tests, the supported Godot runner exits zero, and no local result
+depends on timing or a second screen winning an event race. Live two-process
+evidence remains a separate shipping gate.
+
+### 2. Clean stale documentation and reconcile the contract
+
+Priority: immediately after the current scope is protected.
+
+- Update `godot/docs/HANDOVER.md` so it no longer presents removed mock/live
+  behavior as the current implementation.
+- Mark historical audit and remediation statements as historical, or update
+  them with current evidence; do not leave contradictory “done” claims.
+- Reconcile the active architecture documents with the postgame/rematch
+  contract, current recent-peer/invite behavior, and actual verification state.
+- Re-read `ref/chess-relay` result/menu behavior and preserve explicit citations
+  for behavior adopted from it; do not imply the reference supplied rematch.
+
+Exit condition: a contributor reading the handover, standards, active plan, and
+relevant reference notes gets one consistent current contract and one explicit
+list of unverified behavior.
+
+### 3. Repair enforcement infrastructure
+
+Priority: after documentation agrees with the code, before broader refactors.
+
+- Repair `rust/deny.toml` for the installed `cargo-deny` schema and run the
+  supply-chain gate.
+- Record the `cargo audit` unmaintained-crate warnings and decide whether to
+  replace, accept with rationale, or isolate those dependencies.
+- Ensure the supported combined Godot runner and Rust commands use the exact
+  locked/documented commands from the standards.
+- Add regression checks for stale-generation, duplicate-event, and shutdown
+  behavior required by the cross-layer standard.
+
+Exit condition: all repository gates are executable, their failure modes are
+known, and the closure ledger distinguishes passed, failed, and unavailable
+checks without manual interpretation.
+
+### 4. Remove remaining authority violations
+
+Priority: broader correctness cleanup.
+
+- Remove or explicitly label the out-of-v1 fabricated clock; it must not look
+  authoritative while Rust owns no clock.
+- Remove GDScript FEN parsing/piece tables or replace them with a documented
+  Rust-owned render snapshot contract.
+- Reduce local lifecycle booleans and string role values where a typed bridge
+  snapshot/state can replace them without creating another mirror.
+- Keep Godot limited to intent, rendering, navigation, and temporary visual
+  interaction state.
+
+Exit condition: each remaining mutable value has a named authority and every
+  UI fact can be traced to a bridge snapshot/event or an explicitly local view
+  concern.
+
+### 5. Remove spike identity and finish live integration verification
+
+Priority: shipping readiness.
+
+- Replace or isolate committed spike identities in every path that could be
+  mistaken for real peer identity, including AI/test paths.
+- Run two independent desktop installations through code join, setup
+  synchronization, move exchange, leave, reconnect, checkmate, and rematch.
+- Repeat the applicable flow on Android, including identity reset/install
+  behavior and signed export.
+- Record relay/direct-path and failure-mode results separately; do not collapse
+  them into one “connection works” claim.
+
+Exit condition: bridge/integration findings have real two-process evidence and
+the remaining ledger contains no `Confirmed`, `Assigned`, or unverified
+shipping-critical finding.
+
 ## Rules for this execution
 
 1. No implementation begins from an assumption. Trace the current code and
@@ -199,10 +293,13 @@ network/session fact can be traced to a current core observation.
 
 ### Phase 7 — Enforcement and closure
 
-Status: `Not run`.
+Status: `Blocked by confirmed local gate failure`; Rust gates pass, but the
+supported Godot UI runner exits `139`, and two-process/device verification is
+still open.
 
 - Add regression tests for every confirmed finding and every boundary invariant.
-- Run Rust, Godot, bridge, and integration gates independently and together.
+- Run Rust, Godot, bridge, and integration gates independently and together;
+  do not call the combined gate green when a suite process exits abnormally.
 - Check test counts and failure exit codes; reject skipped/unexecuted suites.
 - Update architecture and standards only when the implemented contract changes.
 - Move each finding through `Implemented`, `Verified`, and `Protected`; leave
@@ -217,13 +314,25 @@ report distinguishes verified behavior from unavailable evidence.
 | --- | --- | --- | --- |
 | `IDENTITY-001` | Network endpoint/session identity regenerates per network start | Implemented | Persistent-identity restart test + endpoint/peer equality; app restart still open |
 | `JOIN-001` | Short-code implementation is not the displayed/used host contract | Implemented | Host-code → resolver contract and UI wiring; live rendezvous still open |
-| `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Verified | Rust recent-peer store tests + rebuilt bridge + Godot empty-state gate and typed population path; production no longer instantiates the mock service |
+| `RECENT-001` | Recent/player list is hardcoded/mock data in production UI | Implemented | Rust owns version-2 recent-peer records with stable identity, latest authenticated endpoint ticket, last successful-contact timestamp, and bridge-exposed presence; Godot renders the Rust query |
+| `INVITE-001` | Morgan incoming/listed-player invite UI has no live backend event contract | Implemented | Authenticated `InviteRequest`/`InviteResponse` messages, bridge signals, persistent-ticket dial, and Morgan accept/decline routing are implemented; two-process verification remains open |
+| `PRESENCE-001` | Recent-peer history is not online presence | Implemented | Presence is a separate Rust-owned live observation (`online`/`offline`/`unknown`); history and ticket retention do not infer it |
+| `TRANSPORT-READY-001` | Host ticket can be generated before Iroh endpoint readiness settles | Implemented | `start_network()` now performs a bounded ten-second `IrohEndpoint::wait_online()` before ticket generation; direct paths remain allowed after timeout. Full Rust suite passes |
 | `DISCOVERY-001` | Discovery controls claim backend state while only changing a local label | Verified | Discovery dialog removed from production; hub explicitly displays unavailable and directs users to invite codes |
 | `LABEL-001` | Game screen hardcodes an opponent name instead of observing the peer identity | Verified | Networked GameScreen receives the bridge-owned peer label; neutral fallback is used when no label exists |
 | `SETUP-001` | Network setup hides shared controls and allows host board entry before guest readiness | Implemented | `LobbyHello` plus durable host `Setup` snapshots; guest is observer-only and auto-acknowledges the host start; both sides advance only through the shared readiness/game-start path |
 | `LIFECYCLE-001` | Bridge/transport/session lifecycle has competing implicit states | Implemented | State transition wiring, startup-order protection, snapshot synchronization, and stale-generation tests; two-process UI integration still open |
 | `SAVE-001` | New games can be hijacked by persisted or finished sessions | Verified | Explicit fresh-start contract, finished-save rejection/purge in both resume paths, and Godot AI regression; user-facing Resume action remains a separate product surface |
-| `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Observed | Authority matrix + removal of duplicate mutable state |
+| `AUTHORITY-001` | Godot and Rust retain overlapping state representations | Protected locally | Clock is explicit mock-only; typed Rust piece snapshots replace GDScript FEN decoding |
+| `DISCONNECT-001` | A peer disconnect left the remaining game board interactive | Implemented | GameScreen now stops clock, closes promotion, clears move affordances, rejects board/promotion/draw input, and retains the last authoritative position; Godot suite passes |
+| `DISCONNECT-002` | Hub invite flow could remain stranded after peer disconnect | Implemented | Morgan outgoing/incoming flows now route disconnects to an explicit failure/ended state with recovery; Godot suite passes |
+| `LEAVE-001` | Lobby/setup leave is indistinguishable from transport failure | Implemented | Retiring a network sends authenticated `Msg::Leave` with bounded acknowledgement; Rust suppresses reconnect, and Godot receives a distinct `peer_left` result |
+| `POSTGAME-001` | Terminal game events had no dedicated presentation or consistent interaction barrier | Implemented | Checkmate/draw/resignation, opponent leave, and unrecovered connection loss now stop interaction and present distinct result cards; menu actions change after terminal state |
+| `REMATCH-001` | Finished network games had no authoritative rematch contract | Implemented | Authenticated rematch request/response messages reset both peers through a fresh setup generation; accept/decline is bridged to the postgame UI |
+| `GATE-UI-001` | Supported Godot runner exited 139 during AppRoot teardown | Protected | `AppRoot._exit_tree()` retires the bridge; full runner passes 25 scripts and 151/151 UI assertions |
+| `REMATCH-VERIFY-001` | Rematch exchange lacked dedicated regression coverage | Protected locally | Memory transport covers request, accept, decline, duplicate, stale-ID rejection, reset, and both fresh generations; live two-process verification remains open |
+| `SUPPLY-CHAIN-001` | Cargo deny policy is not executable with the current config schema | Protected locally | `cargo deny check` passes with explicit licenses and documented transitive advisory exceptions |
+| `DOC-DRIFT-001` | Handover and remediation documents contained stale historical implementation claims | Implemented, locally reconciled | Handover and historical audit headers now point to the active closure ledger; remaining live gaps are explicit |
 
 ## Session handoff rule
 
@@ -237,3 +346,32 @@ At the end of every work session, update this plan with:
 
 No session may end with a broad “done” statement while this ledger contains a
 `Confirmed`, `Assigned`, or `Implemented` finding.
+
+## Latest session handoff — 2026-10-09
+
+Changed the Rust recent-peer record/query, authenticated invite protocol,
+explicit leave protocol, presence signals, endpoint readiness path, Godot
+bridge facade, Morgan hub flow, invite host/guest setup roles, terminal
+game-over presentation, and authenticated rematch flow. This session also
+closed the local authority/policy findings: mock-only clocks, typed Rust-owned
+piece snapshots, per-installation spike role derivation, and executable
+`cargo-deny` policy.
+
+Verification completed:
+
+- `cargo fmt`, `cargo test --locked --all-targets`: 86 unit tests passed, 2 ignored;
+  app/integration suites also passed (23 tests).
+- `cargo clippy --all-targets -- -D warnings`: passed.
+- `RUSTDOCFLAGS='-D warnings' cargo doc --locked --no-deps`: passed.
+- `cargo deny check` from `rust/`: passed; duplicate dependency versions are
+  warnings, and the two transitive unmaintained advisories are explicit policy
+  exceptions.
+- Godot parse/warning-drift passed; all 25 scripts and 151 UI assertions ran,
+  including the game-over-card checks and typed piece rendering, and the
+  supported runner exited zero.
+- `git diff --check`: passed.
+
+Still unavailable here: two independent running installations exercising the
+full Iroh invite/accept/rematch flow over the relay/direct-path matrix, and
+Android on-glass verification. Those are not inferred from local
+memory-transport or Godot assertions.

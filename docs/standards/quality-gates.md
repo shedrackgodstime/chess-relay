@@ -517,15 +517,12 @@ on it.
 
 **Still open, from the foundation audit and not fixed here:**
 
-- **Audit finding 3** — Godot still holds game state the architecture assigns to
-  Rust: the FEN is parsed in GDScript (`FEN_PIECE_TYPES`), the move number is a
-  client counter rather than the log length, and the fabricated ticking clock
-  with `"MORGAN  09:58"` in the scene is still there. The promotion rule and the
-  duplicate piece enum are gone; the rest is not.
-- **Audit finding 4** — `bridge.rs` still forges the opponent with committed
-  seeds `[1u8; 32]` / `[2u8; 32]`, and `game_screen.gd` calls `start()` on every
-  game screen, so every local game runs with a forged opponent holding a signing
-  key. Defensible as a Phase 5 spike, not as the shipped bridge.
+- **Audit finding 3** — closed locally. Rust now exposes typed occupied-square
+  facts; the move number comes from the signed log; and the out-of-v1 clock is
+  static `MOCK` furniture with no local timer or seconds state.
+- **Audit finding 4** — closed locally. The local spike still supports two roles,
+  but no committed shared seeds remain; fresh and persisted role identities are
+  derived per installation. This does not substitute for live transport proof.
 - **Audit finding 5** — `protocol.rs` is an empty placeholder, the tests README
   has been corrected but the handover and `foundation_tightening.md` still
   describe `treat_warnings_as_errors` as a live setting.

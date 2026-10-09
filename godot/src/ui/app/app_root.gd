@@ -41,6 +41,15 @@ func _ready() -> void:
 	_show_home_screen()
 
 
+func _exit_tree() -> void:
+	# Scene-tree teardown is also a shutdown path. Tests and process exit may
+	# remove AppRoot without passing through a screen button; the network owner
+	# must still be retired before its child bridge is released.
+	if _net_bridge != null:
+		_net_bridge.leave_network()
+		_net_bridge = null
+
+
 func _show_home_screen() -> void:
 	var home_screen := HOME_SCREEN.instantiate() as HomeScreen
 	home_screen.play_computer_requested.connect(_on_play_computer_requested)
@@ -68,9 +77,16 @@ func _on_p2p_requested() -> void:
 	hub.create_cancelled.connect(_on_invite_cancelled)
 	hub.join_requested.connect(_on_join_requested)
 	hub.join_cancelled.connect(_on_join_cancelled)
+	hub.player_invite_requested.connect(_on_player_invite_requested)
+	hub.player_invite_cancelled.connect(_on_player_invite_cancelled)
+	hub.incoming_invite_response.connect(_on_incoming_invite_response)
 	hub.game_setup_requested.connect(_on_peer_setup_requested)
 	_show_screen(hub)
-	hub.configure_recent_players(_net(), _identity_path())
+	var net := _net()
+	if not net.start_presence(_identity_path()):
+		hub.configure_recent_players(net, _identity_path())
+		return
+	hub.configure_recent_players(net, _identity_path())
 
 
 ## Hands the live network bridge to whoever needs it, wiring its
@@ -80,8 +96,14 @@ func _net() -> ChessCoreBridge:
 		_net_bridge = ChessCoreBridge.new()
 		add_child(_net_bridge)
 		_net_bridge.peer_connected.connect(_on_net_peer_connected)
+		_net_bridge.incoming_invite.connect(_on_net_incoming_invite)
+		_net_bridge.invite_result.connect(_on_net_invite_result)
+		_net_bridge.peer_presence.connect(_on_net_peer_presence)
 		_net_bridge.network_error.connect(_on_net_network_error)
 		_net_bridge.peer_disconnected.connect(_on_net_peer_disconnected)
+		_net_bridge.peer_left.connect(_on_net_peer_left)
+		_net_bridge.incoming_rematch.connect(_on_net_incoming_rematch)
+		_net_bridge.rematch_result.connect(_on_net_rematch_result)
 		_net_bridge.game_started.connect(_on_net_game_started)
 	return _net_bridge
 
@@ -121,10 +143,28 @@ func _on_join_cancelled(code: String) -> void:
 	join_cancelled.emit(code)
 
 
+func _on_player_invite_requested(ticket: String) -> void:
+	if not _net().invite_peer(ticket, _identity_path()):
+		if _current_screen is MultiplayerHubScreen:
+			(_current_screen as MultiplayerHubScreen).player_invite_failed(
+				"Could not start the invitation.")
+
+
+func _on_player_invite_cancelled() -> void:
+	_leave_network()
+
+
+func _on_incoming_invite_response(invite_id: int, accepted: bool) -> void:
+	if not _net().respond_to_invite(invite_id, accepted):
+		if _current_screen is MultiplayerHubScreen:
+			(_current_screen as MultiplayerHubScreen).player_invite_failed(
+				"The invitation is no longer available.")
+
+
 func _on_peer_setup_requested(opponent_name: String, setup_kind: String) -> void:
 	var setup := GAME_SETUP_SCREEN.instantiate() as GameSetupScreen
 	setup.configure_peer(opponent_name, setup_kind)
-	if (setup_kind == "create" or setup_kind == "join") and _net_if_live() != null:
+	if (setup_kind == "create" or setup_kind == "join" or setup_kind == "invite-host" or setup_kind == "invite-guest" or setup_kind == "rematch-host" or setup_kind == "rematch-guest") and _net_if_live() != null:
 		setup.configure_net_bridge(_net_if_live())
 	setup.settings_requested.connect(_on_settings_requested)
 	setup.leave_requested.connect(_on_game_setup_leave_requested)
@@ -145,7 +185,26 @@ func _show_game_screen(
 	else:
 		game.configure_ai(ai_side, ai_difficulty)
 	game.leave_requested.connect(_on_game_leave_requested)
+	game.rematch_requested.connect(_on_game_rematch_requested)
 	_show_screen(game)
+
+
+func _on_game_rematch_requested() -> void:
+	if _net_bridge == null or not _net_bridge.request_rematch():
+		if _current_screen is GameScreen:
+			(_current_screen as GameScreen).rematch_result_received(false)
+
+
+func _on_net_incoming_rematch(rematch_id: int, peer: String) -> void:
+	if _current_screen is GameScreen:
+		(_current_screen as GameScreen).show_rematch_offer(rematch_id, peer)
+
+
+func _on_net_rematch_result(_rematch_id: int, accepted: bool, peer: String, host: bool) -> void:
+	if _current_screen is GameScreen:
+		(_current_screen as GameScreen).rematch_result_received(accepted)
+	if accepted:
+		_on_peer_setup_requested(peer, "rematch-host" if host else "rematch-guest")
 
 
 ## Leaving a networked game retires its session; leaving a local game
@@ -172,6 +231,21 @@ func _on_net_peer_connected(peer: String) -> void:
 		hub.peer_linked(peer)
 
 
+func _on_net_incoming_invite(invite_id: int, peer: String) -> void:
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).show_incoming_invite(invite_id, peer)
+
+
+func _on_net_invite_result(_invite_id: int, accepted: bool, peer: String) -> void:
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).invite_result_received(accepted, peer)
+
+
+func _on_net_peer_presence(_peer: String, _status: String) -> void:
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).refresh_recent_players(_net(), _identity_path())
+
+
 func _on_net_game_started() -> void:
 	if _current_screen is MultiplayerHubScreen:
 		var opponent := _net_peer if not _net_peer.is_empty() else "Opponent"
@@ -194,6 +268,13 @@ func _on_net_peer_disconnected() -> void:
 		(_current_screen as MultiplayerHubScreen).notify_network_error("Opponent disconnected.")
 	elif _current_screen is GameSetupScreen:
 		(_current_screen as GameSetupScreen).notify_net_issue("Opponent disconnected.")
+
+
+func _on_net_peer_left() -> void:
+	if _current_screen is MultiplayerHubScreen:
+		(_current_screen as MultiplayerHubScreen).notify_network_error("The other player left.")
+	elif _current_screen is GameSetupScreen:
+		(_current_screen as GameSetupScreen).notify_net_issue("The other player left.")
 
 
 ## The live bridge, if any. Null when no networked session exists; setup is

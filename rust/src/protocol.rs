@@ -55,7 +55,30 @@ pub enum Msg {
     LobbyHello {
         /// Must equal [`PROTOCOL_VERSION`].
         version: u16,
+        /// Current endpoint ticket for future direct invitations.
+        ticket: String,
     },
+    /// Requests that the authenticated peer join a new game invitation.
+    InviteRequest {
+        /// Monotonic identifier scoped to the local invite attempt.
+        invite_id: u64,
+        /// Sender identity, checked against the authenticated transport peer.
+        sender: PeerId,
+    },
+    /// Accepts or declines an invite request.
+    InviteResponse {
+        /// Identifier from [`Msg::InviteRequest`].
+        invite_id: u64,
+        /// Whether the recipient accepted.
+        accepted: bool,
+    },
+    /// Explicitly ends the current lobby or game link. This is distinct from
+    /// a transport failure, so the peer can explain that the other player left.
+    Leave,
+    /// Requests a fresh game over the existing authenticated connection.
+    RematchRequest { rematch_id: u64 },
+    /// Accepts or declines a rematch request.
+    RematchResponse { rematch_id: u64, accepted: bool },
     /// Session-start message: version gate plus genesis after the lobby.
     Hello {
         /// Must equal [`PROTOCOL_VERSION`].
@@ -131,7 +154,7 @@ impl Msg {
     pub fn decode(bytes: &[u8]) -> Result<Self, ProtocolError> {
         let msg: Self = postcard::from_bytes(bytes).map_err(|_| ProtocolError::decode())?;
         let version = match &msg {
-            Self::LobbyHello { version } | Self::Hello { version, .. } => Some(*version),
+            Self::LobbyHello { version, .. } | Self::Hello { version, .. } => Some(*version),
             _ => None,
         };
         if version.is_some_and(|version| version != PROTOCOL_VERSION) {
@@ -255,6 +278,21 @@ mod tests {
         let messages = [
             Msg::LobbyHello {
                 version: PROTOCOL_VERSION,
+                ticket: "endpoint-ticket".to_string(),
+            },
+            Msg::InviteRequest {
+                invite_id: 7,
+                sender: peer,
+            },
+            Msg::InviteResponse {
+                invite_id: 7,
+                accepted: true,
+            },
+            Msg::Leave,
+            Msg::RematchRequest { rematch_id: 8 },
+            Msg::RematchResponse {
+                rematch_id: 8,
+                accepted: true,
             },
             Msg::Setup {
                 revision: 1,

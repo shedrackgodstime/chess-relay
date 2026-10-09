@@ -9,22 +9,23 @@
 # not.
 
 [advisories]
-# A known vulnerability in the resolved graph is a hard failure.
-vulnerability = "deny"
 # A yanked release is a hard failure: it can be pulled from the registry, so the
 # lockfile would stop being reproducible.
 yanked = "deny"
-# Unmaintained crates are a judgement call, not a defect. Warn.
-unmaintained = "warn"
-# Informational notices are noise. Warn.
-notice = "warn"
-# No ignored advisories. If one has to be added it needs an inline comment
-# saying why it does not apply and what would remove it; a bare RUSTSEC id is
-# how a real vulnerability hides in plain sight.
+# These are transitive dependencies of the pinned iroh/postcard graph. They
+# are not reachable from application code, and no compatible upstream upgrade
+# is currently available. Keep them explicit here and visible in the separate
+# `cargo audit` report; remove each exception when its parent dependency moves.
+ignore = [
+    "RUSTSEC-2023-0089", # atomic-polyfill via postcard/iroh
+    "RUSTSEC-2024-0436", # paste via iroh/netwatch
+]
 
 [licenses]
-# Permissive only. Anything not listed is denied, so a new dependency with an
-# unusual licence has to be a deliberate decision rather than a default.
+# Explicitly allow the licenses emitted by the verified Godot/iroh graph.
+# MPL-2.0 is required by Godot's generated bindings; GPL-family licenses are
+# still not allowed. Unicode-3.0, CDLA-Permissive-2.0, and Unlicense are
+# dependency metadata licenses, not project source licenses.
 allow = [
     "MIT",
     "Apache-2.0",
@@ -36,11 +37,11 @@ allow = [
     "0BSD",
     "BSL-1.0",
     "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "Unlicense",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
 ]
-# Hard, not warn. The standard is explicit that depending on GPL-3.0 shakmaty
-# would infect the crate; this is the line that says so in a way that runs.
-copyleft = "deny"
-default = "deny"
 confidence-threshold = 0.8
 # A licence we do not recognise should be surfaced rather than denied outright,
 # so the failure message is informative instead of a bare "unknown".

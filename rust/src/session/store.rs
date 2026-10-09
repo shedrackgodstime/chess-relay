@@ -20,6 +20,7 @@
 
 use super::log::LogEntry;
 use super::log::PeerId;
+use serde::{Deserialize, Serialize};
 use std::backtrace::Backtrace;
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
@@ -30,8 +31,10 @@ const MAGIC: &[u8; 6] = b"CRLOG1";
 const FILE_VERSION: u16 = 1;
 /// File magic for the local recent-peer index.
 const RECENT_MAGIC: &[u8; 6] = b"CRPEER";
-/// Recent-peer index format version.
-const RECENT_FILE_VERSION: u16 = 1;
+/// Recent-peer index format version with endpoint and last-seen metadata.
+const RECENT_FILE_VERSION: u16 = 2;
+/// Previous recent-peer index format, retained for one-way migration.
+const LEGACY_RECENT_FILE_VERSION: u16 = 1;
 /// Bound local history so the index cannot grow without limit.
 const MAX_RECENT_PEERS: usize = 20;
 
@@ -145,6 +148,21 @@ pub struct RecentPeerStore {
     path: PathBuf,
 }
 
+/// Durable observation of a peer previously reached by this installation.
+///
+/// `ticket` is the last dialable endpoint ticket received for this peer. It is
+/// an addressing observation, not a presence guarantee: the endpoint may be
+/// offline or its address may have changed since `last_seen_unix_secs`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecentPeerRecord {
+    /// Stable endpoint/session identity.
+    pub peer: PeerId,
+    /// Last usable endpoint ticket, when one was available.
+    pub ticket: Option<String>,
+    /// Unix timestamp in seconds of the last successful contact.
+    pub last_seen_unix_secs: u64,
+}
+
 impl RecentPeerStore {
     /// Stores the index at `path`.
     #[must_use]
@@ -154,8 +172,8 @@ impl RecentPeerStore {
         }
     }
 
-    /// Loads the ordered peer index, empty when it does not exist.
-    pub fn load(&self) -> Result<Vec<PeerId>, StoreError> {
+    /// Loads the ordered peer records, newest contact first.
+    pub fn load(&self) -> Result<Vec<RecentPeerRecord>, StoreError> {
         let bytes = match std::fs::read(&self.path) {
             Ok(bytes) => bytes,
             Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
@@ -164,40 +182,77 @@ impl RecentPeerStore {
         if bytes.len() < 8 || &bytes[..6] != RECENT_MAGIC {
             return Err(StoreError::decode("bad recent-peer magic".to_string()));
         }
-        if u16::from_le_bytes(
+        let version = u16::from_le_bytes(
             bytes[6..8]
                 .try_into()
                 .map_err(|_| StoreError::decode("short recent-peer header".to_string()))?,
-        ) != RECENT_FILE_VERSION
-        {
-            return Err(StoreError::decode(
-                "unsupported recent-peer version".to_string(),
-            ));
-        }
-        let peers: Vec<PeerId> = postcard::from_bytes(&bytes[8..])?;
-        if peers.len() > MAX_RECENT_PEERS {
+        );
+        let records: Vec<RecentPeerRecord> = match version {
+            RECENT_FILE_VERSION => postcard::from_bytes(&bytes[8..])?,
+            LEGACY_RECENT_FILE_VERSION => postcard::from_bytes::<Vec<PeerId>>(&bytes[8..])?
+                .into_iter()
+                .map(|peer| RecentPeerRecord {
+                    peer,
+                    ticket: None,
+                    last_seen_unix_secs: 0,
+                })
+                .collect(),
+            _ => {
+                return Err(StoreError::decode(
+                    "unsupported recent-peer version".to_string(),
+                ));
+            }
+        };
+        if records.len() > MAX_RECENT_PEERS {
             return Err(StoreError::decode(
                 "recent-peer index exceeds bound".to_string(),
             ));
         }
-        if peers.windows(2).any(|pair| pair[0] == pair[1]) {
+        if records.windows(2).any(|pair| pair[0].peer == pair[1].peer) {
             return Err(StoreError::decode(
                 "recent-peer index contains duplicates".to_string(),
             ));
         }
-        Ok(peers)
+        if records.iter().any(|record| {
+            record
+                .ticket
+                .as_ref()
+                .is_some_and(|ticket| ticket.is_empty())
+        }) {
+            return Err(StoreError::decode(
+                "recent-peer record contains an empty ticket".to_string(),
+            ));
+        }
+        Ok(records)
     }
 
-    /// Records one successfully connected peer as the newest entry.
-    pub fn record(&mut self, peer: PeerId) -> Result<(), StoreError> {
-        let mut peers = self.load()?;
-        peers.retain(|known| *known != peer);
-        peers.insert(0, peer);
-        peers.truncate(MAX_RECENT_PEERS);
-        let mut bytes = Vec::with_capacity(8 + peers.len() * 34);
+    /// Inserts or replaces one successfully contacted peer.
+    pub fn upsert(
+        &mut self,
+        peer: PeerId,
+        ticket: Option<String>,
+        last_seen_unix_secs: u64,
+    ) -> Result<(), StoreError> {
+        if ticket.as_ref().is_some_and(String::is_empty) {
+            return Err(StoreError::decode(
+                "recent-peer ticket cannot be empty".to_string(),
+            ));
+        }
+        let mut records = self.load()?;
+        records.retain(|known| known.peer != peer);
+        records.insert(
+            0,
+            RecentPeerRecord {
+                peer,
+                ticket,
+                last_seen_unix_secs,
+            },
+        );
+        records.truncate(MAX_RECENT_PEERS);
+        let mut bytes = Vec::with_capacity(8 + records.len() * 64);
         bytes.extend_from_slice(RECENT_MAGIC);
         bytes.extend_from_slice(&RECENT_FILE_VERSION.to_le_bytes());
-        bytes.extend(postcard::to_stdvec(&peers)?);
+        bytes.extend(postcard::to_stdvec(&records)?);
         std::fs::write(&self.path, bytes)?;
         Ok(())
     }
@@ -367,10 +422,41 @@ mod tests {
         let first = PeerId::of(&SigningKey::from_bytes(&[3u8; 32]));
         let second = PeerId::of(&SigningKey::from_bytes(&[4u8; 32]));
         let mut store = RecentPeerStore::new(&path);
-        store.record(first).unwrap();
-        store.record(second).unwrap();
-        store.record(first).unwrap();
-        assert_eq!(store.load().unwrap(), vec![first, second]);
+        store.upsert(first, None, 1).unwrap();
+        store.upsert(second, None, 2).unwrap();
+        store.upsert(first, None, 3).unwrap();
+        assert_eq!(
+            store
+                .load()
+                .unwrap()
+                .into_iter()
+                .map(|record| record.peer)
+                .collect::<Vec<_>>(),
+            vec![first, second]
+        );
+        std::fs::remove_file(path).ok();
+    }
+
+    #[test]
+    fn recent_peer_store_retains_latest_ticket_and_timestamp() {
+        let path = std::env::temp_dir().join(format!(
+            "chess-relay-recent-record-{}-{}",
+            std::process::id(),
+            std::thread::current().name().unwrap_or("test")
+        ));
+        let peer = PeerId::of(&SigningKey::from_bytes(&[5u8; 32]));
+        let mut store = RecentPeerStore::new(&path);
+        store
+            .upsert(peer, Some("endpoint-ticket".to_string()), 1234)
+            .unwrap();
+        assert_eq!(
+            store.load().unwrap(),
+            vec![RecentPeerRecord {
+                peer,
+                ticket: Some("endpoint-ticket".to_string()),
+                last_seen_unix_secs: 1234,
+            }]
+        );
         std::fs::remove_file(path).ok();
     }
 

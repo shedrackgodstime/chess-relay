@@ -97,10 +97,6 @@ unique_name_in_owner = true
 
 [node name="HUD" type="CanvasLayer" parent="."]
 
-[node name="ClockTimer" type="Timer" parent="."]
-wait_time = 1.0
-autostart = true
-
 [node name="HUDRoot" type="Control" parent="HUD"]
 layout_mode = 3
 anchors_preset = 15

@@ -19,18 +19,19 @@ use crate::chess_core::{Board, Color as ChessColor, Move, Square};
 use crate::protocol::{Msg, PROTOCOL_VERSION};
 use crate::session::{LogEntry, LogStore, PeerId, RecentPeerStore};
 use crate::transport::{Connection, Endpoint as _, TransportError, TransportQuality};
+use crate::transport_iroh::ticket_peer_id;
 use ed25519_dalek::{Signer, SigningKey};
 use godot::prelude::*;
 use sha2::{Digest, Sha256};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-const LOCAL_SEED: [u8; 32] = [1u8; 32];
-const SPIKE_PEER_SEED: [u8; 32] = [2u8; 32];
+const LOCAL_SPIKE_LABEL: &[u8] = b"chess-relay/local-spike/v1";
+const AI_SPIKE_LABEL: &[u8] = b"chess-relay/local-ai/v1";
 
 /// Everything the bridge shares between the scene thread and (later)
 /// network tasks. Always accessed through [`ChessRelayBridge::lock`],
@@ -56,6 +57,40 @@ struct CoreState {
     /// Bumped on every host/join/leave so late tasks from a retired
     /// network go silent instead of emitting stale signals.
     net_generation: u64,
+    next_invite_id: u64,
+    presence: HashMap<PeerId, PeerPresence>,
+    pending_invite: Option<PendingInvite>,
+    remote_left: bool,
+    local_secret: Option<SigningKey>,
+    next_rematch_id: u64,
+    pending_rematch: Option<(u64, PeerId)>,
+    outgoing_rematch: Option<u64>,
+    rematch_host: bool,
+    rematch_generation: u64,
+}
+
+/// Presence is a live observation owned by the Rust bridge, never inferred by
+/// Godot from a saved ticket or timestamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PeerPresence {
+    Unknown,
+    Online,
+    Offline,
+}
+
+impl PeerPresence {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Unknown => "unknown",
+            Self::Online => "online",
+            Self::Offline => "offline",
+        }
+    }
+}
+
+struct PendingInvite {
+    invite_id: u64,
+    response: tokio::sync::oneshot::Sender<bool>,
 }
 
 /// Durable transport observation consumed by every UI surface. Quality is
@@ -141,6 +176,16 @@ enum NetCmd {
     },
     SendReady,
     Flush,
+    Leave {
+        acknowledged: tokio::sync::oneshot::Sender<()>,
+    },
+    RematchRequest {
+        rematch_id: u64,
+    },
+    RematchResponse {
+        rematch_id: u64,
+        accepted: bool,
+    },
 }
 
 /// A live network handoff: everything a link task needs after setup.
@@ -154,6 +199,39 @@ struct NetLaunch {
 #[derive(Debug)]
 enum NetNote {
     Connected(PeerId),
+    PeerAddress {
+        peer: PeerId,
+        ticket: String,
+    },
+    IncomingInvite {
+        invite_id: u64,
+        peer: PeerId,
+        response: tokio::sync::oneshot::Sender<bool>,
+    },
+    IncomingInviteReady {
+        invite_id: u64,
+        peer: PeerId,
+    },
+    InviteAccepted {
+        invite_id: u64,
+        peer: PeerId,
+    },
+    InviteDeclined {
+        invite_id: u64,
+        peer: PeerId,
+    },
+    PeerOffline(PeerId),
+    PeerLeft,
+    IncomingRematch {
+        rematch_id: u64,
+        peer: PeerId,
+    },
+    RematchResult {
+        rematch_id: u64,
+        peer: PeerId,
+        accepted: bool,
+        host: bool,
+    },
     Reconnecting,
     Quality {
         level: u8,
@@ -171,6 +249,12 @@ enum NetNote {
     #[allow(dead_code)]
     Disconnected,
     Error(String),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AcceptMode {
+    Game,
+    Invite,
 }
 
 #[derive(GodotClass)]
@@ -216,6 +300,18 @@ impl ChessRelayBridge {
     #[signal]
     fn peer_connected(peer: GString);
     #[signal]
+    fn incoming_invite(invite_id: i64, peer: GString);
+    #[signal]
+    fn invite_result(invite_id: i64, accepted: bool, peer: GString);
+    #[signal]
+    fn peer_presence(peer: GString, status: GString);
+    #[signal]
+    fn peer_left();
+    #[signal]
+    fn incoming_rematch(rematch_id: i64, peer: GString);
+    #[signal]
+    fn rematch_result(rematch_id: i64, accepted: bool, peer: GString, host: bool);
+    #[signal]
     fn network_reconnecting();
     #[signal]
     fn network_quality(level: i64, rtt_ms: i64, loss_percent: i64, direct: bool);
@@ -242,8 +338,13 @@ impl ChessRelayBridge {
     /// with the transport path.
     #[func]
     fn start(&mut self) {
-        let local_key = SigningKey::from_bytes(&LOCAL_SEED);
-        let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
+        let mut seed = [0u8; 32];
+        if let Err(err) = getrandom::getrandom(&mut seed) {
+            self.emit_error(&format!("could not create local spike identity: {err}"));
+            return;
+        }
+        let local_key = SigningKey::from_bytes(&seed);
+        let peer_key = derive_role_key(&seed, LOCAL_SPIKE_LABEL);
         let (events, errors) = {
             let mut core = self.lock();
             start_fresh(&mut core, local_key, peer_key)
@@ -276,10 +377,11 @@ impl ChessRelayBridge {
             self.emit_error(&err.to_string());
             return false;
         }
-        // Same spike peer model as start(): one device plays both sides
-        // until transport arrives. Only the local identity persists.
+        // Same local peer model as start(): one device plays both sides until
+        // transport arrives. Only the local identity persists; the peer role
+        // is derived, never a committed identity.
         let local_key = SigningKey::from_bytes(&seed);
-        let peer_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
+        let peer_key = derive_role_key(&seed, LOCAL_SPIKE_LABEL);
         let (restored, events, stale_finished) = {
             let mut core = self.lock();
             core.save_path = Some(save_path.clone());
@@ -354,7 +456,7 @@ impl ChessRelayBridge {
             return false;
         }
         let local_key = SigningKey::from_bytes(&seed);
-        let ai_key = SigningKey::from_bytes(&SPIKE_PEER_SEED);
+        let ai_key = derive_role_key(&seed, AI_SPIKE_LABEL);
         let local_peer = PeerId::of(&local_key);
         let ai_peer = PeerId::of(&ai_key);
         let difficulty = parse_difficulty(&difficulty.to_string());
@@ -493,6 +595,7 @@ impl ChessRelayBridge {
                     launch.endpoint,
                     launch.generation,
                     launch.cmd_rx,
+                    AcceptMode::Game,
                 ));
             }
         }
@@ -544,6 +647,207 @@ impl ChessRelayBridge {
                     launch.cmd_rx,
                 ));
             }
+        }
+        true
+    }
+
+    /// Keeps a network endpoint listening in the multiplayer hub so a saved
+    /// peer can reach this installation with an invitation.
+    #[func]
+    fn start_presence(&mut self, identity_path: String) -> bool {
+        let seed = match load_or_create_seed(&identity_path) {
+            Ok(seed) => seed,
+            Err(err) => {
+                self.emit_error(&err.to_string());
+                return false;
+            }
+        };
+        let old = {
+            let mut core = self.lock();
+            begin_retire(&mut core)
+        };
+        finish_retire(old);
+        let launch = {
+            let mut core = self.lock();
+            match start_network(&mut core, seed, recent_peers_path(&identity_path)) {
+                Ok(launch) => launch,
+                Err(message) => {
+                    drop(core);
+                    self.emit_error(&message);
+                    return false;
+                }
+            }
+        };
+        let core = self.lock();
+        if let Some(net) = core.net.as_ref() {
+            net.runtime.spawn(accept_task(
+                Arc::clone(&self.core),
+                launch.endpoint,
+                launch.generation,
+                launch.cmd_rx,
+                AcceptMode::Invite,
+            ));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Dials a saved peer ticket and sends a new game invitation.
+    #[func]
+    fn invite_peer(&mut self, ticket: GString, identity_path: String) -> bool {
+        let ticket = ticket.to_string();
+        if ticket.is_empty() {
+            self.emit_error("selected peer has no usable endpoint ticket");
+            return false;
+        }
+        let seed = match load_or_create_seed(&identity_path) {
+            Ok(seed) => seed,
+            Err(err) => {
+                self.emit_error(&err.to_string());
+                return false;
+            }
+        };
+        let old = {
+            let mut core = self.lock();
+            begin_retire(&mut core)
+        };
+        finish_retire(old);
+        let launch = {
+            let mut core = self.lock();
+            match start_network(&mut core, seed, recent_peers_path(&identity_path)) {
+                Ok(launch) => launch,
+                Err(message) => {
+                    drop(core);
+                    self.emit_error(&message);
+                    return false;
+                }
+            }
+        };
+        let invite_id = {
+            let mut core = self.lock();
+            core.next_invite_id = core.next_invite_id.wrapping_add(1).max(1);
+            core.next_invite_id
+        };
+        let core = self.lock();
+        if let Some(net) = core.net.as_ref() {
+            net.runtime.spawn(invite_task(
+                Arc::clone(&self.core),
+                launch.endpoint,
+                ticket,
+                invite_id,
+                launch.generation,
+                launch.cmd_rx,
+            ));
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Answers the one currently displayed incoming invitation.
+    #[func]
+    fn respond_to_invite(&mut self, invite_id: i64, accepted: bool) -> bool {
+        let invite_id = match u64::try_from(invite_id) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        let pending = {
+            let mut core = self.lock();
+            let matches = core
+                .pending_invite
+                .as_ref()
+                .is_some_and(|pending| pending.invite_id == invite_id);
+            if matches {
+                core.pending_invite.take()
+            } else {
+                None
+            }
+        };
+        let Some(pending) = pending else {
+            self.emit_error("invitation is no longer pending");
+            return false;
+        };
+        pending.response.send(accepted).is_ok()
+    }
+
+    /// Requests a fresh game over the still-authenticated peer connection.
+    #[func]
+    fn request_rematch(&mut self) -> bool {
+        let (tx, rematch_id) = {
+            let mut core = self.lock();
+            let Some(tx) = core.net.as_ref().map(|net| net.cmd_tx.clone()) else {
+                drop(core);
+                self.emit_error("no network active");
+                return false;
+            };
+            core.next_rematch_id = core.next_rematch_id.wrapping_add(1).max(1);
+            let rematch_id = core.next_rematch_id;
+            core.outgoing_rematch = Some(rematch_id);
+            core.rematch_host = true;
+            (tx, rematch_id)
+        };
+        if tx.send(NetCmd::RematchRequest { rematch_id }).is_err() {
+            self.emit_error("network connection closed");
+            return false;
+        }
+        true
+    }
+
+    /// Answers the currently displayed rematch request.
+    #[func]
+    fn respond_to_rematch(&mut self, rematch_id: i64, accepted: bool) -> bool {
+        let rematch_id = match u64::try_from(rematch_id) {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        let response = {
+            let mut core = self.lock();
+            match core.pending_rematch.as_ref().copied() {
+                None => Err("rematch is no longer pending"),
+                Some((pending_id, _)) if pending_id != rematch_id => {
+                    Err("rematch identifier mismatch")
+                }
+                Some((_, peer)) => match core.net.as_ref().map(|net| net.cmd_tx.clone()) {
+                    None => Err("no network active"),
+                    Some(tx) => {
+                        core.pending_rematch = None;
+                        if accepted {
+                            reset_for_rematch(&mut core, false);
+                        }
+                        Ok((tx, peer))
+                    }
+                },
+            }
+        };
+        let (tx, peer) = match response {
+            Ok(value) => value,
+            Err(message) => {
+                self.emit_error(message);
+                return false;
+            }
+        };
+        if tx
+            .send(NetCmd::RematchResponse {
+                rematch_id,
+                accepted,
+            })
+            .is_err()
+        {
+            return false;
+        }
+        if accepted {
+            let generation = self.lock().net_generation;
+            note(
+                &self.core,
+                generation,
+                NetNote::RematchResult {
+                    rematch_id,
+                    peer,
+                    accepted: true,
+                    host: false,
+                },
+            );
         }
         true
     }
@@ -682,8 +986,8 @@ impl ChessRelayBridge {
             core.network_setup = Some(setup.clone());
             core.net.as_ref().map(|net| net.cmd_tx.clone())
         };
-        if let Some(tx) = tx {
-            if tx
+        if let Some(tx) = tx
+            && tx
                 .send(NetCmd::UpdateSetup {
                     revision: setup.revision,
                     side: setup.side,
@@ -691,10 +995,9 @@ impl ChessRelayBridge {
                     variant: setup.variant,
                 })
                 .is_err()
-            {
-                self.emit_error("network connection closed");
-                return false;
-            }
+        {
+            self.emit_error("network connection closed");
+            return false;
         }
         true
     }
@@ -763,9 +1066,9 @@ impl ChessRelayBridge {
     fn recent_players(&mut self, identity_path: String) -> PackedStringArray {
         let mut players = PackedStringArray::new();
         match RecentPeerStore::new(&recent_peers_path(&identity_path)).load() {
-            Ok(peers) => {
-                for peer in peers {
-                    let display = peer.to_string();
+            Ok(records) => {
+                for record in records {
+                    let display = record.peer.to_string();
                     let display = GString::from(display.as_str());
                     players.push(&display);
                 }
@@ -775,6 +1078,48 @@ impl ChessRelayBridge {
             }
         }
         players
+    }
+
+    /// Returns the Rust-owned recent-peer records, newest contact first.
+    ///
+    /// The timestamp and ticket are observations. Neither implies that the
+    /// peer is currently online; presence requires a live backend signal.
+    #[func]
+    fn recent_peer_records(
+        &mut self,
+        identity_path: String,
+    ) -> Array<Dictionary<Variant, Variant>> {
+        let mut result = Array::new();
+        match RecentPeerStore::new(&recent_peers_path(&identity_path)).load() {
+            Ok(records) => {
+                for record in records {
+                    let mut item = Dictionary::<Variant, Variant>::new();
+                    let peer = GString::from(&record.peer.to_string());
+                    item.set("peer", &peer);
+                    let ticket = record
+                        .ticket
+                        .map(|ticket| GString::from(ticket.as_str()))
+                        .unwrap_or_default();
+                    item.set("ticket", &ticket);
+                    item.set("last_seen_unix_secs", record.last_seen_unix_secs as i64);
+                    let presence = self
+                        .lock()
+                        .presence
+                        .get(&record.peer)
+                        .copied()
+                        .unwrap_or(PeerPresence::Unknown)
+                        .as_str()
+                        .to_string();
+                    let presence_text = GString::from(presence.as_str());
+                    item.set("presence", &presence_text);
+                    result.push(&item);
+                }
+            }
+            Err(err) => {
+                self.emit_error(&format!("recent peer history unavailable: {err}"));
+            }
+        }
+        result
     }
 
     /// Reports whether the local recent-peer index can be read.
@@ -893,6 +1238,44 @@ impl ChessRelayBridge {
             Some(QueryResult::GameState(view)) => GString::from(&view.fen),
             _ => GString::from(""),
         }
+    }
+
+    /// Returns the authoritative occupied squares for rendering and hit-test
+    /// decoration. The UI receives typed facts; it does not parse FEN.
+    #[func]
+    fn position_pieces(&self) -> Array<Dictionary<Variant, Variant>> {
+        let mut result = Array::new();
+        let fen = self.fen().to_string();
+        let Ok(board) = Board::from_fen(&fen) else {
+            return result;
+        };
+        for rank in 0..8 {
+            for file in 0..8 {
+                let Ok(square) = Square::from_xy(file, rank) else {
+                    continue;
+                };
+                let Some(piece) = board.piece_at(square) else {
+                    continue;
+                };
+                let mut item = Dictionary::<Variant, Variant>::new();
+                let square_text = GString::from(square.to_string().as_str());
+                let side_text = GString::from(piece.color.to_string().as_str());
+                let role = match piece.role {
+                    crate::chess_core::Role::Pawn => "pawn",
+                    crate::chess_core::Role::Knight => "knight",
+                    crate::chess_core::Role::Bishop => "bishop",
+                    crate::chess_core::Role::Rook => "rook",
+                    crate::chess_core::Role::Queen => "queen",
+                    crate::chess_core::Role::King => "king",
+                };
+                let role_text = GString::from(role);
+                item.set("square", &square_text);
+                item.set("side", &side_text);
+                item.set("role", &role_text);
+                result.push(&item);
+            }
+        }
+        result
     }
 
     /// Side to move as `"white"`, `"black"`, or `""` before play starts.
@@ -1114,20 +1497,91 @@ impl INode for ChessRelayBridge {
         for note in &notes {
             match note {
                 NetNote::Connected(peer) => {
+                    let peer = GString::from(&peer.to_string());
+                    self.signals().peer_connected().emit(&peer);
+                }
+                NetNote::PeerAddress { peer, ticket } => {
+                    {
+                        let mut core = self.lock();
+                        core.presence.insert(*peer, PeerPresence::Online);
+                    }
                     let record_error = {
                         let core = self.lock();
                         core.recent_peers_path.as_ref().and_then(|path| {
-                            RecentPeerStore::new(path)
-                                .record(*peer)
-                                .err()
-                                .map(|err| err.to_string())
+                            let timestamp = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .map(|duration| duration.as_secs());
+                            match timestamp {
+                                Ok(timestamp) => RecentPeerStore::new(path)
+                                    .upsert(*peer, Some(ticket.clone()), timestamp)
+                                    .err()
+                                    .map(|err| err.to_string()),
+                                Err(err) => {
+                                    Some(format!("system clock is before Unix epoch: {err}"))
+                                }
+                            }
                         })
                     };
                     if let Some(message) = record_error {
                         self.emit_error(&format!("recent peer history unavailable: {message}"));
                     }
-                    let peer = GString::from(&peer.to_string());
-                    self.signals().peer_connected().emit(&peer);
+                    let peer_text = GString::from(&peer.to_string());
+                    let status = GString::from(PeerPresence::Online.as_str());
+                    self.signals().peer_presence().emit(&peer_text, &status);
+                }
+                NetNote::IncomingInviteReady { invite_id, peer } => {
+                    let peer_text = GString::from(&peer.to_string());
+                    self.signals()
+                        .incoming_invite()
+                        .emit(*invite_id as i64, &peer_text);
+                }
+                NetNote::IncomingInvite { .. } => {}
+                NetNote::InviteAccepted { invite_id, peer } => {
+                    self.lock().presence.insert(*peer, PeerPresence::Online);
+                    let peer_text = GString::from(&peer.to_string());
+                    self.signals()
+                        .invite_result()
+                        .emit(*invite_id as i64, true, &peer_text);
+                }
+                NetNote::InviteDeclined { invite_id, peer } => {
+                    {
+                        let mut core = self.lock();
+                        core.presence.insert(*peer, PeerPresence::Online);
+                    }
+                    let peer_text = GString::from(&peer.to_string());
+                    self.signals()
+                        .invite_result()
+                        .emit(*invite_id as i64, false, &peer_text);
+                }
+                NetNote::PeerOffline(peer) => {
+                    self.lock().presence.insert(*peer, PeerPresence::Offline);
+                    let peer_text = GString::from(&peer.to_string());
+                    let status = GString::from(PeerPresence::Offline.as_str());
+                    self.signals().peer_presence().emit(&peer_text, &status);
+                }
+                NetNote::PeerLeft => {
+                    self.lock().remote_left = true;
+                    self.signals().peer_left().emit();
+                }
+                NetNote::IncomingRematch { rematch_id, peer } => {
+                    let peer_text = GString::from(&peer.to_string());
+                    self.signals()
+                        .incoming_rematch()
+                        .emit(*rematch_id as i64, &peer_text);
+                }
+                NetNote::RematchResult {
+                    rematch_id,
+                    peer,
+                    accepted,
+                    host,
+                } => {
+                    let peer_text = GString::from(&peer.to_string());
+                    self.signals().rematch_result().emit(
+                        *rematch_id as i64,
+                        *accepted,
+                        &peer_text,
+                        *host,
+                    );
                 }
                 NetNote::Reconnecting => {
                     self.signals().network_reconnecting().emit();
@@ -1540,6 +1994,21 @@ fn turn_peer(core: &CoreState) -> Option<PeerId> {
     }
 }
 
+fn reset_for_rematch(core: &mut CoreState, host: bool) {
+    if let Some(secret) = core.local_secret.clone() {
+        core.app = Some(App::with_local(secret));
+    }
+    core.network_setup = None;
+    core.next_setup_revision = 0;
+    core.network_peer_loaded = false;
+    core.outbox.clear();
+    core.offer_by = None;
+    core.pending_rematch = None;
+    core.outgoing_rematch = None;
+    core.rematch_host = host;
+    core.rematch_generation = core.rematch_generation.wrapping_add(1);
+}
+
 /// Builds a runtime, binds an endpoint on the persisted installation seed, records `me`,
 /// clears any previous session, and retires any previous network.
 /// Returns the handoff a link task needs after setup.
@@ -1556,6 +2025,10 @@ fn start_network(
     let endpoint = runtime
         .block_on(crate::IrohEndpoint::bind_with_seed(seed))
         .map_err(|err| format!("endpoint bind failed: {err}"))?;
+    // Relay readiness improves the ticket but is not required for a direct
+    // path; retain the bounded wait without making relay availability a
+    // hidden hard dependency.
+    let _online = runtime.block_on(endpoint.wait_online(Duration::from_secs(10)));
     let me = PeerId::of(&secret);
     if endpoint.id_bytes() != me.bytes() {
         return Err("endpoint identity diverged from peer identity".to_string());
@@ -1564,6 +2037,14 @@ fn start_network(
     let generation = core.net_generation;
     core.me = me;
     core.remote_peer = None;
+    core.presence.clear();
+    core.pending_invite = None;
+    core.remote_left = false;
+    core.local_secret = Some(secret.clone());
+    core.pending_rematch = None;
+    core.outgoing_rematch = None;
+    core.rematch_host = false;
+    core.rematch_generation = 0;
     core.network_setup = None;
     core.next_setup_revision = 0;
     core.network_snapshot = NetworkSnapshot {
@@ -1602,6 +2083,12 @@ fn begin_retire(core: &mut CoreState) -> Option<NetState> {
         ..NetworkSnapshot::default()
     };
     core.net_notes.clear();
+    core.presence.clear();
+    core.pending_invite = None;
+    core.remote_left = false;
+    core.pending_rematch = None;
+    core.outgoing_rematch = None;
+    core.rematch_host = false;
     core.net.take()
 }
 
@@ -1611,6 +2098,11 @@ fn begin_retire(core: &mut CoreState) -> Option<NetState> {
 fn finish_retire(net: Option<NetState>) {
     if let Some(net) = net {
         net.runtime.block_on(async {
+            let (ack_tx, ack_rx) = tokio::sync::oneshot::channel();
+            let _ = net.cmd_tx.send(NetCmd::Leave {
+                acknowledged: ack_tx,
+            });
+            let _ = tokio::time::timeout(Duration::from_millis(500), ack_rx).await;
             if let Some(code) = net.invite_code.as_deref() {
                 crate::unpublish(code).await;
             }
@@ -1627,6 +2119,7 @@ async fn accept_task(
     mut endpoint: crate::IrohEndpoint,
     generation: u64,
     mut cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
+    mode: AcceptMode,
 ) {
     loop {
         let conn = match endpoint.accept().await {
@@ -1646,13 +2139,259 @@ async fn accept_task(
             }
             guard.remote_peer = Some(guest);
         }
-        note(&core, generation, NetNote::Connected(guest));
-        drive_session(&core, conn, &mut cmd_rx, generation, true).await;
+        let local_ticket = endpoint.ticket();
+        match mode {
+            AcceptMode::Game => {
+                note(&core, generation, NetNote::Connected(guest));
+                drive_session(
+                    &core,
+                    conn,
+                    local_ticket,
+                    &mut cmd_rx,
+                    generation,
+                    true,
+                    true,
+                )
+                .await;
+            }
+            AcceptMode::Invite => {
+                drive_incoming_invite(&core, conn, local_ticket, &mut cmd_rx, generation).await;
+            }
+        }
+        if remote_left(&core, generation) {
+            return;
+        }
         if !is_current(&core, generation) || cmd_rx.is_closed() {
             return;
         }
         note(&core, generation, NetNote::Reconnecting);
     }
+}
+
+/// Handles one incoming invitation on the hub's presence endpoint. The
+/// connection remains open while Godot displays the Morgan invite card.
+async fn drive_incoming_invite(
+    core: &Arc<Mutex<CoreState>>,
+    mut conn: crate::IrohConnection,
+    local_ticket: String,
+    cmd_rx: &mut tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
+    generation: u64,
+) {
+    let peer = {
+        let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard.remote_peer
+    };
+    let Some(peer) = peer else {
+        note(
+            core,
+            generation,
+            NetNote::Error("peer identity missing".to_string()),
+        );
+        return;
+    };
+    if conn
+        .send(&Msg::LobbyHello {
+            version: PROTOCOL_VERSION,
+            ticket: local_ticket.clone(),
+        })
+        .await
+        .is_err()
+    {
+        return;
+    }
+    let Ok(remote_hello) = conn.recv().await else {
+        note(
+            core,
+            generation,
+            NetNote::Error("invite handshake failed".to_string()),
+        );
+        return;
+    };
+    if on_msg(core, &mut conn, remote_hello, generation, false)
+        .await
+        .is_err()
+    {
+        return;
+    }
+    let invite = match conn.recv().await {
+        Ok(Msg::InviteRequest { invite_id, sender }) if sender == peer => (invite_id, sender),
+        Ok(_) => {
+            note(
+                core,
+                generation,
+                NetNote::Error("invalid invitation request".to_string()),
+            );
+            return;
+        }
+        Err(_) => return,
+    };
+    let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+    note(
+        core,
+        generation,
+        NetNote::IncomingInvite {
+            invite_id: invite.0,
+            peer: invite.1,
+            response: response_tx,
+        },
+    );
+    let accepted = tokio::select! {
+        result = response_rx => result.unwrap_or(false),
+        command = cmd_rx.recv() => {
+            if let Some(NetCmd::Leave { acknowledged }) = command {
+                let _ = conn.send(&Msg::Leave).await;
+                let _ = acknowledged.send(());
+            }
+            return;
+        }
+        result = conn.recv() => {
+            if result.is_err() {
+                return;
+            }
+            return;
+        }
+    };
+    if conn
+        .send(&Msg::InviteResponse {
+            invite_id: invite.0,
+            accepted,
+        })
+        .await
+        .is_err()
+    {
+        return;
+    }
+    if !accepted {
+        note(
+            core,
+            generation,
+            NetNote::InviteDeclined {
+                invite_id: invite.0,
+                peer,
+            },
+        );
+        return;
+    }
+    note(core, generation, NetNote::Connected(peer));
+    drive_session(core, conn, local_ticket, cmd_rx, generation, false, false).await;
+}
+
+/// Dials a saved ticket and waits for the recipient's explicit response
+/// before converting the connection into a game session.
+async fn invite_task(
+    core: Arc<Mutex<CoreState>>,
+    endpoint: crate::IrohEndpoint,
+    ticket: String,
+    invite_id: u64,
+    generation: u64,
+    mut cmd_rx: tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
+) {
+    let mut endpoint = endpoint;
+    let mut conn = match endpoint.connect(&ticket).await {
+        Ok(conn) => conn,
+        Err(err) => {
+            if let Some(peer) = ticket_peer_id(&ticket).map(|id| PeerId::from_bytes(*id.as_bytes()))
+            {
+                note(&core, generation, NetNote::PeerOffline(peer));
+            }
+            note(
+                &core,
+                generation,
+                NetNote::Error(format!("peer invite could not connect: {err}")),
+            );
+            return;
+        }
+    };
+    let peer = PeerId::from_bytes(conn.peer_id_bytes());
+    {
+        let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+        if guard.net_generation != generation {
+            return;
+        }
+        guard.remote_peer = Some(peer);
+    }
+    let local_ticket = endpoint.ticket();
+    if conn
+        .send(&Msg::LobbyHello {
+            version: PROTOCOL_VERSION,
+            ticket: local_ticket.clone(),
+        })
+        .await
+        .is_err()
+    {
+        return;
+    }
+    let Ok(remote_hello) = conn.recv().await else {
+        note(
+            &core,
+            generation,
+            NetNote::Error("invite handshake failed".to_string()),
+        );
+        return;
+    };
+    if on_msg(&core, &mut conn, remote_hello, generation, true)
+        .await
+        .is_err()
+    {
+        return;
+    }
+    if conn
+        .send(&Msg::InviteRequest {
+            invite_id,
+            sender: {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.me
+            },
+        })
+        .await
+        .is_err()
+    {
+        return;
+    }
+    let accepted = loop {
+        tokio::select! {
+            command = cmd_rx.recv() => {
+                if let Some(NetCmd::Leave { acknowledged }) = command {
+                    let _ = conn.send(&Msg::Leave).await;
+                    let _ = acknowledged.send(());
+                }
+                return;
+            }
+            message = conn.recv() => match message {
+                Ok(Msg::InviteResponse {
+                    invite_id: response_id,
+                    accepted,
+                }) if response_id == invite_id => break accepted,
+                Ok(Msg::LobbyHello { .. }) => continue,
+                Ok(_) => continue,
+                Err(_) => return,
+            }
+        }
+    };
+    if !accepted {
+        note(
+            &core,
+            generation,
+            NetNote::InviteDeclined { invite_id, peer },
+        );
+        return;
+    }
+    note(
+        &core,
+        generation,
+        NetNote::InviteAccepted { invite_id, peer },
+    );
+    note(&core, generation, NetNote::Connected(peer));
+    drive_session(
+        &core,
+        conn,
+        local_ticket,
+        &mut cmd_rx,
+        generation,
+        true,
+        false,
+    )
+    .await;
 }
 
 /// Background dial for the guest: resolves short codes through
@@ -1715,7 +2454,20 @@ async fn join_task(
         }
         failures = 0;
         note(&core, generation, NetNote::Connected(host));
-        drive_session(&core, conn, &mut cmd_rx, generation, false).await;
+        let local_ticket = endpoint.ticket();
+        drive_session(
+            &core,
+            conn,
+            local_ticket,
+            &mut cmd_rx,
+            generation,
+            false,
+            true,
+        )
+        .await;
+        if remote_left(&core, generation) {
+            return;
+        }
         if !is_current(&core, generation) || cmd_rx.is_closed() {
             return;
         }
@@ -1731,11 +2483,34 @@ fn is_current(core: &Arc<Mutex<CoreState>>, generation: u64) -> bool {
         == generation
 }
 
+fn remote_left(core: &Arc<Mutex<CoreState>>, generation: u64) -> bool {
+    let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    guard.net_generation == generation && guard.remote_left
+}
+
 /// Pushes a note for the scene thread, unless a newer network retired
 /// this session mid-flight.
 fn note(core: &Arc<Mutex<CoreState>>, generation: u64, note: NetNote) {
     let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if guard.net_generation == generation {
+        if let NetNote::IncomingInvite {
+            invite_id,
+            peer,
+            response,
+        } = note
+        {
+            if let Some(previous) = guard.pending_invite.take() {
+                let _ = previous.response.send(false);
+            }
+            guard.pending_invite = Some(PendingInvite {
+                invite_id,
+                response,
+            });
+            guard
+                .net_notes
+                .push_back(NetNote::IncomingInviteReady { invite_id, peer });
+            return;
+        }
         match &note {
             NetNote::Connected(_) => {
                 guard.network_snapshot.lifecycle = "connected".to_string();
@@ -1761,7 +2536,23 @@ fn note(core: &Arc<Mutex<CoreState>>, generation: u64, note: NetNote) {
                 guard.network_snapshot.rtt_ms = -1;
                 guard.network_snapshot.loss_percent = -1;
             }
-            NetNote::Setup { .. } | NetNote::PeerLoaded => {}
+            NetNote::PeerLeft => {
+                guard.remote_left = true;
+                guard.network_snapshot.lifecycle = "lost".to_string();
+                guard.network_snapshot.level = 0;
+                guard.network_snapshot.rtt_ms = -1;
+                guard.network_snapshot.loss_percent = -1;
+            }
+            NetNote::Setup { .. }
+            | NetNote::PeerLoaded
+            | NetNote::PeerAddress { .. }
+            | NetNote::IncomingInvite { .. }
+            | NetNote::IncomingInviteReady { .. }
+            | NetNote::InviteAccepted { .. }
+            | NetNote::InviteDeclined { .. }
+            | NetNote::PeerOffline(_)
+            | NetNote::IncomingRematch { .. }
+            | NetNote::RematchResult { .. } => {}
         }
         guard.net_notes.push_back(note);
     }
@@ -1786,31 +2577,48 @@ fn apply(core: &Arc<Mutex<CoreState>>, command: Command) -> Result<(), String> {
 async fn drive_session<C: Connection>(
     core: &Arc<Mutex<CoreState>>,
     mut conn: C,
+    local_ticket: String,
     cmd_rx: &mut tokio::sync::mpsc::UnboundedReceiver<NetCmd>,
     generation: u64,
     host_role: bool,
+    handshake: bool,
 ) {
     let mut sent_seq = next_local_seq(core);
+    let mut seen_rematch_generation = core
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .rematch_generation;
     let mut quality_tick = tokio::time::interval(Duration::from_secs(2));
     quality_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-    if conn
-        .send(&Msg::LobbyHello {
-            version: PROTOCOL_VERSION,
-        })
-        .await
-        .is_err()
-    {
-        note(core, generation, NetNote::Disconnected);
-        return;
-    }
-    if send_resume_snapshot(core, &mut conn, generation, host_role)
-        .await
-        .is_err()
-    {
-        note(core, generation, NetNote::Disconnected);
-        return;
+    if handshake {
+        if conn
+            .send(&Msg::LobbyHello {
+                version: PROTOCOL_VERSION,
+                ticket: local_ticket,
+            })
+            .await
+            .is_err()
+        {
+            note(core, generation, NetNote::Disconnected);
+            return;
+        }
+        if send_resume_snapshot(core, &mut conn, generation, host_role)
+            .await
+            .is_err()
+        {
+            note(core, generation, NetNote::Disconnected);
+            return;
+        }
     }
     loop {
+        let rematch_generation = core
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .rematch_generation;
+        if rematch_generation != seen_rematch_generation {
+            sent_seq = next_local_seq(core);
+            seen_rematch_generation = rematch_generation;
+        }
         tokio::select! {
             _ = quality_tick.tick() => {
                 if let Some(sample) = conn.quality() {
@@ -1879,6 +2687,23 @@ async fn drive_session<C: Connection>(
                             .await
                             .is_err()
                         {
+                            note(core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
+                    Some(NetCmd::Leave { acknowledged }) => {
+                        let _ = conn.send(&Msg::Leave).await;
+                        let _ = acknowledged.send(());
+                        return;
+                    }
+                    Some(NetCmd::RematchRequest { rematch_id }) => {
+                        if conn.send(&Msg::RematchRequest { rematch_id }).await.is_err() {
+                            note(core, generation, NetNote::Disconnected);
+                            return;
+                        }
+                    }
+                    Some(NetCmd::RematchResponse { rematch_id, accepted }) => {
+                        if conn.send(&Msg::RematchResponse { rematch_id, accepted }).await.is_err() {
                             note(core, generation, NetNote::Disconnected);
                             return;
                         }
@@ -1958,17 +2783,15 @@ async fn send_resume_snapshot<C: Connection>(
     if entries.len() > 1 && conn.send(&Msg::Resume { entries }).await.is_err() {
         return Err(());
     }
-    if host_role {
-        if let Some(setup) = setup {
-            conn.send(&Msg::Setup {
-                revision: setup.revision,
-                side: setup.side,
-                time: setup.time,
-                variant: setup.variant,
-            })
-            .await
-            .map_err(|_| ())?;
-        }
+    if host_role && let Some(setup) = setup {
+        conn.send(&Msg::Setup {
+            revision: setup.revision,
+            side: setup.side,
+            time: setup.time,
+            variant: setup.variant,
+        })
+        .await
+        .map_err(|_| ())?;
     }
     Ok(())
 }
@@ -2016,7 +2839,7 @@ async fn on_msg<C: Connection>(
     host_role: bool,
 ) -> Result<(), ()> {
     match msg {
-        Msg::LobbyHello { version } => {
+        Msg::LobbyHello { version, ticket } => {
             if version != PROTOCOL_VERSION {
                 note(
                     core,
@@ -2025,6 +2848,103 @@ async fn on_msg<C: Connection>(
                 );
                 return Err(());
             }
+            let peer = {
+                let guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                guard.remote_peer
+            };
+            let Some(peer) = peer else {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("peer identity missing".to_string()),
+                );
+                return Err(());
+            };
+            if ticket.is_empty() {
+                // MemoryTransport tests do not have an Iroh ticket. Real
+                // network handshakes always carry one and are validated.
+                return Ok(());
+            }
+            let Some(ticket_peer) = ticket_peer_id(&ticket) else {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("invalid peer ticket".to_string()),
+                );
+                return Err(());
+            };
+            if ticket_peer.as_bytes() != &peer.bytes() {
+                note(
+                    core,
+                    generation,
+                    NetNote::Error("peer ticket identity mismatch".to_string()),
+                );
+                return Err(());
+            }
+            note(core, generation, NetNote::PeerAddress { peer, ticket });
+            Ok(())
+        }
+        Msg::Leave => {
+            note(core, generation, NetNote::PeerLeft);
+            Err(())
+        }
+        Msg::RematchRequest { rematch_id } => {
+            let peer = {
+                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                let Some(peer) = guard.remote_peer else {
+                    note(
+                        core,
+                        generation,
+                        NetNote::Error("rematch peer identity missing".to_string()),
+                    );
+                    return Err(());
+                };
+                guard.pending_rematch = Some((rematch_id, peer));
+                peer
+            };
+            note(
+                core,
+                generation,
+                NetNote::IncomingRematch { rematch_id, peer },
+            );
+            Ok(())
+        }
+        Msg::RematchResponse {
+            rematch_id,
+            accepted,
+        } => {
+            let result = {
+                let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                if guard.outgoing_rematch != Some(rematch_id) {
+                    Err("rematch identifier mismatch")
+                } else if let Some(peer) = guard.remote_peer {
+                    if accepted {
+                        reset_for_rematch(&mut guard, true);
+                    } else {
+                        guard.outgoing_rematch = None;
+                    }
+                    Ok(peer)
+                } else {
+                    Err("rematch peer identity missing")
+                }
+            };
+            let peer = match result {
+                Ok(peer) => peer,
+                Err(message) => {
+                    note(core, generation, NetNote::Error(message.to_string()));
+                    return Err(());
+                }
+            };
+            note(
+                core,
+                generation,
+                NetNote::RematchResult {
+                    rematch_id,
+                    peer,
+                    accepted,
+                    host: true,
+                },
+            );
             Ok(())
         }
         Msg::Hello { version, genesis } => {
@@ -2348,6 +3268,14 @@ async fn on_msg<C: Connection>(
             Err(())
         }
         Msg::Tip { .. } | Msg::Fen { .. } => Ok(()),
+        Msg::InviteRequest { .. } | Msg::InviteResponse { .. } => {
+            note(
+                core,
+                generation,
+                NetNote::Error("invite message arrived outside invite handshake".to_string()),
+            );
+            Err(())
+        }
     }
 }
 
@@ -2380,21 +3308,22 @@ fn sync_resume(
             if existing.hash() != remote_entry.hash() {
                 return Err("resume rejected: log mismatch".to_string());
             }
-            if remote_entry.seq > 0 && existing.co_sig.is_none() {
-                if let Some(sig) = remote_entry.co_sig {
-                    let app = guard
-                        .app
-                        .as_mut()
-                        .ok_or_else(|| "resume rejected: no session".to_string())?;
-                    let mut events = app
-                        .handle(&Command::NoteMoveAgreed {
-                            seq: remote_entry.seq,
-                            co_sig: sig,
-                        })
-                        .map_err(|err| err.to_string())?;
-                    events.extend(app.drain());
-                    guard.outbox.extend(events);
-                }
+            if remote_entry.seq > 0
+                && existing.co_sig.is_none()
+                && let Some(sig) = remote_entry.co_sig
+            {
+                let app = guard
+                    .app
+                    .as_mut()
+                    .ok_or_else(|| "resume rejected: no session".to_string())?;
+                let mut events = app
+                    .handle(&Command::NoteMoveAgreed {
+                        seq: remote_entry.seq,
+                        co_sig: sig,
+                    })
+                    .map_err(|err| err.to_string())?;
+                events.extend(app.drain());
+                guard.outbox.extend(events);
             }
             continue;
         }
@@ -2479,6 +3408,17 @@ fn load_or_create_seed(path: &str) -> Result<[u8; 32], crate::session::StoreErro
     Ok(seed)
 }
 
+/// Derives an in-process local role from the persisted installation seed.
+/// This keeps the hot-seat/AI spike usable without shipping a shared identity
+/// that makes every installation look like the same peer.
+fn derive_role_key(seed: &[u8; 32], label: &[u8]) -> SigningKey {
+    let mut hasher = Sha256::new();
+    hasher.update(label);
+    hasher.update(seed);
+    let digest: [u8; 32] = hasher.finalize().into();
+    SigningKey::from_bytes(&digest)
+}
+
 /// Removes the previous local match before an explicit fresh start.
 fn clear_saved_game(path: &str) -> Result<(), crate::session::StoreError> {
     match std::fs::remove_file(path) {
@@ -2554,6 +3494,16 @@ mod tests {
         .expect("condition met in time");
     }
 
+    async fn poll_until_named(label: &str, condition: impl Fn() -> bool) {
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !condition() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .unwrap_or_else(|_| panic!("condition met in time: {label}"));
+    }
+
     fn has_game_started(core: &Arc<Mutex<CoreState>>) -> bool {
         core.lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -2626,6 +3576,7 @@ mod tests {
             guard.net_generation = 1;
             guard.me = host_peer;
             guard.remote_peer = Some(guest_peer);
+            guard.local_secret = Some(host_key.clone());
             guard.app = Some(App::with_local(host_key));
         }
         {
@@ -2633,19 +3584,29 @@ mod tests {
             guard.net_generation = 1;
             guard.me = guest_peer;
             guard.remote_peer = Some(host_peer);
+            guard.local_secret = Some(guest_key.clone());
             guard.app = Some(App::with_local(guest_key));
         }
 
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                drive_session(&core, host_conn, &mut host_rx, 1, true).await;
+                drive_session(&core, host_conn, String::new(), &mut host_rx, 1, true, true).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                drive_session(&core, guest_conn, &mut guest_rx, 1, false).await;
+                drive_session(
+                    &core,
+                    guest_conn,
+                    String::new(),
+                    &mut guest_rx,
+                    1,
+                    false,
+                    true,
+                )
+                .await;
             }
         });
 
@@ -2733,6 +3694,56 @@ mod tests {
         poll_until(|| has_move_agreed(&guest_core, 2)).await;
         assert_eq!(fen_of(&host_core), fen_of(&guest_core));
 
+        // A rematch is a protocol exchange, not a local scene reset. The
+        // guest receives the request, accepts it, and both authenticated
+        // peers enter a fresh setup generation with an empty move log.
+        host_core
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .outgoing_rematch = Some(41);
+        host_tx
+            .send(NetCmd::RematchRequest { rematch_id: 41 })
+            .unwrap();
+        poll_until_named("guest received rematch request", || {
+            guest_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .pending_rematch
+                == Some((41, host_peer))
+        })
+        .await;
+        {
+            let mut guard = guest_core
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            reset_for_rematch(&mut guard, false);
+        }
+        guest_tx
+            .send(NetCmd::RematchResponse {
+                rematch_id: 41,
+                accepted: true,
+            })
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let host_generation = host_core
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .rematch_generation;
+        let guest_generation = guest_core
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .rematch_generation;
+        assert_eq!(
+            (
+                move_log_len(&host_core),
+                move_log_len(&guest_core),
+                host_generation,
+                guest_generation
+            ),
+            (0, 0, 1, 1),
+            "both peers must reset for rematch"
+        );
+
         drop(host_tx);
         drop(guest_tx);
         tokio::time::timeout(Duration::from_secs(5), host_task)
@@ -2743,6 +3754,91 @@ mod tests {
             .await
             .expect("guest driver exits")
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn rematch_control_rejects_stale_and_handles_decline_and_duplicate() {
+        let hub = MemoryTransport::new();
+        let mut host_ep = hub.endpoint();
+        let mut guest_ep = hub.endpoint();
+        let ticket = host_ep.ticket();
+        let _guest_conn = guest_ep.connect(&ticket).await.unwrap();
+        let mut host_conn = host_ep.accept().await.unwrap();
+        let host_peer = peer_of([31u8; 32]);
+        let guest_peer = peer_of([32u8; 32]);
+        let host_core = Arc::new(Mutex::new(CoreState::default()));
+        let guest_core = Arc::new(Mutex::new(CoreState::default()));
+        {
+            let mut guard = host_core.lock().unwrap();
+            guard.me = host_peer;
+            guard.remote_peer = Some(guest_peer);
+            guard.outgoing_rematch = Some(7);
+        }
+        {
+            let mut guard = guest_core.lock().unwrap();
+            guard.me = guest_peer;
+            guard.remote_peer = Some(host_peer);
+        }
+
+        let stale = on_msg(
+            &host_core,
+            &mut host_conn,
+            Msg::RematchResponse {
+                rematch_id: 99,
+                accepted: true,
+            },
+            0,
+            true,
+        )
+        .await;
+        assert!(stale.is_err(), "stale rematch IDs must be rejected");
+        assert_eq!(
+            host_core.lock().unwrap().outgoing_rematch,
+            Some(7),
+            "a stale response must not consume the pending request"
+        );
+
+        on_msg(
+            &host_core,
+            &mut host_conn,
+            Msg::RematchResponse {
+                rematch_id: 7,
+                accepted: false,
+            },
+            0,
+            true,
+        )
+        .await
+        .expect("matching decline is a valid response");
+        assert_eq!(
+            host_core.lock().unwrap().outgoing_rematch,
+            None,
+            "decline clears the pending request"
+        );
+
+        on_msg(
+            &guest_core,
+            &mut host_conn,
+            Msg::RematchRequest { rematch_id: 8 },
+            0,
+            false,
+        )
+        .await
+        .expect("first rematch request is accepted");
+        on_msg(
+            &guest_core,
+            &mut host_conn,
+            Msg::RematchRequest { rematch_id: 8 },
+            0,
+            false,
+        )
+        .await
+        .expect("duplicate rematch request is idempotent");
+        assert_eq!(
+            guest_core.lock().unwrap().pending_rematch,
+            Some((8, host_peer)),
+            "duplicate request must not create a different pending ID"
+        );
     }
 
     /// Host chooses Black: guest is assigned White, receives genesis,
@@ -2786,13 +3882,22 @@ mod tests {
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                drive_session(&core, host_conn, &mut host_rx, 1, true).await;
+                drive_session(&core, host_conn, String::new(), &mut host_rx, 1, true, true).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                drive_session(&core, guest_conn, &mut guest_rx, 1, false).await;
+                drive_session(
+                    &core,
+                    guest_conn,
+                    String::new(),
+                    &mut guest_rx,
+                    1,
+                    false,
+                    true,
+                )
+                .await;
             }
         });
 
@@ -2911,13 +4016,22 @@ mod tests {
         let host_task = tokio::spawn({
             let core = Arc::clone(&host_core);
             async move {
-                drive_session(&core, host_conn, &mut host_rx, 1, true).await;
+                drive_session(&core, host_conn, String::new(), &mut host_rx, 1, true, true).await;
             }
         });
         let guest_task = tokio::spawn({
             let core = Arc::clone(&guest_core);
             async move {
-                drive_session(&core, guest_conn, &mut guest_rx, 1, false).await;
+                drive_session(
+                    &core,
+                    guest_conn,
+                    String::new(),
+                    &mut guest_rx,
+                    1,
+                    false,
+                    true,
+                )
+                .await;
             }
         });
 
@@ -3021,7 +4135,13 @@ mod tests {
                 invite_code: None,
             });
         }
-        spawner.spawn(accept_task(core.clone(), endpoint, 1, cmd_rx));
+        spawner.spawn(accept_task(
+            core.clone(),
+            endpoint,
+            1,
+            cmd_rx,
+            AcceptMode::Game,
+        ));
         std::thread::sleep(Duration::from_millis(200));
         let old = {
             let mut guard = core.lock().unwrap_or_else(|poisoned| poisoned.into_inner());

@@ -16,6 +16,7 @@ signal invite_pressed
 @export var display_name := "Player"
 @export var presence := ""
 @export var is_recent := false
+@export var ticket := ""
 
 @onready var _avatar: Label = %Avatar
 @onready var _name_label: Label = %Name
@@ -32,10 +33,11 @@ func _ready() -> void:
 ## Shows a person. Called once when the row is made and again if it is reused, so
 ## both paths go through the same place rather than one setting text and the other
 ## setting fields.
-func configure(name_text: String, presence_text: String, recent: bool) -> void:
+func configure(name_text: String, presence_text: String, recent: bool, ticket_text: String = "") -> void:
 	display_name = name_text
 	presence = presence_text
 	is_recent = recent
+	ticket = ticket_text
 	if is_node_ready():
 		_apply()
 
@@ -45,7 +47,7 @@ func configure(name_text: String, presence_text: String, recent: bool) -> void:
 ## Used while another flow is active: the row stays legible so the list does not
 ## jump, but an invite cannot be started halfway through something else.
 func set_invite_enabled(enabled: bool) -> void:
-	_invite_button.disabled = not enabled
+	_invite_button.disabled = not enabled or ticket.is_empty()
 
 
 ## The initial, rather than the whole name, because the avatar is a circle and a

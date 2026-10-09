@@ -11,8 +11,9 @@ changed and they are the ones to know before anything else:
 - The test suite used to report success while **78 of 146 checks had never executed**.
   Fixed, and the harness now cannot report success without saying how many ran. §7.
 - The Rust core **had never loaded** on the machine that ran those tests, so the last
-  three commits' "runs on real core state" was unproven. Fixed on the project's side;
-  this device cannot load it at all, for an environment reason. §4, §7.
+  three commits' "runs on real core state" was unproven. That historical environment
+  limitation is recorded in §4; the current rebuilt extension loads and local bridge
+  checks run.
 - `treat_warnings_as_errors` **was not a Godot setting** and never had been since 2023.
   It looked set, it reported `true`, it did nothing. §3.
 
@@ -119,11 +120,13 @@ Keep writing them.
 
 ## 2. Where the project actually is
 
-### Working, end to end
+### Working locally; live boundary evidence remains separate
 
 - **Screens:** home, game setup (VS Computer and P2P), multiplayer hub, game
-- **Multiplayer hub:** create code, join code, invite a listed player, receive an invite,
-  recover from a decline — all five states, driven by `MockMultiplayerService`
+- **Multiplayer hub:** create code, join code, recent authenticated peers, listed-player
+  invites, incoming invites, and presence are Rust-bridge paths. Remaining live
+  two-process and Android evidence is tracked separately; mock outcomes are not
+  treated as network proof.
 - **Board:** 64 squares, frame, plinth, coordinate labels, highlights, per-square picking
 - **Camera:** orbit, flip, pinch zoom, touch drag — verified on a device
 - **Pieces:** a 1k set imported as scenes with embedded meshes, both colourways, knights
@@ -131,28 +134,28 @@ Keep writing them.
 - **Checks:** `bash godot/tests/run_all_checks.sh` — per-file parse with
   warnings-as-errors, a warning-key drift gate, and every `*_test.gd` suite with
   stderr treated as a failure. Backed by `.github/workflows/gates.yml`.
-  **61 of 148 UI checks do not execute on this device**, all of them behind the
-  bridge; see §4 on why, and §3 for what that means for the evidence.
+  The supported runner currently executes 151/151 UI assertions with the rebuilt
+  bridge and exits zero; the exact command and environment remain the evidence source.
 
-### Not started
+### Explicitly out of v1 or still open
 
 - **Chess rules.** None in Godot. They belong to Rust's `chess_core`, per
   `application_core.md`. Do not write them here.
-- **Multiplayer.** The mock service is a presentation fixture. There is no transport.
-- **Clocks, trays, promotion UI, captures.**
+- **Clocks:** reserved/out of v1; the current strip is explicitly mock furniture and
+  must not be treated as authoritative time.
+- **FEN parsing and committed spike identities:** locally closed: Rust now supplies
+  typed piece facts, and no committed shared spike identity remains. Live network
+  verification is still open.
+- **Live relay/direct-path and Android verification:** not inferred from local tests.
 
 ### Half-live, and it matters
 
-- **Movement.** The command/event boundary *is* wired: `game_screen.gd` goes
-  through `ChessCoreBridge` for legal moves, `submit_move`, and FEN. It has never
-  run to completion on a device that can load the core, so treat it as written but
-  unproven.
-- **The clock is fabricated.** `_white_seconds := 600` in `game_screen.gd`, and
-  `game_screen.tscn` hard-codes `"MORGAN  09:58"` and `"10:00  YOU"`. A `Timer`
-  ticks it down. `application_core.md` puts clocks **out of v1** and says the host
-  would be the timekeeper. Nobody is timekeeping; the display implies someone is.
-  Either delete it or label it in the scene as out-of-scope furniture. Leaving it
-  looking real is the worst of the three.
+- **Movement.** The command/event boundary is wired: `game_screen.gd` goes through
+  `ChessCoreBridge` for legal moves, `submit_move`, and the position snapshot. Rust
+  and Godot local bridge suites exercise it; live two-process movement remains open.
+- **The clock is intentionally mock-only.** The strip displays `MOCK`, has no
+  timer or local seconds state, and only the move number/turn come from the core.
+  A real host-authoritative timekeeper remains out of v1.
 
 ### Staged plan
 
@@ -162,22 +165,18 @@ Keep writing them.
   than authored. Attempted once and reverted; read the original first this time.
 - **Stage 2, world — done.**
 - **Stage 3, pieces — done, differently than planned.** See §3.
-- **Stage 7, contract — written, never verified.** The bridge is wired and typed; it has
-  not completed a round-trip on any device. This is the gap §7 is about.
+- **Current contract — locally verified, live boundary open.** The bridge is wired and
+  typed; memory transport and Godot bridge suites pass, while independent-device
+  Iroh verification remains open.
 
 ### What to do next, in order
 
-1. **Look at the board.** Open the project on a desktop, where the core can load. 61 UI
-   checks have never executed and the round-trip has never run. Expect real findings;
-   they are information, not regression.
-2. **Watch the first CI run.** It builds the core and runs those 61 checks on a stock
-   Linux runner, where `dlopen` works. The workflow has never executed either, so treat
-   a syntax or action-tag failure as a workflow bug rather than a project one.
-3. **Stop the bridge forging the opponent.** `bridge.rs` holds committed seeds and
-   `game_screen.gd` calls `start()` on every game screen. Mark it spike-only at the call
-   site at minimum. See §3.
-4. **Then the boundary:** move number from the signed log rather than a client counter;
-   decide the fabricated clock's fate; stop parsing the core's FEN in GDScript.
+1. **Protect postgame/rematch.** Keep the supported Godot runner green and add the
+   rematch/terminal regression cases in the active closure plan.
+2. **Reconcile documentation.** This handover and historical audits must agree with
+   the current bridge contract and explicitly label unavailable live evidence.
+3. **Repair enforcement.** Make the cargo supply-chain gate executable, then address
+   the remaining authority findings and live desktop/Android verification.
 
 ---
 
@@ -199,8 +198,9 @@ made rather than deferred.
 The editor dropdown is gone. That was the correct trade: a dropdown implies this
 project is the authority on which pieces exist, and it is not.
 
-`FEN_PIECE_TYPES` in `game_screen.gd` is still a mapping in GDScript — see the
-flags below.
+The historical FEN-piece mapping finding is closed locally: Rust now exposes
+`position_pieces()` facts, and the screen renders that snapshot. See the active
+closure plan for current evidence.
 
 ### The theme lost 268 lines and gained 229
 
@@ -255,33 +255,19 @@ Deliberate. `_build_frame()` makes four raised rails around a plinth, and the ge
 that was replacing it emitted a slab — same name, different silhouette. It moves when it
 moves as rails.
 
-### The bridge forges the opponent, and nothing at the call site says so
+### The local spike has no committed shared identity
 
-`rust/src/bridge.rs` holds `LOCAL_SEED = [1u8; 32]` and `SPIKE_PEER_SEED = [2u8; 32]`
-as committed constants. `start()` creates both keys, admits the second, signs genesis
-with it, co-signs entries, and marks both sides ready — one process playing both sides
-with full authority over both.
+The local spike still admits a second role so one process can exercise both sides, but
+it no longer ships `[1; 32]`/`[2; 32]` shared identities. Fresh starts use a random
+local seed; resumable/AI roles derive from the installation seed and a role-specific
+label. This remains a local-only spike path and must not be used as evidence for live
+peer identity.
 
-The Rust doc comment is honest that this is a Phase 5 spike shortcut. **The GDScript
-side is not.** `game_screen.gd` calls `_bridge.start()` on every game screen, so every
-local game runs against a forged opponent holding a signing key derived from `[2u8; 32]`,
-and nothing in `godot/` marks it temporary.
+### Piece facts cross the bridge as typed observations
 
-Defensible as a spike. Not defensible as the shipped bridge, and it is the single
-worst thing left in the repository. Mark it spike-only at the call site today, and
-replace it with the transport path before anyone builds a feature on local play.
-
-### The core's FEN is still parsed in GDScript
-
-`game_screen.gd` has `FEN_PIECE_TYPES` and `_build_position_from_fen()`, which walks the
-placement field and calls `_add_piece`. That is a second reader of the position, in the
-client, beside `chess_core`.
-
-Rendering from an arriving FEN is legitimate — the arch doc says Godot renders the
-board. The concern is that this is *parsing*, in GDScript, and that the same file also
-holds `FEN_PIECE_TYPES` as a piece table. Under the escalating warning gate these are
-now typed and checked, which is an improvement and not the same thing as being one
-source of truth.
+The Rust bridge exposes occupied squares with side and role fields. `game_screen.gd`
+renders those facts and uses the same snapshot for capture decoration; it no longer
+maintains a FEN piece table or decodes the placement field.
 
 ---
 
@@ -314,10 +300,13 @@ source of truth.
   script. Use `CARGO_TARGET_DIR=/tmp/...`. The documented `cargo test` never worked on the
   machine that wrote it.
 
-### This device cannot load the Rust core at all
+### Historical environment limitation
 
-**This is the single most useful thing to know before touching the bridge, and it is not
-a project defect.**
+The following limitation described an older Termux/Godot environment. It is
+not the current verification state: the rebuilt extension loads here and the
+supported Godot runner completes 151/151 assertions.
+
+On that older environment, the limitation was not a project defect:
 
 Termux's `godot-headless` is a wrapper. It runs the Linux glibc Godot binary through
 Termux's glibc sysroot:
@@ -333,17 +322,17 @@ Adding a `libdl.so` symlink to the library path instead makes the loader resolve
 — a linker script, not an ELF — and fail with `invalid ELF header`. Both verified with a
 minimal probe project.
 
-So on this device: `ClassDB.class_exists("ChessRelayBridge")` is always false, the game
-screen renders no pieces, and every bridge-dependent check fails. **That is the 61 checks
-that do not run.**
+In that older environment, `ClassDB.class_exists("ChessRelayBridge")` was false,
+the game screen rendered no pieces, and bridge-dependent checks failed. That
+historical result must not be reused as current evidence.
 
 `bridge_spike_test.gd` prints which of three causes it is — extension missing, library not
 built, host cannot `dlopen` — and **fails in all of them**. That is deliberate. The suite
 exists because a missing core was once reported as a pass, and swapping "always green" for
 "always red for an environment reason" would trade one lie for another.
 
-**Verify the bridge on a desktop or in CI.** CI runs on a stock Linux x86_64 runner, where
-`dlopen` works, and builds the core before running the suites.
+**For current verification, rebuild the extension and run the supported runner.**
+Independent desktop/Android Iroh verification remains a separate open gate.
 
 ### `.godot/extension_list.cfg` is gitignored and required
 
@@ -382,10 +371,8 @@ Two things it needs that are not obvious:
 - **The Rust core library must be built and copied to `godot/bin/`.** Without it,
   `chess_relay.gdextension` registers nothing, the board renders no pieces, and
   every bridge-dependent check fails. The runner says which of the three causes it
-  is. On this device it is *always* the third one: Termux's glibc sysroot has
-  `libdl.so.2` but no `libdl.so`, so the Linux Godot binary run through the
-  `godot-headless` wrapper cannot `dlopen` any extension. Verify that gate on a
-  desktop or in CI.
+  is. If the host cannot load it, record that as an environment limitation and
+  do not describe bridge assertions as verified.
 - **`.godot/extension_list.cfg` must list the extension.** It is git-ignored with
   the rest of `.godot/`, and without it Godot never considers the
   `.gdextension` file at all — which looks exactly like a missing library entry.

@@ -2,6 +2,7 @@ class_name GameScreen
 extends Control
 
 signal leave_requested
+signal rematch_requested
 
 
 @onready var _board: ChessBoardView = %Board
@@ -11,7 +12,6 @@ signal leave_requested
 @onready var _opponent_clock: Label = $HUD/HUDRoot/ClockStrip/Content/OpponentClock
 @onready var _player_clock: Label = $HUD/HUDRoot/ClockStrip/Content/PlayerClock
 @onready var _move_number_label: Label = $HUD/HUDRoot/ClockStrip/Content/MoveNumber
-@onready var _clock_timer: Timer = $ClockTimer
 @onready var _picker: PromotionPicker = %PromotionPicker
 
 const CAMERA_TARGET := Vector3(0.0, -0.45, 0.0)
@@ -19,7 +19,6 @@ const PIECE_VIEW_SCENE := preload("res://src/game/pieces/piece_view.tscn")
 const IDENTITY_FILE := "user://chess_relay_identity.key"
 const SAVE_FILE := "user://chess_relay_save.bin"
 const AI_SAVE_FILE := "user://chess_relay_ai_save.bin"
-const FEN_PIECE_TYPES := {"p": "pawn", "n": "knight", "b": "bishop", "r": "rook", "q": "queen", "k": "king"}
 var _camera_scale := 1.0
 var _is_multiplayer := false
 var _is_ai := false
@@ -28,11 +27,9 @@ var _ai_difficulty := "Medium"
 var _fresh_start := false
 var _opponent_name := "Opponent"
 var _active_clock_side := "white"
-# Out-of-scope furniture, not timekeeping: application_core.md puts the
-# clock out of v1 (the host would be timekeeper). This strip only shows
-# whose turn the core reports. Delete or replace when the clock lands.
-var _white_seconds := 600
-var _black_seconds := 598
+# Time is explicitly out of v1. Keep the slot visible so the layout remains
+# stable, but never present locally fabricated seconds as game state.
+const MOCK_CLOCK_TEXT := "MOCK"
 var _selected_piece_square := ""
 var _selected_piece_type := ""
 var _selected_piece_side := ""
@@ -47,6 +44,8 @@ var _bridge: ChessCoreBridge
 ## this screen only borrows it: no resume, no save, no resign-on-leave
 ## beyond its own side.
 var _owns_bridge := true
+var _game_over_card: PanelContainer = null
+var _game_over_backdrop: Panel = null
 
 
 ## Marks a networked game. With a bridge the screen borrows the live
@@ -77,7 +76,6 @@ func _ready() -> void:
 	_header.menu_requested.connect(_open_game_menu)
 	_board_view_button.pressed.connect(_toggle_board_view_menu)
 	_board.square_pressed.connect(_on_square_pressed)
-	_clock_timer.timeout.connect(_on_clock_tick)
 	_header.set_peer_context(_is_multiplayer)
 	_update_clock_strip()
 	_camera.target = CAMERA_TARGET
@@ -94,46 +92,20 @@ func _ready() -> void:
 			_reveal_network_board()
 
 
-func _on_clock_tick() -> void:
-	if _active_clock_side == "white":
-		_white_seconds = maxi(0, _white_seconds - 1)
-		if _white_seconds == 0:
-			_clock_timer.stop()
-	else:
-		_black_seconds = maxi(0, _black_seconds - 1)
-		if _black_seconds == 0:
-			_clock_timer.stop()
-	_update_clock_strip()
-
-
 func _update_clock_strip() -> void:
 	var local_side := _bridge.my_side() if _bridge != null else _ai_side.to_lower()
 	var local_is_black := local_side == "black"
-	var player_seconds := _black_seconds if local_is_black else _white_seconds
-	var opponent_seconds := _white_seconds if local_is_black else _black_seconds
 	var local_active := "black" if local_is_black else "white"
-	_opponent_clock.text = "%s  %s" % [_opponent_name.to_upper(), _format_clock(opponent_seconds)]
-	_player_clock.text = "%s  YOU" % _format_clock(player_seconds)
+	_opponent_clock.text = "%s  %s" % [_opponent_name.to_upper(), MOCK_CLOCK_TEXT]
+	_player_clock.text = "%s  YOU" % MOCK_CLOCK_TEXT
 	var active_color := Color(1.0, 0.94, 0.82, 1.0)
 	var idle_color := Color(0.72, 0.66, 0.58, 1.0)
-	var warning_color := Color(1.0, 0.45, 0.28, 1.0)
-	var opponent_color := warning_color if opponent_seconds <= 60 \
-		else active_color if _active_clock_side != local_active else idle_color
-	var player_color := warning_color if player_seconds <= 60 \
-		else active_color if _active_clock_side == local_active else idle_color
+	var opponent_color := active_color if _active_clock_side != local_active else idle_color
+	var player_color := active_color if _active_clock_side == local_active else idle_color
 	_opponent_clock.add_theme_color_override(
 		"font_color", opponent_color)
 	_player_clock.add_theme_color_override(
 		"font_color", player_color)
-
-
-## Whole minutes and seconds.
-##
-## `floori` rather than `/`: integer division silently truncates, which is right
-## for a clock by accident and wrong the moment the value is negative or
-## fractional. See `game_screen.gd` integer division in the quality gates doc.
-func _format_clock(seconds: int) -> String:
-	return "%02d:%02d" % [floori(seconds / 60.0), seconds % 60]
 
 
 ## SPIKE-ONLY: the core behind this bridge plays both sides from committed
@@ -186,11 +158,15 @@ func _connect_bridge_signals() -> void:
 	_bridge.network_error.connect(_on_net_error)
 	_bridge.network_reconnecting.connect(_on_net_reconnecting)
 	_bridge.peer_disconnected.connect(_on_peer_disconnected)
+	_bridge.peer_left.connect(_on_peer_left)
 	_bridge.peer_loaded.connect(_on_peer_loaded)
 	_header.bind_net_bridge(_bridge)
 
 
 func _on_core_game_started() -> void:
+	_close_game_over_card()
+	if _is_multiplayer and not _bridge.session_finished():
+		_finished = false
 	_sync_board_perspective()
 	_rebuild_position()
 	_header.set_center_text("Game started · %s to move" % _bridge.turn().capitalize())
@@ -216,7 +192,17 @@ func _sync_board_perspective() -> void:
 
 
 func _on_peer_disconnected() -> void:
+	_stop_game_interaction()
 	_header.set_center_text("Opponent disconnected")
+	_show_game_over_card("Connection lost", false)
+
+
+func _on_peer_left() -> void:
+	if _bridge.session_finished():
+		return
+	_stop_game_interaction()
+	_header.set_center_text("Opponent left the game")
+	_show_game_over_card("Opponent left", false)
 
 
 func _on_net_reconnecting() -> void:
@@ -235,7 +221,7 @@ func _abs(path: String) -> String:
 
 
 ## Position rendering: the board observes the core, never the reverse.
-## Every applied move rebuilds the piece set from the authoritative FEN,
+## Every applied move rebuilds the piece set from the typed Rust snapshot,
 ## so captures, promotions and castling need no special cases here.
 
 func _rebuild_position() -> void:
@@ -257,26 +243,9 @@ func _rebuild_position() -> void:
 		child.queue_free()
 	if not _bridge.is_available():
 		return
-	_build_position_from_fen(pieces_root, _bridge.fen())
-
-
-func _build_position_from_fen(pieces_root: Node3D, fen: String) -> void:
-	var placement := fen.split(" ")[0]
-	var rank := 8
-	var file := 0
-	for index in range(placement.length()):
-		var token := placement.substr(index, 1)
-		if token == "/":
-			rank -= 1
-			file = 0
-		elif token.is_valid_int():
-			file += token.to_int()
-		elif FEN_PIECE_TYPES.has(token.to_lower()):
-			var square := "%s%d" % [char("a".unicode_at(0) + file), rank]
-			var side := "white" if token == token.to_upper() else "black"
-			_add_piece(pieces_root, str(FEN_PIECE_TYPES[token.to_lower()]), side, square)
-			file += 1
-
+	for item: Dictionary in _bridge.position_pieces():
+		_add_piece(pieces_root, str(item.get("role", "")),
+			str(item.get("side", "")), str(item.get("square", "")))
 
 func _add_piece(parent: Node3D, piece_type: String, side: String, square: String) -> void:
 	var piece := PIECE_VIEW_SCENE.instantiate() as ChessPieceView
@@ -357,7 +326,7 @@ func _update_camera_framing(width: float = -1.0, height: float = -1.0) -> void:
 
 
 func _on_square_pressed(square: String) -> void:
-	if not _bridge.is_available():
+	if _finished or not _bridge.is_available():
 		return
 	if (_is_multiplayer or _is_ai) and _bridge.turn() != _bridge.my_side():
 		_header.set_center_text("Waiting for opponent")
@@ -373,7 +342,7 @@ func _on_square_pressed(square: String) -> void:
 			return
 		_header.set_center_text("Illegal move")
 		return
-	var occupied_side := str(_position_sides(_bridge.fen().split(" ")[0]).get(square, ""))
+	var occupied_side := str(_observed_position_sides().get(square, ""))
 	var local_side := _bridge.my_side().to_lower()
 	if (_is_multiplayer or _is_ai) and not occupied_side.is_empty() and occupied_side != local_side:
 		_header.set_center_text("Waiting for opponent")
@@ -442,11 +411,10 @@ func _capture_squares(from_square: String, targets: Array[String]) -> Array[Stri
 	var captures: Array[String] = []
 	if _bridge == null:
 		return captures
-	var fen := _bridge.fen()
-	var fields := fen.split(" ")
+	var fields := _bridge.fen().split(" ")
 	if fields.size() < 4:
 		return captures
-	var occupants := _position_sides(fields[0])
+	var occupants := _observed_position_sides()
 	var mover_side := str(occupants.get(from_square, ""))
 	for target in targets:
 		if target == fields[3] or str(occupants.get(target, "")) != "" and str(occupants.get(target, "")) != mover_side:
@@ -467,22 +435,11 @@ func _castle_squares(from_square: String, piece_type: String, targets: Array[Str
 	return castles
 
 
-## Maps board squares to "white"/"black" from a FEN placement field.
-func _position_sides(placement: String) -> Dictionary:
+## Maps observed occupied squares to their side. Rust owns piece decoding.
+func _observed_position_sides() -> Dictionary:
 	var occupants := {}
-	var rank := 8
-	var file := 0
-	for index in range(placement.length()):
-		var token := placement.substr(index, 1)
-		if token == "/":
-			rank -= 1
-			file = 0
-		elif token.is_valid_int():
-			file += token.to_int()
-		elif FEN_PIECE_TYPES.has(token.to_lower()):
-			var square := "%s%d" % [char("a".unicode_at(0) + file), rank]
-			occupants[square] = "white" if token == token.to_upper() else "black"
-			file += 1
+	for item: Dictionary in _bridge.position_pieces():
+		occupants[str(item.get("square", ""))] = str(item.get("side", ""))
 	return occupants
 
 
@@ -520,19 +477,174 @@ func _save_if_local() -> void:
 
 
 func _on_core_game_ended(reason: String) -> void:
+	_stop_game_interaction()
+	_save_if_local()
+	_header.set_center_text(_end_text(reason))
+	_show_game_over_card(reason)
+
+
+## Terminal network/game states share one interaction barrier. Keeping the
+## board visible preserves the last authoritative position, while every move
+## and promotion path is rejected until a later core game-start event proves
+## that a resumed session exists.
+func _stop_game_interaction() -> void:
 	_finished = true
 	_pending_promotion = ""
 	_picker.close()
-	_save_if_local()
 	_board.set_highlight("")
 	_board.set_legal_moves([])
 	_board.set_capture_moves([])
 	_board.set_castle_moves([])
 	_selected_piece_square = ""
+	_selected_piece_type = ""
+	_selected_piece_side = ""
 	_legal_targets.clear()
 	_capture_targets.clear()
 	_castle_targets.clear()
-	_header.set_center_text(_end_text(reason))
+
+
+func _show_game_over_card(reason: String, allow_rematch: bool = true) -> void:
+	_close_game_over_card()
+	_game_over_backdrop = Panel.new()
+	_game_over_backdrop.name = "GameOverBackdrop"
+	_game_over_backdrop.theme_type_variation = &"ModalBackdrop"
+	_game_over_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_game_over_backdrop.mouse_filter = Control.MOUSE_FILTER_STOP
+	_game_over_backdrop.gui_input.connect(func(event: InputEvent) -> void:
+		if HeaderMenu._is_dismiss_press(event):
+			_close_game_over_card())
+	$HUD/HUDRoot.add_child(_game_over_backdrop)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_game_over_backdrop.add_child(center)
+	_game_over_card = PanelContainer.new()
+	_game_over_card.name = "GameOverCard"
+	_game_over_card.custom_minimum_size = Vector2(360.0, 0.0)
+	_game_over_card.theme_type_variation = &"Card"
+	_game_over_card.mouse_filter = Control.MOUSE_FILTER_STOP
+	center.add_child(_game_over_card)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 12)
+	_game_over_card.add_child(content)
+	var title := Label.new()
+	title.text = _result_title(reason)
+	title.theme_type_variation = &"SetupHeadingText"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(title)
+	var subtitle := Label.new()
+	subtitle.text = _result_reason(reason)
+	subtitle.theme_type_variation = &"SetupStatusText"
+	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	content.add_child(subtitle)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 8)
+	content.add_child(actions)
+	if _is_ai:
+		var again := _terminal_button("Play again")
+		again.pressed.connect(_restart_local_game)
+		actions.add_child(again)
+	elif _is_multiplayer and allow_rematch:
+		var rematch := _terminal_button("Rematch")
+		rematch.pressed.connect(func() -> void:
+			rematch.disabled = true
+			rematch_requested.emit())
+		actions.add_child(rematch)
+	var review := _terminal_button("Review board", &"QuietButton")
+	review.pressed.connect(_close_game_over_card)
+	actions.add_child(review)
+	var leave := _terminal_button("Leave", &"QuietButton")
+	leave.pressed.connect(_confirm_leave)
+	actions.add_child(leave)
+
+
+func _terminal_button(label: String, variation: StringName = &"SetupActionButton") -> Button:
+	var button := Button.new()
+	button.text = label
+	button.custom_minimum_size = Vector2(112.0, 44.0)
+	button.theme_type_variation = variation
+	return button
+
+
+func _close_game_over_card() -> void:
+	if is_instance_valid(_game_over_backdrop):
+		_game_over_backdrop.queue_free()
+	_game_over_backdrop = null
+	_game_over_card = null
+
+
+func _restart_local_game() -> void:
+	if not _is_ai or _bridge == null:
+		return
+	_close_game_over_card()
+	_finished = false
+	_network_local_loaded = false
+	if not _bridge.start_ai(
+		_abs(IDENTITY_FILE), _abs(AI_SAVE_FILE), _ai_side, _ai_difficulty, true):
+		_finished = true
+		_header.set_center_text("Could not start a new game")
+		return
+	_board.visible = true
+	_header.set_center_text("Starting a new game…")
+
+
+func show_rematch_offer(rematch_id: int, peer: String) -> void:
+	var offer := ConfirmationDialog.new()
+	offer.theme_type_variation = &"ModalDialog"
+	offer.title = "Rematch"
+	offer.dialog_text = "%s wants to play again." % peer
+	offer.ok_button_text = "Accept"
+	offer.cancel_button_text = "Decline"
+	offer.confirmed.connect(func() -> void:
+		_bridge.respond_to_rematch(rematch_id, true)
+		offer.queue_free())
+	offer.canceled.connect(func() -> void:
+		_bridge.respond_to_rematch(rematch_id, false)
+		offer.queue_free())
+	add_child(offer)
+	offer.popup_centered(Vector2i(460, 220))
+
+
+func rematch_result_received(accepted: bool) -> void:
+	if not accepted:
+		_header.set_center_text("Rematch declined")
+		return
+	_close_game_over_card()
+	_header.set_center_text("Rematch accepted · setting up…")
+
+
+func _result_title(reason: String) -> String:
+	if reason == "Opponent left":
+		return "Opponent left"
+	if reason == "Connection lost":
+		return "Connection lost"
+	if "Checkmate" in reason:
+		return "Victory" if _player_won(reason) else "Defeat"
+	if "Draw" in reason:
+		return "Draw"
+	if "Resignation" in reason:
+		return "Victory" if _player_won(reason) else "Defeat"
+	return "Game over"
+
+
+func _result_reason(reason: String) -> String:
+	if reason == "Opponent left":
+		return "The game ended because your opponent left."
+	if reason == "Connection lost":
+		return "The connection could not be restored."
+	if "Checkmate" in reason:
+		return "by Checkmate · %s" % _end_text(reason)
+	if "Resignation" in reason:
+		return "by Resignation"
+	if "Draw agreed" in reason:
+		return "by Agreement"
+	return "by %s" % _end_text(reason).to_lower()
+
+
+func _player_won(reason: String) -> bool:
+	var side := _bridge.my_side().capitalize()
+	return side in reason
 
 
 ## Presentation wording for a finished session; the fact itself is Rust's.
@@ -594,7 +706,7 @@ func _on_core_draw_answered(by: String, accept: bool) -> void:
 
 
 func _on_promotion_chosen(piece: String) -> void:
-	if _pending_promotion.is_empty():
+	if _finished or _pending_promotion.is_empty():
 		return
 	var uci := _pending_promotion + PromotionPicker.suffix_for(piece)
 	_pending_promotion = ""
@@ -608,6 +720,11 @@ func _on_bridge_error(message: String) -> void:
 
 
 func _open_game_menu() -> void:
+	if _finished:
+		var terminal_actions := PackedStringArray(["Play again", "Review board", "Leave game"])
+		var terminal_callbacks: Array[Callable] = [_restart_local_game, _close_game_over_card, _confirm_leave]
+		HeaderMenu.toggle_in(self, terminal_actions, terminal_callbacks)
+		return
 	HeaderMenu.toggle_in(
 		self,
 		["Offer draw", "Leave game"],
@@ -616,6 +733,8 @@ func _open_game_menu() -> void:
 
 
 func _offer_draw() -> void:
+	if _finished:
+		return
 	if not _bridge.offer_draw():
 		return
 	if _is_multiplayer or _is_ai:

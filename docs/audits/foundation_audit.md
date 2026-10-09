@@ -4,6 +4,10 @@ An audit of what exists, before any new work. Written after reading every
 architecture doc, plan, handover, and source file in the repository, and after
 running both suites.
 
+This is a historical snapshot. The active status and closure evidence live in
+`docs/plans/implementation-closure-plan.md`; findings below may describe code
+that has since been changed.
+
 Authority for what "correct" means here is already in the repository:
 `docs/architecture/application_core.md`, `docs/standards/rust-standards.md`,
 `docs/plans/rust-core-plan.md`, and `godot/docs/HANDOVER.md`. This document
@@ -177,12 +181,12 @@ drawn in `application_core.md` in the first place.
 
 | What | Where | Who should own it |
 | --- | --- | --- |
-| Position → piece list | `game_screen.gd:115-140`, FEN parsed in GDScript | Rust's `chess_core` |
-| Piece identity table | `game_screen.gd:18`, `piece_view.gd:12` | Rust's `chess_core` |
+| Position → piece list | Rust bridge `position_pieces()` snapshot | Rust's `chess_core` |
+| Piece identity table | Rust role facts; Godot only maps visual scene names | Rust's `chess_core` |
 | Promotion suffix | `game_screen.gd:218-219` (`uci += "q"`) | Rust's `chess_core` |
 | Legal move list | mirrored into `_legal_targets` then re-shown | Rust's `chess_core` |
 | Move number | `_move_number`, incremented on `move_applied` | session's log length |
-| Clock state | `_white_seconds`, `_black_seconds`, `_on_clock_tick` | nobody — clock is out of v1 |
+| Clock state | static `MOCK` labels; no timer or seconds state | nobody — clock is out of v1 |
 | Whose turn | `_active_clock_side` shadowing the core's turn | Rust's `chess_core` |
 
 Specifics worth being precise about:

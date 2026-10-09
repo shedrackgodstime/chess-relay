@@ -39,6 +39,7 @@ func _run() -> void:
 	await _phase("draw_offer", _scenario_draw_offer)
 	await _phase("resign", _scenario_resign)
 	await _phase("resume", _scenario_resume)
+	await _phase("terminal_transport", _scenario_terminal_transport)
 	_report()
 
 
@@ -292,6 +293,9 @@ func _scenario_checkmate() -> void:
 	_check(game._header.center_text == "Checkmate · White wins",
 		"checkmate banners the result, got '%s'" % game._header.center_text)
 	_check(game._finished, "checkmate ends input")
+	_check(game._game_over_card != null, "checkmate opens the dedicated result card")
+	_check(game._game_over_card.get_child(0).get_child(2).get_child_count() == 2,
+		"result card offers review and leave actions for a local finished game")
 	var before := _fen(game)
 	game._on_square_pressed("e2")
 	_check(_fen(game) == before, "taps after mate change nothing")
@@ -384,4 +388,25 @@ func _scenario_resign() -> void:
 		or "resign" in game._header.center_text.to_lower(),
 		"resignation banners, got '%s'" % game._header.center_text)
 	game.queue_free()
+	_phase_reached_end = true
+
+
+func _scenario_terminal_transport() -> void:
+	var disconnected := await _new_game()
+	disconnected._on_peer_disconnected()
+	_check(disconnected._finished, "transport loss stops game input")
+	_check(disconnected._header.center_text == "Opponent disconnected",
+		"transport loss has a distinct presentation")
+	_check(disconnected._game_over_card != null,
+		"transport loss opens the connection-lost card")
+	disconnected.queue_free()
+
+	var left := await _new_game()
+	left._on_peer_left()
+	_check(left._finished, "authenticated leave stops game input")
+	_check(left._header.center_text == "Opponent left the game",
+		"authenticated leave has a distinct presentation")
+	_check(left._game_over_card != null,
+		"authenticated leave opens the opponent-left card")
+	left.queue_free()
 	_phase_reached_end = true

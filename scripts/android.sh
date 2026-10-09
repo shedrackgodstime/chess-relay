@@ -7,7 +7,7 @@
 set -eu
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GODOT="$ROOT/godot"
-APK=/tmp/opencode/chess-relay-spike.apk
+APK=/tmp/chess-relay/chess-relay-spike.apk
 PKG=org.chessrelay.spike
 ADB="${ADB:-/opt/android-sdk/platform-tools/adb}"
 export GODOT_ANDROID_KEYSTORE_DEBUG_PATH="${GODOT_ANDROID_KEYSTORE_DEBUG_PATH:-$HOME/.android/debug.keystore}"
@@ -18,6 +18,7 @@ export GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD=android
 "$ROOT/rust/build_android.sh" release
 
 # 2. Export.
+mkdir -p "$(dirname "$APK")"
 rm -f "$APK"
 godot --headless --path "$GODOT" --export-debug "Android-Spike" "$APK"
 test -s "$APK" || { echo "EXPORT FAIL: APK missing or empty"; exit 1; }

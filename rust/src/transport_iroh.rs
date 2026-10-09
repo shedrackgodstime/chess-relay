@@ -77,10 +77,12 @@ impl IrohEndpoint {
         *self.endpoint.id().as_bytes()
     }
 
-    /// Waits until the endpoint reaches its home relay. Best effort:
-    /// direct paths work without it.
-    pub async fn wait_online(&self) {
-        self.endpoint.online().await;
+    /// Waits until the endpoint reaches its home relay, bounded so startup
+    /// cannot hang forever when relay discovery is unavailable.
+    pub async fn wait_online(&self, timeout: std::time::Duration) -> bool {
+        tokio::time::timeout(timeout, self.endpoint.online())
+            .await
+            .is_ok()
     }
 
     /// Closes the endpoint.

@@ -99,9 +99,11 @@ async fn host(code: Option<String>) -> anyhow::Result<()> {
     connection
         .send(&Msg::LobbyHello {
             version: PROTOCOL_VERSION,
+            ticket: endpoint.ticket(),
         })
         .await?;
-    let Msg::LobbyHello { version } = recv(&mut connection, Duration::from_secs(60)).await? else {
+    let Msg::LobbyHello { version, .. } = recv(&mut connection, Duration::from_secs(60)).await?
+    else {
         anyhow::bail!("expected lobby greeting from guest");
     };
     assert_eq!(version, PROTOCOL_VERSION, "version gate");
@@ -166,9 +168,11 @@ async fn join(target: &str) -> anyhow::Result<()> {
     connection
         .send(&Msg::LobbyHello {
             version: PROTOCOL_VERSION,
+            ticket: endpoint.ticket(),
         })
         .await?;
-    let Msg::LobbyHello { version } = recv(&mut connection, Duration::from_secs(60)).await? else {
+    let Msg::LobbyHello { version, .. } = recv(&mut connection, Duration::from_secs(60)).await?
+    else {
         anyhow::bail!("expected lobby greeting from host");
     };
     assert_eq!(version, PROTOCOL_VERSION, "version gate");

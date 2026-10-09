@@ -18,8 +18,8 @@
 GODOT ?= godot
 ADB ?= $(shell command -v adb 2>/dev/null || echo /opt/android-sdk/platform-tools/adb)
 PKG := org.chessrelay.spike
-DEBUG_APK := /tmp/opencode/chess-relay-debug.apk
-RELEASE_APK := /tmp/opencode/chess-relay-release.apk
+DEBUG_APK := /tmp/chess-relay/chess-relay-debug.apk
+RELEASE_APK := /tmp/chess-relay/chess-relay-release.apk
 RUST_SRCS := $(shell find rust/src rust/Cargo.toml rust/Cargo.lock -type f 2>/dev/null)
 
 .PHONY: help run run-reset android android-reset android-release android-release-reset \
@@ -71,11 +71,13 @@ check:
 	GODOT_BIN=$(GODOT) bash godot/tests/run_all_checks.sh
 
 android: .build/android-debug.stamp
+	mkdir -p $(dir $(DEBUG_APK))
 	rm -f $(DEBUG_APK)
 	$(GODOT) --headless --path godot --export-debug "Android-Spike" "$(DEBUG_APK)"
 	$(MAKE) _launch APK=$(DEBUG_APK) RESET=$(RESET)
 
 android-release: .build/android-release.stamp
+	mkdir -p $(dir $(RELEASE_APK))
 	rm -f $(RELEASE_APK)
 	$(GODOT) --headless --path godot --export-release "Android-Release" "$(RELEASE_APK)"
 	$(MAKE) _launch APK=$(RELEASE_APK) RESET=$(RESET)
