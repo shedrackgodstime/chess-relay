@@ -1,0 +1,20 @@
+name: storage-quota-probe
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: runner alive
+        run: |
+          echo "runner alive: $(date -u)"
+          echo hello > probe.txt
+      - name: create a 1-byte artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quota-probe
+          path: probe.txt
+          retention-days: 1
